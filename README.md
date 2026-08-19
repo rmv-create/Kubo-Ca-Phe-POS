@@ -21,16 +21,19 @@ owner entering anything twice.
 Built in phases. See `docs/ARCHITECTURE.md` for the full design and
 `docs/DEVELOPMENT.md` for how to build, test and contribute.
 
-| Phase | Scope | State |
+| Delivery | Scope | State |
 |---|---|---|
 | 1 | Foundation: project, iOS/iPad target, SQLite, migrations, architecture, shell, settings, backup | **Done** |
-| 2 | Menu: categories, products, Small/Grande sizes and prices, customisations | Not started |
-| 3 | POS: customers, order building, cash/GCash, atomic order completion | Not started |
-| 4 | Customers and the "usual" order | Not started |
-| 5 | Ingredients, recipes, versioning, costing | Not started |
-| 6 | Inventory, purchases, suppliers, waste | Not started |
-| 7 | Refunds, voids, audit trail, daily closing | Not started |
-| 8 | Reporting and Excel exports | Not started |
+| 2 | Setup & Menu: categories, sizes, products, prices, customisation groups and options, per-product rules, defaults — all editable in the app | Next |
+| 3 | POS: customers, the usual order, order building, cash/GCash, atomic order completion | Not started |
+| 4 | Costing & Stock: ingredients, recipes and versions, cost history, inventory, purchases, suppliers, waste | Not started |
+| 5 | Controls & Reports: refunds, voids, audit trail, daily closing, reporting, Excel exports | Not started |
+
+Everything the business is — menu, prices, sizes, customisations, recipes, ingredients,
+costs, thresholds, suppliers — is **data, not code**. The owner sets all of it up in the
+app herself; no source change is needed to add a drink, change a price, or rewrite a
+recipe. `docs/Kubo Ca Phe - POS Setup.xlsx` is an optional worksheet for gathering that
+information away from the phone.
 
 ## Quick start
 
