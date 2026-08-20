@@ -61,8 +61,27 @@ The web build uses SQLite compiled to WebAssembly, stored in the browser. Same
 schema, same migrations, same seed, same engines. The only thing it cannot do
 is file backups, because a browser has no folder to write into.
 
-`.github/workflows/pages.yml` builds and publishes this automatically; switch
-it on under repository Settings → Pages → Source → GitHub Actions.
+### Publishing it for someone else to try
+
+`.github/workflows/pages.yml` builds and publishes the web version to GitHub
+Pages. Switch it on under repository **Settings → Pages → Source → GitHub
+Actions**, then push to a branch the workflow watches.
+
+Two things that catch people out:
+
+* **Pages needs a paid plan on a private repo.** On the free plan the
+  repository has to be public for the site to serve. Flipping it back to
+  private takes the site down again, which is the normal way to end a test.
+* **The workflow only offers a "Run workflow" button once it is on the default
+  branch.** Until then a push to one of the branches it watches is what starts
+  it.
+
+The published link opens in Safari on an iPhone or iPad, and **Share → Add to
+Home Screen** turns it into a full-screen app with the shop's mark as its
+icon. Each device keeps its own database in its own browser — nothing syncs
+between them, which is fine for trying the app out and is not how the real
+product works.
+
 
 ## Repository layout
 
