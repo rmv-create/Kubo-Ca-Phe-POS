@@ -14,15 +14,13 @@ class ManagementEntry {
     required this.description,
     required this.icon,
     required this.route,
-    required this.phase,
-    this.isReady = false,
+    this.isReady = true,
   });
 
   final String label;
   final String description;
   final IconData icon;
   final String route;
-  final String phase;
 
   /// True once the screen genuinely works, so the list never overstates what
   /// is finished.
@@ -35,94 +33,78 @@ const List<ManagementEntry> managementEntries = <ManagementEntry>[
     description: 'Every completed, refunded and voided order',
     icon: Icons.receipt_long_outlined,
     route: Routes.orders,
-    phase: 'Delivery 3',
   ),
   ManagementEntry(
     label: 'Customers',
     description: 'Profiles, history, usual orders and segments',
     icon: Icons.people_outline,
     route: Routes.customers,
-    phase: 'Delivery 4',
   ),
   ManagementEntry(
     label: 'Menu',
     description: 'Categories, products, sizes, prices, customisations',
     icon: Icons.local_cafe_outlined,
     route: Routes.menu,
-    phase: 'Delivery 2',
-    isReady: true,
   ),
   ManagementEntry(
     label: 'Recipes',
     description: 'Independent Small and Grande recipes, with versions',
     icon: Icons.science_outlined,
     route: Routes.recipes,
-    phase: 'Delivery 5',
   ),
   ManagementEntry(
     label: 'Ingredients',
     description: 'Units, costs, thresholds and suppliers',
     icon: Icons.grass_outlined,
     route: Routes.ingredients,
-    phase: 'Delivery 5',
   ),
   ManagementEntry(
     label: 'Inventory',
     description: 'Stock on hand, movements, counts and alerts',
     icon: Icons.inventory_2_outlined,
     route: Routes.inventory,
-    phase: 'Delivery 6',
   ),
   ManagementEntry(
     label: 'Waste',
     description: 'Record spills, spoilage and mistakes',
     icon: Icons.delete_outline,
     route: Routes.waste,
-    phase: 'Delivery 6',
   ),
   ManagementEntry(
     label: 'Suppliers',
     description: 'Who you buy from',
     icon: Icons.local_shipping_outlined,
     route: Routes.suppliers,
-    phase: 'Delivery 6',
   ),
   ManagementEntry(
     label: 'Purchases',
     description: 'Deliveries in, and what they cost',
     icon: Icons.shopping_basket_outlined,
     route: Routes.purchases,
-    phase: 'Delivery 6',
   ),
   ManagementEntry(
     label: 'Reports',
     description: 'Daily, monthly, profitability and Excel exports',
     icon: Icons.insights_outlined,
     route: Routes.reports,
-    phase: 'Delivery 8',
   ),
   ManagementEntry(
     label: 'Daily closing',
     description: 'Close the day and lock the numbers',
     icon: Icons.nightlight_outlined,
     route: Routes.closing,
-    phase: 'Delivery 7',
   ),
   ManagementEntry(
     label: 'Settings',
     description: 'Business name, trading day, costing method',
     icon: Icons.settings_outlined,
     route: Routes.settings,
-    phase: 'Delivery 1',
-    isReady: true,
   ),
   ManagementEntry(
     label: 'Backup',
     description: 'Create, verify and restore backups',
     icon: Icons.backup_outlined,
     route: Routes.backup,
-    phase: 'Delivery 1',
-    isReady: true,
   ),
 ];
 
@@ -176,30 +158,11 @@ class _EntryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     return ListTile(
       leading: Icon(entry.icon),
       title: Text(entry.label),
       subtitle: Text(entry.description),
-      trailing: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (!entry.isReady)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: KuboSpacing.sm,
-                vertical: 2,
-              ),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHigh,
-                borderRadius: BorderRadius.circular(KuboRadius.pill),
-              ),
-              child: Text(entry.phase, style: theme.textTheme.labelSmall),
-            ),
-          const SizedBox(width: KuboSpacing.sm),
-          const Icon(Icons.chevron_right),
-        ],
-      ),
+      trailing: const Icon(Icons.chevron_right),
       onTap: () => context.go(entry.route),
     );
   }

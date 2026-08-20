@@ -30,6 +30,12 @@ dependencies:
   # Hashing for order-pattern signatures and backup manifests
   crypto: ^3.0.6
 
+  # Excel exports. SQLite stays the database; .xlsx is only a report.
+  excel: ^4.0.6
+
+  # Sharing an export or a backup off the device.
+  share_plus: ^10.1.4
+
   # Small utilities
   collection: ^1.19.0
   meta: ^1.16.0

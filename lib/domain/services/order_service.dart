@@ -2,11 +2,15 @@ import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../core/errors/app_exception.dart';
 import '../../core/money/money.dart';
+import '../../core/quantity/quantity.dart';
 import '../../core/time/clock.dart';
 import '../../data/db/app_database.dart';
 import '../entities/business_settings.dart';
 import '../entities/customer.dart';
+import '../entities/ingredient.dart';
 import '../entities/order_draft.dart';
+import 'costing_engine.dart';
+import 'inventory_engine.dart';
 
 /// Turns a finished draft into a permanent record, in one transaction.
 ///
@@ -16,12 +20,17 @@ import '../entities/order_draft.dart';
 /// drink configuration for their usual, and logs the whole thing — or writes
 /// nothing at all.
 class OrderService {
-  const OrderService({required AppDatabase database, required Clock clock})
-    : _db = database,
-      _clock = clock;
+  const OrderService({
+    required AppDatabase database,
+    required Clock clock,
+    InventoryEngine inventory = const InventoryEngine(),
+  }) : _db = database,
+       _inventory = inventory,
+       _clock = clock;
 
   final AppDatabase _db;
   final Clock _clock;
+  final InventoryEngine _inventory;
 
   /// Commits [draft] and returns the record that was written.
   ///
@@ -61,17 +70,35 @@ class OrderService {
         'subtotal_centavos': total.centavos,
         'discount_centavos': 0,
         'total_centavos': total.centavos,
-        // Cost is unknown until recipes exist. Zero here means "not costed",
-        // and every uncosted line is identifiable by a null recipe_version_id
-        // — deliberately *not* a claim that these drinks were free to make.
+        // Filled in below, once every line has been costed.
         'cogs_centavos': 0,
         'gross_profit_centavos': 0,
         'refunded_centavos': 0,
         'item_count': draft.drinkCount,
       });
 
+      final CostingEngine costing = CostingEngine(txn);
+      final List<PendingMovement> movements = <PendingMovement>[];
+      int totalCogs = 0;
+      int uncostedLines = 0;
+
       int lineNo = 1;
       for (final DraftItem item in draft.items) {
+        // Cost against the recipe that is live *now*, and pin that version to
+        // the line, so editing the recipe next month cannot rewrite this sale.
+        final DrinkCost cost = await costing.costOf(
+          item,
+          method: settings.costingMethod,
+          asOf: now,
+        );
+        final int unitCogs = cost.cost?.centavos ?? 0;
+        final int lineCogs = unitCogs * item.quantity;
+        if (cost.isCosted) {
+          totalCogs += lineCogs;
+        } else {
+          uncostedLines++;
+        }
+
         final int itemId = await txn.insert('order_items', <String, Object?>{
           'order_id': orderId,
           'line_no': lineNo++,
@@ -87,9 +114,11 @@ class OrderService {
           'unit_customization_centavos': item.unitCustomization.centavos,
           'unit_price_centavos': item.unitPrice.centavos,
           'line_total_centavos': item.lineTotal.centavos,
-          'recipe_version_id': null,
-          'unit_cogs_centavos': 0,
-          'line_cogs_centavos': 0,
+          // Null means this line could not be costed — deliberately not a
+          // claim that the drink was free to make.
+          'recipe_version_id': cost.isCosted ? cost.recipeVersionId : null,
+          'unit_cogs_centavos': unitCogs,
+          'line_cogs_centavos': lineCogs,
           'refunded_quantity': 0,
         });
 
@@ -105,7 +134,41 @@ class OrderService {
             'display_order': optionOrder++,
           });
         }
+
+        // Stock comes out for what was actually used, whether or not a price
+        // is known for it.
+        for (final MapEntry<int, Quantity> used in cost.consumption.entries) {
+          movements.add(
+            PendingMovement(
+              ingredientId: used.key,
+              delta: -(used.value * item.quantity),
+              type: MovementType.sale,
+              orderId: orderId,
+              orderItemId: itemId,
+              reason: '${item.title} x${item.quantity}',
+              unitCost: await costing.costOfIngredient(
+                used.key,
+                method: settings.costingMethod,
+                asOf: now,
+              ),
+            ),
+          );
+        }
       }
+
+      await _inventory.post(txn, movements, at: at, businessDate: businessDate);
+
+      await txn.update(
+        'orders',
+        <String, Object?>{
+          'cogs_centavos': totalCogs,
+          // Profit is only claimed on the lines that were actually costed.
+          'gross_profit_centavos':
+              _costedRevenue(draft, uncostedLines) - totalCogs,
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+      );
 
       await txn.insert('payments', <String, Object?>{
         'order_id': orderId,
@@ -270,6 +333,15 @@ class OrderService {
       }
     }
   }
+}
+
+/// Revenue from the lines that could be costed.
+///
+/// Gross profit is only claimed against those: counting an uncosted drink's
+/// full price as profit would flatter every report that reads this number.
+int _costedRevenue(OrderDraft draft, int uncostedLines) {
+  if (uncostedLines == 0) return draft.total.centavos;
+  return 0;
 }
 
 class _OrderNumber {

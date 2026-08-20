@@ -1,18 +1,33 @@
+import 'dart:io';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/time/clock.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
+import '../data/export/excel_export_service.dart';
 import '../data/repositories/customer_repository_impl.dart';
+import '../data/repositories/inventory_repository_impl.dart';
 import '../data/repositories/menu_repository_impl.dart';
+import '../data/repositories/purchasing_repository_impl.dart';
+import '../data/repositories/recipe_repository_impl.dart';
 import '../data/repositories/settings_repository_impl.dart';
 import '../domain/entities/business_settings.dart';
 import '../domain/entities/customer.dart';
+import '../domain/entities/ingredient.dart';
 import '../domain/entities/menu.dart';
+import '../domain/entities/purchasing.dart';
+import '../domain/entities/recipe.dart';
+import '../domain/entities/reporting.dart';
 import '../domain/repositories/customer_repository.dart';
+import '../domain/repositories/inventory_repository.dart';
 import '../domain/repositories/menu_repository.dart';
+import '../domain/repositories/purchasing_repository.dart';
+import '../domain/repositories/recipe_repository.dart';
 import '../domain/repositories/settings_repository.dart';
 import '../domain/services/order_service.dart';
+import '../domain/services/reporting_service.dart';
+import '../domain/services/sales_service.dart';
 
 /// Infrastructure providers.
 ///
@@ -230,3 +245,172 @@ final FutureProviderFamily<UsualOrder?, int> usualOrderProvider =
       ref.watch(menuRevisionProvider);
       return ref.watch(customerRepositoryProvider).usualFor(customerId);
     });
+
+// ───────────────────── ingredients, recipes, stock ─────────────────────
+
+final Provider<InventoryRepository> inventoryRepositoryProvider =
+    Provider<InventoryRepository>(
+      (Ref ref) => InventoryRepositoryImpl(
+        ref.watch(databaseProvider),
+        ref.watch(clockProvider),
+        settings: () => ref.read(settingsControllerProvider),
+      ),
+    );
+
+final Provider<RecipeRepository> recipeRepositoryProvider =
+    Provider<RecipeRepository>(
+      (Ref ref) => RecipeRepositoryImpl(
+        ref.watch(databaseProvider),
+        ref.watch(clockProvider),
+        ref.watch(inventoryRepositoryProvider),
+      ),
+    );
+
+final Provider<PurchasingRepository> purchasingRepositoryProvider =
+    Provider<PurchasingRepository>(
+      (Ref ref) => PurchasingRepositoryImpl(
+        ref.watch(databaseProvider),
+        ref.watch(clockProvider),
+        settings: () => ref.read(settingsControllerProvider),
+      ),
+    );
+
+final Provider<SalesService> salesServiceProvider = Provider<SalesService>(
+  (Ref ref) => SalesService(
+    database: ref.watch(databaseProvider),
+    clock: ref.watch(clockProvider),
+    settings: () => ref.read(settingsControllerProvider),
+  ),
+);
+
+final Provider<ReportingService> reportingServiceProvider =
+    Provider<ReportingService>(
+      (Ref ref) => ReportingService(
+        database: ref.watch(databaseProvider),
+        clock: ref.watch(clockProvider),
+        settings: () => ref.read(settingsControllerProvider),
+      ),
+    );
+
+/// Bumped after anything that changes stock, cost or a recipe.
+final NotifierProvider<StockRevision, int> stockRevisionProvider =
+    NotifierProvider<StockRevision, int>(StockRevision.new);
+
+class StockRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+final FutureProvider<List<Ingredient>> ingredientsProvider =
+    FutureProvider<List<Ingredient>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      return ref.watch(inventoryRepositoryProvider).ingredients();
+    });
+
+final FutureProvider<List<Ingredient>> stockAlertsProvider =
+    FutureProvider<List<Ingredient>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      return ref.watch(inventoryRepositoryProvider).stockAlerts();
+    });
+
+final FutureProvider<List<InventoryMovement>> movementsProvider =
+    FutureProvider<List<InventoryMovement>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      return ref.watch(inventoryRepositoryProvider).movements();
+    });
+
+final FutureProvider<List<WasteEntry>> wasteProvider =
+    FutureProvider<List<WasteEntry>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      return ref.watch(inventoryRepositoryProvider).waste();
+    });
+
+final FutureProvider<List<Recipe>> recipesProvider =
+    FutureProvider<List<Recipe>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      ref.watch(menuRevisionProvider);
+      return ref.watch(recipeRepositoryProvider).recipes();
+    });
+
+final FutureProvider<List<Supplier>> suppliersProvider =
+    FutureProvider<List<Supplier>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      return ref.watch(purchasingRepositoryProvider).suppliers();
+    });
+
+final FutureProvider<List<Purchase>> purchasesProvider =
+    FutureProvider<List<Purchase>>((Ref ref) {
+      ref.watch(stockRevisionProvider);
+      return ref.watch(purchasingRepositoryProvider).purchases();
+    });
+
+// ─────────────────────────── sales and reports ───────────────────────────
+
+final FutureProviderFamily<List<OrderRecord>, String?> ordersProvider =
+    FutureProvider.family<List<OrderRecord>, String?>((Ref ref, String? day) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(salesServiceProvider).orders(businessDate: day);
+    });
+
+final FutureProviderFamily<SalesSummary, String> dailySummaryProvider =
+    FutureProvider.family<SalesSummary, String>((Ref ref, String day) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(stockRevisionProvider);
+      return ref.watch(reportingServiceProvider).forDay(day);
+    });
+
+final FutureProviderFamily<SalesSummary, String> monthlySummaryProvider =
+    FutureProvider.family<SalesSummary, String>((Ref ref, String month) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(stockRevisionProvider);
+      return ref.watch(reportingServiceProvider).forMonth(month);
+    });
+
+final FutureProviderFamily<List<ProductPerformance>, String>
+productPerformanceProvider =
+    FutureProvider.family<List<ProductPerformance>, String>((
+      Ref ref,
+      String month,
+    ) {
+      ref.watch(salesRevisionProvider);
+      return ref
+          .watch(reportingServiceProvider)
+          .productPerformance(month: month);
+    });
+
+final FutureProviderFamily<List<ProductPerformance>, String>
+mostProfitableProvider =
+    FutureProvider.family<List<ProductPerformance>, String>((
+      Ref ref,
+      String month,
+    ) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(reportingServiceProvider).mostProfitable(month: month);
+    });
+
+final FutureProviderFamily<DailyClosing?, String> closingProvider =
+    FutureProvider.family<DailyClosing?, String>((Ref ref, String day) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(reportingServiceProvider).closingFor(day);
+    });
+
+/// Where exports are written. Overridden at startup with the real Documents
+/// folder; tests point it at a temporary directory.
+final Provider<Directory> exportDirectoryProvider = Provider<Directory>(
+  (Ref ref) => throw UnimplementedError(
+    'exportDirectoryProvider must be overridden by bootstrapApp() or a test.',
+  ),
+);
+
+final Provider<ExcelExportService> excelExportProvider =
+    Provider<ExcelExportService>(
+      (Ref ref) => ExcelExportService(
+        directory: ref.watch(exportDirectoryProvider),
+        reporting: ref.watch(reportingServiceProvider),
+        inventory: ref.watch(inventoryRepositoryProvider),
+        purchasing: ref.watch(purchasingRepositoryProvider),
+        customers: ref.watch(customerRepositoryProvider),
+      ),
+    );

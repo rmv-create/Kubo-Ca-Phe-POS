@@ -22,12 +22,14 @@ class AppBootstrap {
     required this.backupService,
     required this.settings,
     required this.clock,
+    required this.exportDirectory,
   });
 
   final AppDatabase database;
   final BackupService backupService;
   final BusinessSettings settings;
   final Clock clock;
+  final Directory exportDirectory;
 
   /// Riverpod overrides that hand the running app its real infrastructure.
   /// Tests supply their own, pointing at an in-memory database.
@@ -52,6 +54,8 @@ Future<AppBootstrap> bootstrapApp({Clock clock = const SystemClock()}) async {
   // Backups live in Documents so the owner can pull them off the device with
   // the Files app — the iOS target enables file sharing for exactly this.
   final Directory backupDir = Directory(p.join(documentsDir.path, 'backups'));
+  // Exports sit beside the backups, in the folder the Files app can reach.
+  final Directory exportDir = Directory(p.join(documentsDir.path, 'exports'));
 
   late final AppDatabase database;
   late final BackupService backups;
@@ -97,6 +101,7 @@ Future<AppBootstrap> bootstrapApp({Clock clock = const SystemClock()}) async {
     backupService: backups,
     settings: settings,
     clock: clock,
+    exportDirectory: exportDir,
   );
 }
 

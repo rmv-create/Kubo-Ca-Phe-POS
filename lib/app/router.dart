@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/backup/presentation/backup_screen.dart';
+import '../features/customers/presentation/customers_screen.dart';
 import '../features/management/presentation/management_home_screen.dart';
-import '../features/management/presentation/management_section_screens.dart';
 import '../features/menu/presentation/categories_screen.dart';
 import '../features/menu/presentation/customisations_screen.dart';
 import '../features/menu/presentation/menu_hub_screen.dart';
@@ -11,7 +11,14 @@ import '../features/menu/presentation/product_editor_screen.dart';
 import '../features/menu/presentation/products_screen.dart';
 import '../features/menu/presentation/sizes_screen.dart';
 import '../features/pos/presentation/pos_screen.dart';
+import '../features/sales/presentation/closing_screen.dart';
+import '../features/sales/presentation/orders_screen.dart';
+import '../features/sales/presentation/reports_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
+import '../features/stock/presentation/ingredients_screen.dart';
+import '../features/stock/presentation/inventory_screen.dart';
+import '../features/stock/presentation/purchasing_screens.dart';
+import '../features/stock/presentation/recipes_screen.dart';
 import 'shell/app_shell.dart';
 
 abstract final class Routes {
