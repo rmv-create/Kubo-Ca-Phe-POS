@@ -75,6 +75,12 @@ Two things that catch people out:
 * **The workflow only offers a "Run workflow" button once it is on the default
   branch.** Until then a push to one of the branches it watches is what starts
   it.
+* **Enabling Pages locks deployment to the default branch.** GitHub creates a
+  `github-pages` environment whose branch policy allows only `main`, so a
+  deploy from any other branch is killed in about a second with no log at all
+  — the build succeeds and the publish step simply never runs. Fix it under
+  **Settings → Environments → github-pages → Deployment branches and tags**,
+  or merge to `main` first.
 
 The published link opens in Safari on an iPhone or iPad, and **Share → Add to
 Home Screen** turns it into a full-screen app with the shop's mark as its
