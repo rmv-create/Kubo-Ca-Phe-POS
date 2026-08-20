@@ -4,6 +4,12 @@ import 'package:go_router/go_router.dart';
 import '../features/backup/presentation/backup_screen.dart';
 import '../features/management/presentation/management_home_screen.dart';
 import '../features/management/presentation/management_section_screens.dart';
+import '../features/menu/presentation/categories_screen.dart';
+import '../features/menu/presentation/customisations_screen.dart';
+import '../features/menu/presentation/menu_hub_screen.dart';
+import '../features/menu/presentation/product_editor_screen.dart';
+import '../features/menu/presentation/products_screen.dart';
+import '../features/menu/presentation/sizes_screen.dart';
 import '../features/pos/presentation/pos_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import 'shell/app_shell.dart';
@@ -14,6 +20,10 @@ abstract final class Routes {
   static const String orders = '/manage/orders';
   static const String customers = '/manage/customers';
   static const String menu = '/manage/menu';
+  static const String menuProducts = '/manage/menu/drinks';
+  static const String menuCategories = '/manage/menu/categories';
+  static const String menuSizes = '/manage/menu/sizes';
+  static const String menuCustomisations = '/manage/menu/customisations';
   static const String recipes = '/manage/recipes';
   static const String ingredients = '/manage/ingredients';
   static const String inventory = '/manage/inventory';
@@ -64,7 +74,49 @@ GoRouter createRouter() => GoRouter(
               routes: <RouteBase>[
                 _section('orders', const OrdersScreen()),
                 _section('customers', const CustomersScreen()),
-                _section('menu', const MenuManagementScreen()),
+                GoRoute(
+                  path: 'menu',
+                  builder: (BuildContext context, GoRouterState state) =>
+                      const MenuHubScreen(),
+                  routes: <RouteBase>[
+                    GoRoute(
+                      path: 'drinks',
+                      builder: (BuildContext context, GoRouterState state) =>
+                          const ProductsScreen(),
+                      routes: <RouteBase>[
+                        GoRoute(
+                          path: ':id',
+                          builder:
+                              (BuildContext context, GoRouterState state) =>
+                                  ProductEditorScreen(
+                                    productId: int.parse(
+                                      state.pathParameters['id']!,
+                                    ),
+                                  ),
+                        ),
+                      ],
+                    ),
+                    _section('categories', const CategoriesScreen()),
+                    _section('sizes', const SizesScreen()),
+                    GoRoute(
+                      path: 'customisations',
+                      builder: (BuildContext context, GoRouterState state) =>
+                          const CustomisationsScreen(),
+                      routes: <RouteBase>[
+                        GoRoute(
+                          path: ':id',
+                          builder:
+                              (BuildContext context, GoRouterState state) =>
+                                  CustomizationGroupScreen(
+                                    groupId: int.parse(
+                                      state.pathParameters['id']!,
+                                    ),
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
                 _section('recipes', const RecipesScreen()),
                 _section('ingredients', const IngredientsScreen()),
                 _section('inventory', const InventoryScreen()),

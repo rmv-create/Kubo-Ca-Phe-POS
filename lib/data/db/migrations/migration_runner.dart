@@ -1,13 +1,17 @@
 import 'package:sqflite_common/sqlite_api.dart';
 
 import 'm001_initial_schema.dart';
+import 'm002_customisation_prompting.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
 ///
 /// Append only. Editing a released migration would leave existing installs on
 /// a different schema than fresh ones.
-const List<Migration> appMigrations = <Migration>[M001InitialSchema()];
+const List<Migration> appMigrations = <Migration>[
+  M001InitialSchema(),
+  M002CustomisationPrompting(),
+];
 
 /// The schema version a freshly built app expects.
 int get targetSchemaVersion => appMigrations

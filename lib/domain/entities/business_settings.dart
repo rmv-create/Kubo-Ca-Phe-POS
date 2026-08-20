@@ -37,6 +37,9 @@ class BusinessSettings {
     required this.autoBackupDaily,
     required this.discountsEnabled,
     required this.lowStockAlertsEnabled,
+    required this.orderNumberResetDaily,
+    required this.showCustomerName,
+    required this.pricesProvisional,
   });
 
   /// Values used before the owner has configured anything. The business name
@@ -53,6 +56,10 @@ class BusinessSettings {
     // V1 ships with discounts switched off; the POS shows no discount control.
     discountsEnabled: false,
     lowStockAlertsEnabled: true,
+    // The owner numbers orders K-0001 onwards, continuously.
+    orderNumberResetDaily: false,
+    showCustomerName: true,
+    pricesProvisional: false,
   );
 
   final String businessName;
@@ -70,6 +77,16 @@ class BusinessSettings {
   final bool discountsEnabled;
   final bool lowStockAlertsEnabled;
 
+  /// Whether order numbers start again at 1 each trading day.
+  final bool orderNumberResetDaily;
+
+  /// Whether the customer's name is shown on the order screen.
+  final bool showCustomerName;
+
+  /// Set while the seeded menu still carries the owner's tentative prices.
+  /// The app says so on screen rather than presenting guesses as final.
+  final bool pricesProvisional;
+
   BusinessSettings copyWith({
     String? businessName,
     int? businessDayCutoffHour,
@@ -79,6 +96,9 @@ class BusinessSettings {
     bool? autoBackupDaily,
     bool? discountsEnabled,
     bool? lowStockAlertsEnabled,
+    bool? orderNumberResetDaily,
+    bool? showCustomerName,
+    bool? pricesProvisional,
   }) => BusinessSettings(
     businessName: businessName ?? this.businessName,
     currencyCode: currencyCode,
@@ -90,6 +110,9 @@ class BusinessSettings {
     autoBackupDaily: autoBackupDaily ?? this.autoBackupDaily,
     discountsEnabled: discountsEnabled ?? this.discountsEnabled,
     lowStockAlertsEnabled: lowStockAlertsEnabled ?? this.lowStockAlertsEnabled,
+    orderNumberResetDaily: orderNumberResetDaily ?? this.orderNumberResetDaily,
+    showCustomerName: showCustomerName ?? this.showCustomerName,
+    pricesProvisional: pricesProvisional ?? this.pricesProvisional,
   );
 }
 
@@ -104,5 +127,8 @@ abstract final class SettingKeys {
   static const String lastAutoBackupDate = 'backup.last_auto_date';
   static const String discountsEnabled = 'features.discounts_enabled';
   static const String lowStockAlertsEnabled = 'features.low_stock_alerts';
-  static const String demoDataSeeded = 'data.demo_seeded';
+  static const String orderNumberResetDaily = 'orders.number_reset_daily';
+  static const String showCustomerName = 'pos.show_customer_name';
+  static const String pricesProvisional = 'menu.prices_provisional';
+  static const String menuSeeded = 'data.menu_seeded';
 }

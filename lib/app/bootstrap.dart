@@ -9,6 +9,7 @@ import '../core/time/clock.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
 import '../data/db/migrations/migration_runner.dart';
+import '../data/db/seed/menu_seeder.dart';
 import '../data/repositories/settings_repository_impl.dart';
 import '../domain/entities/backup_entry.dart';
 import '../domain/entities/business_settings.dart';
@@ -72,6 +73,11 @@ Future<AppBootstrap> bootstrapApp({Clock clock = const SystemClock()}) async {
       await backups.create(reason: BackupReason.preMigration);
     },
   );
+
+  // First launch only: writes the owner's menu from her setup worksheet.
+  // Refuses to run if any product already exists, so her later edits are never
+  // overwritten by a seed on a subsequent launch.
+  await MenuSeeder(database, clock).seedIfEmpty();
 
   final SettingsRepositoryImpl settingsRepository = SettingsRepositoryImpl(
     database,

@@ -16,53 +16,59 @@ abstract final class AppTheme {
 
     final ColorScheme scheme = ColorScheme(
       brightness: brightness,
-      primary: isDark ? KuboColors.crema : KuboColors.roast,
-      onPrimary: isDark ? KuboColors.espresso : KuboColors.condensedMilk,
-      primaryContainer: isDark ? KuboColors.roast : KuboColors.oatMilk,
-      onPrimaryContainer: isDark ? KuboColors.oatMilk : KuboColors.espresso,
-      secondary: KuboColors.turmeric,
-      onSecondary: KuboColors.espresso,
+      // Primary is the brush black of the logo: buttons that commit, and type.
+      primary: isDark ? KuboColors.darkInk : KuboColors.ink,
+      onPrimary: isDark ? KuboColors.darkPaper : KuboColors.paper,
+      primaryContainer: isDark
+          ? KuboColors.darkKraftSoft
+          : KuboColors.kraftSoft,
+      onPrimaryContainer: isDark ? KuboColors.darkInk : KuboColors.ink,
+      // Secondary is kraft — the menu card. It marks what is chosen and what
+      // carries the order, never a whole screen.
+      secondary: isDark ? KuboColors.darkKraft : KuboColors.kraft,
+      onSecondary: isDark ? KuboColors.darkInk : KuboColors.paper,
       secondaryContainer: isDark
-          ? const Color(0xFF4A3416)
-          : KuboColors.turmericSoft,
-      onSecondaryContainer: isDark ? KuboColors.oatMilk : KuboColors.espresso,
-      tertiary: KuboColors.pandan,
-      onTertiary: Colors.white,
+          ? KuboColors.darkKraftSoft
+          : KuboColors.kraftSoft,
+      onSecondaryContainer: isDark ? KuboColors.darkInk : KuboColors.ink,
+      tertiary: isDark ? KuboColors.darkKraftDeep : KuboColors.kraftDeep,
+      onTertiary: isDark ? KuboColors.darkInk : KuboColors.paper,
       tertiaryContainer: isDark
-          ? const Color(0xFF1F3D2D)
-          : KuboColors.pandanSoft,
-      onTertiaryContainer: isDark
-          ? KuboColors.pandanSoft
-          : const Color(0xFF16301F),
-      error: KuboColors.chili,
-      onError: Colors.white,
-      errorContainer: isDark ? const Color(0xFF4A1D17) : KuboColors.chiliSoft,
-      onErrorContainer: isDark ? KuboColors.chiliSoft : const Color(0xFF4A1D17),
-      surface: isDark ? KuboColors.darkSurface : KuboColors.condensedMilk,
+          ? KuboColors.darkKraftSoft
+          : KuboColors.kraftSoft,
+      onTertiaryContainer: isDark ? KuboColors.darkInk : KuboColors.ink,
+      // The seal red. Confirm this, or undo this — nothing else.
+      error: isDark ? KuboColors.darkSeal : KuboColors.seal,
+      onError: isDark ? KuboColors.darkPaper : Colors.white,
+      errorContainer: isDark ? KuboColors.darkSealSoft : KuboColors.sealSoft,
+      onErrorContainer: isDark ? KuboColors.darkSeal : KuboColors.seal,
+      surface: isDark ? KuboColors.darkPaper : KuboColors.paper,
       onSurface: isDark ? KuboColors.darkInk : KuboColors.ink,
-      surfaceContainerLowest: isDark ? const Color(0xFF150E09) : Colors.white,
+      surfaceContainerLowest: isDark
+          ? KuboColors.darkPaperSunk
+          : const Color(0xFFFFFDF9),
       surfaceContainerLow: isDark
-          ? const Color(0xFF1F150F)
-          : const Color(0xFFFDF9F3),
+          ? KuboColors.darkPaperRaised
+          : KuboColors.paperRaised,
       surfaceContainer: isDark
-          ? KuboColors.darkSurfaceRaised
-          : const Color(0xFFF7EFE4),
+          ? KuboColors.darkPaperRaised
+          : const Color(0xFFEBE0CE),
       surfaceContainerHigh: isDark
-          ? const Color(0xFF2E2018)
-          : KuboColors.oatMilk,
+          ? KuboColors.darkKraftSoft
+          : KuboColors.paperSunk,
       surfaceContainerHighest: isDark
-          ? const Color(0xFF3A281E)
-          : const Color(0xFFEADCC8),
+          ? KuboColors.darkKraftDeep
+          : KuboColors.kraftSoft,
       onSurfaceVariant: isDark ? KuboColors.darkInkMuted : KuboColors.inkMuted,
       outline: isDark ? KuboColors.darkHairline : KuboColors.hairline,
       outlineVariant: isDark
-          ? const Color(0xFF2F2118)
-          : const Color(0xFFF0E5D6),
+          ? KuboColors.darkHairlineSoft
+          : KuboColors.hairlineSoft,
       shadow: Colors.black,
       scrim: Colors.black,
-      inverseSurface: isDark ? KuboColors.oatMilk : KuboColors.espresso,
-      onInverseSurface: isDark ? KuboColors.espresso : KuboColors.condensedMilk,
-      inversePrimary: isDark ? KuboColors.roast : KuboColors.crema,
+      inverseSurface: isDark ? KuboColors.darkInk : KuboColors.ink,
+      onInverseSurface: isDark ? KuboColors.darkPaper : KuboColors.paper,
+      inversePrimary: isDark ? KuboColors.ink : KuboColors.kraftSoft,
     );
 
     final TextTheme text = _textTheme(scheme);

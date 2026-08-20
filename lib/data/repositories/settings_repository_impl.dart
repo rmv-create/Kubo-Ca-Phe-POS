@@ -42,6 +42,18 @@ class SettingsRepositoryImpl implements SettingsRepository {
         values[SettingKeys.lowStockAlertsEnabled],
         d.lowStockAlertsEnabled,
       ),
+      orderNumberResetDaily: _bool(
+        values[SettingKeys.orderNumberResetDaily],
+        d.orderNumberResetDaily,
+      ),
+      showCustomerName: _bool(
+        values[SettingKeys.showCustomerName],
+        d.showCustomerName,
+      ),
+      pricesProvisional: _bool(
+        values[SettingKeys.pricesProvisional],
+        d.pricesProvisional,
+      ),
     );
   }
 

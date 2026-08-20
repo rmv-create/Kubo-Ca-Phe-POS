@@ -64,28 +64,6 @@ class CustomersScreen extends StatelessWidget {
   );
 }
 
-class MenuManagementScreen extends StatelessWidget {
-  const MenuManagementScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) => const _SectionScaffold(
-    title: 'Menu',
-    body: PhasePlaceholder(
-      title: 'Categories, products and customisations',
-      phase: 'Phase 2',
-      summary:
-          'Set up the menu without touching code: categories, products, '
-          'Small and Grande prices, customisation groups and defaults.',
-      bullets: <String>[
-        'Small (12 oz) and Grande (16 oz) are configured independently',
-        'Customisation groups are reusable and assigned per product and size',
-        'Prices come from the owner — none are invented',
-      ],
-      icon: Icons.local_cafe_outlined,
-    ),
-  );
-}
-
 class RecipesScreen extends StatelessWidget {
   const RecipesScreen({super.key});
 

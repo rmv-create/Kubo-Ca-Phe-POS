@@ -1,5 +1,6 @@
 import 'package:kubo_pos/core/time/clock.dart';
 import 'package:kubo_pos/data/db/app_database.dart';
+import 'package:kubo_pos/data/db/seed/menu_seeder.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Opens a migrated, empty database in memory.
@@ -59,3 +60,11 @@ const Set<String> expectedTables = <String>{
   'daily_closings',
   'discounts',
 };
+
+/// Opens a test database and writes the owner's menu into it, exactly as the
+/// app does on first launch.
+Future<AppDatabase> openSeededDatabase({FixedClock? clock}) async {
+  final AppDatabase db = await openTestDatabase();
+  await MenuSeeder(db, clock ?? testClock()).seedIfEmpty();
+  return db;
+}
