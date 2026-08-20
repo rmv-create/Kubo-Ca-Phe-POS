@@ -1,12 +1,12 @@
 {
-    "name": "kubo_pos",
-    "short_name": "kubo_pos",
+    "name": "Kubo Cà Phê",
+    "short_name": "Kubo",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#EFE6D6",
+    "theme_color": "#EFE6D6",
+    "description": "Offline-first point of sale for Kubo Cà Phê.",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {

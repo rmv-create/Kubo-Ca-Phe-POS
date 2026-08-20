@@ -9,6 +9,7 @@ import '../../../app/theme/kubo_tokens.dart';
 import '../../../domain/entities/customer.dart';
 import '../../../domain/entities/menu.dart';
 import '../../../shared/widgets/async_view.dart';
+import '../../../shared/widgets/kubo_mark.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../state/cart_controller.dart';
 import 'customer_sheet.dart';
@@ -176,7 +177,6 @@ class _PosHeader extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ThemeData theme = Theme.of(context);
     final String businessName = ref
         .watch(settingsControllerProvider)
         .businessName;
@@ -191,15 +191,10 @@ class _PosHeader extends ConsumerWidget {
       ),
       child: Row(
         children: <Widget>[
-          Icon(Icons.coffee, color: theme.colorScheme.primary),
-          const SizedBox(width: KuboSpacing.sm),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(businessName, style: theme.textTheme.titleMedium),
-                Text('New order', style: theme.textTheme.bodySmall),
-              ],
+            child: KuboWordmark(
+              businessName: businessName,
+              subtitle: 'New order',
             ),
           ),
           if (compact)

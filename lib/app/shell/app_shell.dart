@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../shared/widgets/kubo_mark.dart';
 import '../responsive/form_factor.dart';
 import '../theme/kubo_tokens.dart';
 
@@ -89,7 +90,7 @@ class _Rail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: KuboSpacing.xl),
         child: Column(
           children: <Widget>[
-            Icon(Icons.coffee, color: theme.colorScheme.primary),
+            KuboMark(size: 15, color: theme.colorScheme.onSurface),
             const SizedBox(height: KuboSpacing.xs),
             Text('Kubo', style: theme.textTheme.labelSmall),
           ],
