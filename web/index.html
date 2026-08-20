@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Kubo Cà Phê — offline-first coffee shop POS">
+
+  <!-- Full screen when added to the iPad or iPhone home screen. -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Kubo Cà Phê">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  <title>Kubo Cà Phê</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* The paper the logo is printed on, so the first paint is not white. */
+    html, body { margin: 0; padding: 0; height: 100%; background: #EFE6D6; }
+  </style>
+</head>
+<body>
+  <script>
+    // Serve the renderer from this build rather than from Google's CDN.
+    // The whole point of the app is that it works without internet, and a
+    // renderer fetched at runtime would break that.
+    window.flutterConfiguration = { canvasKitBaseUrl: 'canvaskit/' };
+  </script>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>

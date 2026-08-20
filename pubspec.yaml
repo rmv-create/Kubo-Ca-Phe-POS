@@ -40,6 +40,7 @@ dependencies:
   collection: ^1.19.0
   meta: ^1.16.0
 
+  sqflite_common_ffi_web: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

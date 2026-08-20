@@ -389,7 +389,6 @@ class _ProductTile extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
     final ProductSize? defaultSize = product.defaultSize;
-    final bool multipleSizes = product.availableSizes.length > 1;
 
     return InkWell(
       borderRadius: BorderRadius.circular(KuboRadius.lg),
@@ -430,12 +429,17 @@ class _ProductTile extends ConsumerWidget {
                         ? ''
                         : '${defaultSize.size.name} ${defaultSize.size.volumeLabel}',
                     style: theme.textTheme.labelMedium,
+                    // One line, always: a wrapping label used to push the
+                    // price out of the tile.
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                // The price of the size named beside it — the one that is
+                // pre-selected when the tile is tapped. Showing the cheapest
+                // size's price under the default size's name reads as a lie.
                 Text(
-                  (multipleSizes ? product.lowestPrice : defaultSize?.price)
-                          ?.format() ??
-                      '',
+                  defaultSize?.price.format() ?? '',
                   style: theme.textTheme.titleMedium,
                 ),
               ],

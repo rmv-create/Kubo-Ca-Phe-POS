@@ -1,0 +1,65 @@
+# Publishes the app as a web build so it can be tried on a phone or iPad
+# without Xcode.
+#
+# This is for reviewing and commenting on the real app, not the production
+# target — iOS is. The web build runs the same Dart, the same schema and the
+# same engines, with SQLite compiled to WebAssembly and stored in the
+# browser instead of in a file. Backups are the one thing it cannot do,
+# because a browser has no folder to write into.
+#
+# To switch it on: repository Settings → Pages → Source → GitHub Actions.
+
+name: Web preview
+
+on:
+  push:
+    branches: ['claude/coffee-pos-architecture-2tfbhk', 'main']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Fetch the SQLite WebAssembly worker
+        run: dart run sqflite_common_ffi_web:setup
+
+      # --no-web-resources-cdn keeps the renderer in the build rather than
+      # fetching it from Google at runtime, so the page works offline once
+      # it has loaded.
+      - name: Build
+        run: |
+          flutter build web --release --no-web-resources-cdn \
+            --base-href "/${GITHUB_REPOSITORY#*/}/"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: build/web
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

@@ -72,3 +72,7 @@ app.*.map.json
 *.db-wal
 *.db-shm
 /backups/
+
+# Fetched by `dart run sqflite_common_ffi_web:setup`, not source.
+web/sqlite3.wasm
+web/sqflite_sw.js

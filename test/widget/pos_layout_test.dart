@@ -72,8 +72,15 @@ void main() {
       expect(find.text('SPECIALTY COFFEE'), findsOneWidget);
       expect(find.text('BLACK'), findsOneWidget);
       expect(find.text('SPANISH LATTE'), findsOneWidget);
-      // Grande 139, Small 129 — a drink with two prices shows the lower one.
-      expect(find.text('₱129.00'), findsWidgets);
+      // The tile shows the default size and *that size's* price, so the
+      // number always matches the size named beside it.
+      expect(find.textContaining('Grande 16 oz'), findsWidgets);
+      expect(find.text('₱139.00'), findsWidgets);
+      expect(
+        find.text('₱129.00'),
+        findsNothing,
+        reason: 'the Small price must not appear under a Grande label',
+      );
     });
 
     testWidgets('the payment block is pinned inside the thumb arc', (

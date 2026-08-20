@@ -40,6 +40,30 @@ flutter test
 CI (`.github/workflows/ci.yml`) runs exactly these on Linux, plus an unsigned
 iOS build on macOS — the one check a Linux machine cannot do itself.
 
+## Trying it without a Mac
+
+The production target is iOS, but the same code runs in a browser, which is
+the quickest way to click through it and leave comments.
+
+```bash
+flutter pub get
+dart run sqflite_common_ffi_web:setup      # once — fetches the SQLite wasm worker
+flutter build web --release --no-web-resources-cdn
+cd build/web && python3 -m http.server 8099
+# then open http://localhost:8099
+```
+
+`--no-web-resources-cdn` keeps the renderer inside the build. Without it
+Flutter fetches it from Google at run time, which would break the one promise
+the app makes — that it works without internet.
+
+The web build uses SQLite compiled to WebAssembly, stored in the browser. Same
+schema, same migrations, same seed, same engines. The only thing it cannot do
+is file backups, because a browser has no folder to write into.
+
+`.github/workflows/pages.yml` builds and publishes this automatically; switch
+it on under repository Settings → Pages → Source → GitHub Actions.
+
 ## Repository layout
 
 ```
