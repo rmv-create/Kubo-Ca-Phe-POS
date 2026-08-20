@@ -1,116 +1,187 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/responsive/form_factor.dart';
+import '../../../app/router.dart';
 import '../../../app/theme/kubo_tokens.dart';
-import '../../../core/money/money.dart';
-import '../../../shared/widgets/money_text.dart';
+import '../../../domain/entities/customer.dart';
+import '../../../domain/entities/menu.dart';
+import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../state/cart_controller.dart';
+import 'customer_sheet.dart';
+import 'order_pane.dart';
+import 'payment_block.dart';
+import 'product_config_sheet.dart';
 
-/// The POS frame.
-///
-/// Phase 1 establishes the layout, the zones and their proportions on both
-/// form factors. The menu grid arrives with Phase 2 and the working order flow
-/// with Phase 3; nothing on this screen writes to the database yet, and the
-/// controls that are not wired up are visibly disabled rather than fake.
+/// Which category is showing. Kept outside the widget so switching layouts —
+/// rotating an iPad — does not reset it.
+final NotifierProvider<SelectedCategory, int?> selectedCategoryProvider =
+    NotifierProvider<SelectedCategory, int?>(SelectedCategory.new);
+
+class SelectedCategory extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void select(int? id) => state = id;
+}
+
+/// The order screen. This is the app.
 class PosScreen extends ConsumerWidget {
   const PosScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final String businessName = ref
-        .watch(settingsControllerProvider)
-        .businessName;
+  Widget build(BuildContext context, WidgetRef ref) => ResponsiveBuilder(
+    compact: (BuildContext context) => const _CompactPos(),
+    medium: (BuildContext context) => const _WidePos(threePane: false),
+    expanded: (BuildContext context) => const _WidePos(threePane: true),
+  );
+}
 
-    return ResponsiveBuilder(
-      compact: (BuildContext context) =>
-          _CompactPos(businessName: businessName),
-      medium: (BuildContext context) =>
-          _WidePos(businessName: businessName, threePane: false),
-      expanded: (BuildContext context) =>
-          _WidePos(businessName: businessName, threePane: true),
+// ─────────────────────────────── iPhone ───────────────────────────────
+
+/// One column. The drink grid is the only thing that scrolls; the total and
+/// COMPLETE ORDER never move.
+class _CompactPos extends StatelessWidget {
+  const _CompactPos();
+
+  @override
+  Widget build(BuildContext context) => const SafeArea(
+    bottom: false,
+    child: Column(
+      children: <Widget>[
+        _PosHeader(),
+        _CustomerStrip(),
+        Expanded(child: _MenuPane()),
+        _BottomBar(),
+      ],
+    ),
+  );
+}
+
+// ─────────────────────────────── iPad ───────────────────────────────
+
+/// Landscape gets three panes, so a whole order happens without one sheet or
+/// navigation. Portrait drops the middle pane rather than squeezing three.
+class _WidePos extends ConsumerWidget {
+  const _WidePos({required this.threePane});
+
+  final bool threePane;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    return SafeArea(
+      child: Column(
+        children: <Widget>[
+          const _PosHeader(),
+          const Divider(height: 1),
+          Expanded(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Expanded(
+                  flex: threePane ? 4 : 6,
+                  child: const Column(
+                    children: <Widget>[
+                      _CustomerStrip(),
+                      Expanded(child: _MenuPane()),
+                    ],
+                  ),
+                ),
+                if (threePane) ...<Widget>[
+                  const VerticalDivider(width: 1),
+                  const Expanded(flex: 4, child: _ConfigurePane()),
+                ],
+                const VerticalDivider(width: 1),
+                SizedBox(
+                  width: 340,
+                  child: Container(
+                    color: theme.colorScheme.surfaceContainerLow,
+                    child: const Column(
+                      children: <Widget>[
+                        SectionHeader('Current order'),
+                        Expanded(child: OrderLines()),
+                        Divider(height: 1),
+                        Padding(
+                          padding: EdgeInsets.all(KuboSpacing.lg),
+                          child: PaymentBlock(showOrderButton: false),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ─────────────────────────── iPhone ───────────────────────────
-
-/// One column. The menu scrolls; the customer strip is pinned to the top and
-/// the order + payment block is pinned to the bottom, inside the thumb arc.
-class _CompactPos extends StatelessWidget {
-  const _CompactPos({required this.businessName});
-
-  final String businessName;
+/// iPad landscape only: the drink being configured, in place of a sheet.
+class _ConfigurePane extends ConsumerWidget {
+  const _ConfigurePane();
 
   @override
-  Widget build(BuildContext context) => SafeArea(
-    bottom: false,
-    child: Column(
-      children: <Widget>[
-        _PosHeader(businessName: businessName),
-        const _CustomerStrip(),
-        const Expanded(child: _MenuPane()),
-        const _OrderSummaryBar(),
-      ],
-    ),
-  );
-}
-
-// ─────────────────────────── iPad ───────────────────────────
-
-/// Landscape gets three panes so a whole order — pick, configure, review, pay —
-/// happens without a single navigation or modal. Portrait drops the middle
-/// pane, since there is not enough width for three comfortable columns.
-class _WidePos extends StatelessWidget {
-  const _WidePos({required this.businessName, required this.threePane});
-
-  final String businessName;
-  final bool threePane;
-
-  @override
-  Widget build(BuildContext context) => SafeArea(
-    child: Column(
-      children: <Widget>[
-        _PosHeader(businessName: businessName),
-        const Divider(height: 1),
-        Expanded(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Expanded(
-                flex: threePane ? 4 : 6,
-                child: const Column(
-                  children: <Widget>[
-                    _CustomerStrip(),
-                    Expanded(child: _MenuPane()),
-                  ],
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Product? product = ref.watch(_configuringProductProvider);
+    if (product == null) {
+      final ThemeData theme = Theme.of(context);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          const SectionHeader('Configure'),
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(KuboSpacing.xl),
+                child: Text(
+                  'Pick a drink to choose its size and options.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
-              if (threePane) ...<Widget>[
-                const VerticalDivider(width: 1),
-                const Expanded(flex: 4, child: _ConfigurationPane()),
-              ],
-              const VerticalDivider(width: 1),
-              const SizedBox(width: 340, child: _OrderPane()),
-            ],
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+        ],
+      );
+    }
+    return ProductConfigSheet(key: ValueKey<int>(product.id), product: product);
+  }
 }
 
-// ─────────────────────────── pieces ───────────────────────────
+/// The drink open in the iPad configuration pane.
+final NotifierProvider<ConfiguringProduct, Product?>
+_configuringProductProvider = NotifierProvider<ConfiguringProduct, Product?>(
+  ConfiguringProduct.new,
+);
 
-class _PosHeader extends StatelessWidget {
-  const _PosHeader({required this.businessName});
+class ConfiguringProduct extends Notifier<Product?> {
+  @override
+  Product? build() => null;
 
-  final String businessName;
+  void select(Product? product) => state = product;
+}
+
+// ─────────────────────────────── pieces ───────────────────────────────
+
+class _PosHeader extends ConsumerWidget {
+  const _PosHeader();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
+    final String businessName = ref
+        .watch(settingsControllerProvider)
+        .businessName;
+    final bool compact = context.formFactor.isCompact;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         KuboSpacing.lg,
@@ -131,204 +202,253 @@ class _PosHeader extends StatelessWidget {
               ],
             ),
           ),
+          if (compact)
+            IconButton(
+              icon: const Icon(Icons.tune),
+              tooltip: 'Management',
+              onPressed: () => context.go(Routes.manage),
+            ),
         ],
       ),
     );
   }
 }
 
-/// Customer is optional and always skippable — a sale is never blocked on it.
-class _CustomerStrip extends StatelessWidget {
+/// Optional, and always skippable.
+class _CustomerStrip extends ConsumerWidget {
   const _CustomerStrip();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final ThemeData theme = Theme.of(context);
-    return Container(
-      margin: const EdgeInsets.fromLTRB(
-        KuboSpacing.lg,
-        0,
-        KuboSpacing.lg,
-        KuboSpacing.md,
-      ),
-      padding: const EdgeInsets.all(KuboSpacing.md),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(KuboRadius.lg),
-        border: Border.all(color: theme.colorScheme.outline),
-      ),
-      child: Row(
-        children: <Widget>[
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: theme.colorScheme.surfaceContainerHighest,
-            child: Icon(
-              Icons.person_outline,
-              size: 20,
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(width: KuboSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text('Guest', style: theme.textTheme.titleSmall),
-                Text(
-                  'Search or add a customer',
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const _ComingSoonButton(
-            label: 'Search',
-            icon: Icons.search,
-            phase: 'Phase 3',
-          ),
-        ],
-      ),
-    );
-  }
-}
+    final Customer? customer = ref.watch(cartProvider).customer;
+    final bool showName = ref
+        .watch(settingsControllerProvider)
+        .showCustomerName;
 
-class _MenuPane extends StatelessWidget {
-  const _MenuPane();
-
-  /// Category names come from `product_categories` once Phase 2 seeds the
-  /// menu. They are shown here so the layout can be judged at real size.
-  static const List<String> _placeholderCategories = <String>[
-    'Classics',
-    'Specialty Coffee',
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        SizedBox(
-          height: KuboTouch.chip + KuboSpacing.md,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
-            itemCount: _placeholderCategories.length,
-            separatorBuilder: (_, __) => const SizedBox(width: KuboSpacing.sm),
-            itemBuilder: (BuildContext context, int index) => Center(
-              child: ChoiceChip(
-                label: Text(_placeholderCategories[index]),
-                selected: index == 0,
-                onSelected: null,
-              ),
-            ),
+    return InkWell(
+      onTap: () => CustomerSheet.show(context),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(
+          KuboSpacing.lg,
+          0,
+          KuboSpacing.lg,
+          KuboSpacing.md,
+        ),
+        padding: const EdgeInsets.all(KuboSpacing.md),
+        decoration: BoxDecoration(
+          color: customer == null
+              ? theme.colorScheme.surfaceContainer
+              : theme.colorScheme.secondaryContainer,
+          borderRadius: BorderRadius.circular(KuboRadius.lg),
+          border: Border.all(
+            color: customer == null
+                ? theme.colorScheme.outline
+                : theme.colorScheme.primary,
           ),
         ),
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(KuboSpacing.xl),
+        child: Row(
+          children: <Widget>[
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: theme.colorScheme.surfaceContainerHighest,
+              child: customer == null
+                  ? Icon(
+                      Icons.person_outline,
+                      size: 20,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    )
+                  : Text(customer.initials, style: theme.textTheme.labelMedium),
+            ),
+            const SizedBox(width: KuboSpacing.md),
+            Expanded(
               child: Column(
-                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Icon(
-                    Icons.local_cafe_outlined,
-                    size: 44,
-                    color: theme.colorScheme.outline,
-                  ),
-                  const SizedBox(height: KuboSpacing.md),
                   Text(
-                    'No products yet',
-                    style: theme.textTheme.titleMedium,
-                    textAlign: TextAlign.center,
+                    customer == null || !showName ? 'Guest' : customer.name,
+                    style: theme.textTheme.titleSmall,
                   ),
-                  const SizedBox(height: KuboSpacing.xs),
                   Text(
-                    'Products, sizes and prices are set up in Phase 2. '
-                    'Real prices and recipes come from the owner — nothing is '
-                    'invented here.',
+                    customer == null
+                        ? 'Search or add a customer'
+                        : '${customer.visitCount} '
+                              'visit${customer.visitCount == 1 ? '' : 's'} · '
+                              'tap to change',
                     style: theme.textTheme.bodySmall,
-                    textAlign: TextAlign.center,
                   ),
                 ],
               ),
             ),
-          ),
+            if (customer != null)
+              IconButton(
+                icon: const Icon(Icons.close),
+                tooltip: 'Continue as guest',
+                onPressed: () =>
+                    ref.read(cartProvider.notifier).setCustomer(null),
+              )
+            else
+              const Icon(Icons.search),
+          ],
         ),
-      ],
-    );
-  }
-}
-
-/// iPad-only middle pane: size and customisation live here instead of in a
-/// sheet, because there is room for them.
-class _ConfigurationPane extends StatelessWidget {
-  const _ConfigurationPane();
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        const SectionHeader('Configure'),
-        Expanded(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(KuboSpacing.xl),
-              child: Text(
-                'Pick a drink to choose its size and customisations.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// iPad-only right pane: the running order and payment, always visible.
-class _OrderPane extends StatelessWidget {
-  const _OrderPane();
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Container(
-      color: theme.colorScheme.surfaceContainerLow,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          const SectionHeader('Current order'),
-          Expanded(
-            child: Center(
-              child: Text(
-                'No items yet',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          ),
-          const Divider(height: 1),
-          const Padding(
-            padding: EdgeInsets.all(KuboSpacing.lg),
-            child: _PaymentBlock(),
-          ),
-        ],
       ),
     );
   }
 }
 
-/// iPhone-only bottom block: total, payment method, complete. Never scrolls
-/// away.
-class _OrderSummaryBar extends StatelessWidget {
-  const _OrderSummaryBar();
+class _MenuPane extends ConsumerWidget {
+  const _MenuPane();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<MenuSnapshot> menu = ref.watch(menuProvider);
+
+    return AsyncView<MenuSnapshot>(
+      value: menu,
+      onRetry: () => ref.invalidate(menuProvider),
+      builder: (BuildContext context, MenuSnapshot data) {
+        final List<ProductCategory> categories = data.sellableCategories;
+        if (categories.isEmpty) {
+          return EmptyState(
+            icon: Icons.local_cafe_outlined,
+            title: 'No drinks on the menu',
+            message: 'Add drinks and prices in Management → Menu.',
+            action: FilledButton(
+              onPressed: () => context.go(Routes.menu),
+              child: const Text('Open the menu'),
+            ),
+          );
+        }
+
+        final int? selected = ref.watch(selectedCategoryProvider);
+        final ProductCategory active = categories.firstWhere(
+          (ProductCategory c) => c.id == selected,
+          orElse: () => categories.first,
+        );
+        final List<Product> products = data.sellableIn(active.id);
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            SizedBox(
+              height: KuboTouch.chip + KuboSpacing.md,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
+                itemCount: categories.length,
+                separatorBuilder: (_, __) =>
+                    const SizedBox(width: KuboSpacing.sm),
+                itemBuilder: (BuildContext context, int index) {
+                  final ProductCategory category = categories[index];
+                  return Center(
+                    child: ChoiceChip(
+                      label: Text(category.name.toUpperCase()),
+                      selected: category.id == active.id,
+                      onSelected: (_) => ref
+                          .read(selectedCategoryProvider.notifier)
+                          .select(category.id),
+                    ),
+                  );
+                },
+              ),
+            ),
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(
+                  KuboSpacing.lg,
+                  0,
+                  KuboSpacing.lg,
+                  KuboSpacing.lg,
+                ),
+                gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
+                  maxCrossAxisExtent: 260,
+                  mainAxisSpacing: KuboSpacing.sm,
+                  crossAxisSpacing: KuboSpacing.sm,
+                  mainAxisExtent: context.formFactor.isCompact
+                      ? 108
+                      : KuboTouch.productTile,
+                ),
+                itemCount: products.length,
+                itemBuilder: (BuildContext context, int index) =>
+                    _ProductTile(product: products[index]),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ProductTile extends ConsumerWidget {
+  const _ProductTile({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    final ProductSize? defaultSize = product.defaultSize;
+    final bool multipleSizes = product.availableSizes.length > 1;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(KuboRadius.lg),
+      onTap: () {
+        // On iPad the configuration pane is already on screen, so opening a
+        // sheet over it would be a step backwards.
+        if (context.formFactor.isExpanded) {
+          ref.read(_configuringProductProvider.notifier).select(product);
+        } else {
+          ProductConfigSheet.show(context, product: product);
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.all(KuboSpacing.md),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(KuboRadius.lg),
+          border: Border.all(color: theme.colorScheme.outline, width: 1.5),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Expanded(
+              child: Text(
+                product.name.toUpperCase(),
+                style: theme.textTheme.titleSmall,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: KuboSpacing.xs),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    defaultSize == null
+                        ? ''
+                        : '${defaultSize.size.name} ${defaultSize.size.volumeLabel}',
+                    style: theme.textTheme.labelMedium,
+                  ),
+                ),
+                Text(
+                  (multipleSizes ? product.lowestPrice : defaultSize?.price)
+                          ?.format() ??
+                      '',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BottomBar extends StatelessWidget {
+  const _BottomBar();
 
   @override
   Widget build(BuildContext context) {
@@ -347,91 +467,9 @@ class _OrderSummaryBar extends StatelessWidget {
             KuboSpacing.lg,
             KuboSpacing.md,
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[_PaymentBlock()],
-          ),
+          child: PaymentBlock(),
         ),
       ),
     );
   }
-}
-
-class _PaymentBlock extends StatelessWidget {
-  const _PaymentBlock();
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: Text(
-                'No items',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-            const MoneyText(Money.zero, emphasised: true),
-          ],
-        ),
-        const SizedBox(height: KuboSpacing.md),
-        Row(
-          children: <Widget>[
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.payments_outlined),
-                label: const Text('Cash'),
-              ),
-            ),
-            const SizedBox(width: KuboSpacing.sm),
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: null,
-                icon: const Icon(Icons.smartphone_outlined),
-                label: const Text('GCash'),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: KuboSpacing.sm),
-        const SizedBox(
-          height: KuboTouch.primaryAction,
-          child: FilledButton(onPressed: null, child: Text('COMPLETE ORDER')),
-        ),
-      ],
-    );
-  }
-}
-
-class _ComingSoonButton extends StatelessWidget {
-  const _ComingSoonButton({
-    required this.label,
-    required this.icon,
-    required this.phase,
-  });
-
-  final String label;
-  final IconData icon;
-  final String phase;
-
-  @override
-  Widget build(BuildContext context) => Tooltip(
-    message: 'Arrives in $phase',
-    child: OutlinedButton.icon(
-      onPressed: null,
-      icon: Icon(icon, size: 18),
-      label: Text(label),
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size(0, KuboTouch.minTarget),
-        padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.md),
-      ),
-    ),
-  );
 }

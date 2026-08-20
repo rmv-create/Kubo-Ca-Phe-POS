@@ -25,8 +25,8 @@ Built in phases. See `docs/ARCHITECTURE.md` for the full design and
 |---|---|---|
 | 1 | Foundation: project, iOS/iPad target, SQLite, migrations, architecture, shell, settings, backup | **Done** |
 | 2 | Setup & Menu: categories, sizes, products, prices, customisation groups and options, per-product rules, defaults — all editable in the app | **Done** |
-| 3 | POS: customers, the usual order, order building, cash/GCash, atomic order completion | Next |
-| 4 | Costing & Stock: ingredients, recipes and versions, cost history, inventory, purchases, suppliers, waste | Not started |
+| 3 | POS: customers, the usual order, order building, cash/GCash, atomic order completion | **Done** |
+| 4 | Costing & Stock: ingredients, recipes and versions, cost history, inventory, purchases, suppliers, waste | Next |
 | 5 | Controls & Reports: refunds, voids, audit trail, daily closing, reporting, Excel exports | Not started |
 
 Everything the business is — menu, prices, sizes, customisations, recipes, ingredients,

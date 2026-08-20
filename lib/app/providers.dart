@@ -3,12 +3,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/time/clock.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
+import '../data/repositories/customer_repository_impl.dart';
 import '../data/repositories/menu_repository_impl.dart';
 import '../data/repositories/settings_repository_impl.dart';
 import '../domain/entities/business_settings.dart';
+import '../domain/entities/customer.dart';
 import '../domain/entities/menu.dart';
+import '../domain/repositories/customer_repository.dart';
 import '../domain/repositories/menu_repository.dart';
 import '../domain/repositories/settings_repository.dart';
+import '../domain/services/order_service.dart';
 
 /// Infrastructure providers.
 ///
@@ -184,3 +188,45 @@ class ProductEditorData {
     return null;
   }
 }
+
+// ───────────────────────── customers and orders ─────────────────────────
+
+final Provider<CustomerRepository> customerRepositoryProvider =
+    Provider<CustomerRepository>(
+      (Ref ref) => CustomerRepositoryImpl(
+        ref.watch(databaseProvider),
+        ref.watch(clockProvider),
+      ),
+    );
+
+final Provider<OrderService> orderServiceProvider = Provider<OrderService>(
+  (Ref ref) => OrderService(
+    database: ref.watch(databaseProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+/// Bumped after every completed order, so customer lists and usuals refresh.
+final NotifierProvider<SalesRevision, int> salesRevisionProvider =
+    NotifierProvider<SalesRevision, int>(SalesRevision.new);
+
+class SalesRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+/// Customer search. An empty query returns recent visitors.
+final FutureProviderFamily<List<Customer>, String> customerSearchProvider =
+    FutureProvider.family<List<Customer>, String>((Ref ref, String query) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(customerRepositoryProvider).search(query);
+    });
+
+final FutureProviderFamily<UsualOrder?, int> usualOrderProvider =
+    FutureProvider.family<UsualOrder?, int>((Ref ref, int customerId) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(menuRevisionProvider);
+      return ref.watch(customerRepositoryProvider).usualFor(customerId);
+    });
