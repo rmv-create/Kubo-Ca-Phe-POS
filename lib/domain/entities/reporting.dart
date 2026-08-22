@@ -31,7 +31,6 @@ class OrderRecord {
     this.discountBeneficiaryIdNo,
     this.customerId,
     this.customerName,
-    this.customerMobile,
     this.paymentMethod,
     this.paymentReference,
     this.tendered,
@@ -80,7 +79,6 @@ class OrderRecord {
 
   final int? customerId;
   final String? customerName;
-  final String? customerMobile;
   final PaymentMethod? paymentMethod;
   final String? paymentReference;
   final Money? tendered;

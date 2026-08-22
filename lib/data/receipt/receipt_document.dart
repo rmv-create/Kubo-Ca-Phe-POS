@@ -131,11 +131,12 @@ class ReceiptDocument {
       children: <pw.Widget>[
         _centred(order.orderNo, size: 12, bold: true),
         _centred(_formatDateTime(local), size: 8),
+        // The name, and only the name. A mobile number printed on a slip of
+        // paper that gets left on a table is the customer's, not the shop's,
+        // to hand around.
         if (order.customerName != null) ...<pw.Widget>[
           pw.SizedBox(height: 4),
           _centred(order.customerName!, size: 9),
-          if (order.customerMobile != null)
-            _centred(order.customerMobile!, size: 8),
         ],
       ],
     );

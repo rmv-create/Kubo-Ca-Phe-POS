@@ -68,8 +68,6 @@ class SalesService {
                AS tendered_centavos,
              (SELECT change_centavos FROM payments WHERE order_id = o.id LIMIT 1)
                AS change_centavos,
-             (SELECT c.mobile FROM customers c WHERE c.id = o.customer_id)
-               AS customer_mobile,
              (SELECT reason FROM order_voids WHERE order_id = o.id LIMIT 1)
                AS void_reason,
              (SELECT COUNT(*) FROM order_items
@@ -104,8 +102,6 @@ class SalesService {
                AS tendered_centavos,
              (SELECT change_centavos FROM payments WHERE order_id = o.id LIMIT 1)
                AS change_centavos,
-             (SELECT c.mobile FROM customers c WHERE c.id = o.customer_id)
-               AS customer_mobile,
              (SELECT reason FROM order_voids WHERE order_id = o.id LIMIT 1)
                AS void_reason,
              (SELECT COUNT(*) FROM order_items
@@ -205,7 +201,6 @@ class SalesService {
       ),
       discountBeneficiaryName: discountRow?['beneficiary_name'] as String?,
       discountBeneficiaryIdNo: discountRow?['beneficiary_id_no'] as String?,
-      customerMobile: row['customer_mobile'] as String?,
       paymentReference: row['payment_reference'] as String?,
       tendered: row['tendered_centavos'] == null
           ? null
