@@ -29,6 +29,23 @@
   </style>
 </head>
 <body>
+  <!--
+    Receipt previews need pdf.js. The printing package will fetch it from a
+    CDN on demand, which breaks the one promise this app makes — that it works
+    without internet — so the library is served from this build instead, and
+    loaded here rather than left to the package: the package only injects it
+    when it is missing, and that injection was failing silently, leaving the
+    preview reading "Unable to display the document" with nothing in the
+    console. Loading it up front is one line and cannot half-happen.
+    See web/pdfjs/README.md.
+  -->
+  <script src="pdfjs/pdf.min.js"></script>
+  <script>
+    window.dartPdfJsBaseUrl = 'pdfjs/';
+    if (window.pdfjsLib) {
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.js';
+    }
+  </script>
   <script>
     // Serve the renderer from this build rather than from Google's CDN.
     // The whole point of the app is that it works without internet, and a
