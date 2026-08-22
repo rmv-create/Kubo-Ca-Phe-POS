@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
+import 'package:meta/meta.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -61,11 +62,19 @@ class ReceiptDocument {
           crossAxisAlignment: pw.CrossAxisAlignment.stretch,
           mainAxisSize: pw.MainAxisSize.min,
           children: <pw.Widget>[
+            // ── centred: who this is from, and which order ──
             _logo(),
             pw.SizedBox(height: 6),
-            _centred(settings.businessName, size: 13, bold: true),
+            ..._businessName(),
             pw.SizedBox(height: 10),
-            _header(),
+            _centred(order.orderNo, size: 12, bold: true),
+            _centred(_formatDateTime(order.createdAt.toLocal()), size: 8),
+
+            // ── left from here down: everything about the order ──
+            if (order.customerName != null) ...<pw.Widget>[
+              pw.SizedBox(height: 8),
+              _text('Customer Name: ${order.customerName}', size: 9),
+            ],
             _rule(),
             ..._items(),
             _rule(),
@@ -88,8 +97,7 @@ class ReceiptDocument {
                 ),
               ),
             ],
-            pw.SizedBox(height: 10),
-            _centred('Thank you', size: 9),
+            pw.SizedBox(height: 6),
           ],
         ),
       ),
@@ -124,22 +132,20 @@ class ReceiptDocument {
     ),
   );
 
-  pw.Widget _header() {
-    final DateTime local = order.createdAt.toLocal();
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: <pw.Widget>[
-        _centred(order.orderNo, size: 12, bold: true),
-        _centred(_formatDateTime(local), size: 8),
-        // The name, and only the name. A mobile number printed on a slip of
-        // paper that gets left on a table is the customer's, not the shop's,
-        // to hand around.
-        if (order.customerName != null) ...<pw.Widget>[
-          pw.SizedBox(height: 4),
-          _centred(order.customerName!, size: 9),
-        ],
-      ],
-    );
+  /// The shop's name, stacked the way the logo stacks it.
+  ///
+  /// "Kubo" over "Cà Phê", because that is how the mark above it reads. Any
+  /// other business name is left on one line rather than split at a space it
+  /// was never meant to break at.
+  List<pw.Widget> _businessName() {
+    const String kubo = 'Kubo Cà Phê';
+    if (settings.businessName.trim() != kubo) {
+      return <pw.Widget>[_centred(settings.businessName, size: 13, bold: true)];
+    }
+    return <pw.Widget>[
+      _centred('Kubo', size: 15, bold: true),
+      _centred('Cà Phê', size: 12, bold: true),
+    ];
   }
 
   /// The drinks, itemised.
@@ -184,12 +190,24 @@ class ReceiptDocument {
     ],
   ];
 
-  List<pw.Widget> _totals() => <pw.Widget>[
-    _amountRow('Subtotal', order.subtotal),
+  /// Subtotal, what came off, what went on, and what was owed.
+  ///
+  /// Only lines that happened are printed. A walk-in coffee has no discount
+  /// and no delivery, and a receipt that lists them at ₱0.00 is asking the
+  /// customer to read two lines that say nothing.
+  ///
+  /// Worked out as data rather than straight into widgets, so a test can
+  /// assert exactly which lines a given order produces. "Only if there is
+  /// one" is the sort of rule that quietly stops being true.
+  static List<ReceiptLine> totalLines(OrderRecord order) => <ReceiptLine>[
+    ReceiptLine('Subtotal', order.subtotal),
+    // Only ever present on a VAT-registered shop's exempt sale, where the
+    // figures would not otherwise add up — and where the BIR expects to see
+    // exempt sales stated.
     if (order.discountVatExempt.isPositive)
-      _amountRow('Less VAT (exempt sale)', -order.discountVatExempt),
+      ReceiptLine('Less VAT (exempt sale)', -order.discountVatExempt),
     if (order.hasDiscount)
-      _amountRow(
+      ReceiptLine(
         order.discountLabel == null
             ? 'Discount'
             : '${order.discountLabel} '
@@ -197,11 +215,45 @@ class ReceiptDocument {
         -order.discount,
       ),
     if (order.deliveryFee.isPositive)
-      _amountRow('Delivery fee', order.deliveryFee),
-    pw.SizedBox(height: 3),
-    _amountRow('TOTAL', order.total, bold: true, size: 12),
-    if (order.vat.isPositive)
-      _amountRow('VAT included (12%)', order.vat, size: 7),
+      ReceiptLine('Delivery fee', order.deliveryFee),
+    ReceiptLine('Total', order.total, emphasised: true),
+    if (order.vat.isPositive) ReceiptLine('VAT included (12%)', order.vat),
+  ];
+
+  /// How it was paid, and the one thing that follows from that.
+  ///
+  /// Cash has change; anything settled through a phone has a reference, and
+  /// only when one was actually typed in. Neither appears on the other.
+  static List<ReceiptLine> paymentLines(OrderRecord order) {
+    final PaymentMethod? method = order.paymentMethod;
+    final String? reference = order.paymentReference;
+    return <ReceiptLine>[
+      ReceiptLine('${method?.label ?? 'Paid'} payment', order.total),
+      if (order.tendered != null) ...<ReceiptLine>[
+        ReceiptLine('Received', order.tendered!),
+        ReceiptLine('Change', order.change ?? Money.zero),
+      ],
+      if (reference != null && reference.isNotEmpty)
+        ReceiptLine(
+          '${method?.label ?? 'Payment'} reference: $reference',
+          null,
+        ),
+    ];
+  }
+
+  List<pw.Widget> _totals() => <pw.Widget>[
+    for (final ReceiptLine line in totalLines(order))
+      if (line.emphasised) ...<pw.Widget>[
+        pw.SizedBox(height: 3),
+        _amountRow(line.label, line.amount!, bold: true, size: 12),
+      ] else
+        _amountRow(
+          line.label,
+          line.amount!,
+          size: line.label.startsWith('VAT') ? 7 : 9,
+        ),
+    // RA 9994 and RA 10754 make the shop record who claimed the discount, so
+    // the receipt carries it too.
     if (order.discountBeneficiaryName != null ||
         order.discountBeneficiaryIdNo != null) ...<pw.Widget>[
       pw.SizedBox(height: 4),
@@ -214,22 +266,20 @@ class ReceiptDocument {
     ],
   ];
 
-  pw.Widget _payment() {
-    final PaymentMethod? method = order.paymentMethod;
-    return pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      children: <pw.Widget>[
-        _amountRow(method?.label ?? 'Paid', order.total, size: 9),
-        if (order.tendered != null)
-          _amountRow('Cash received', order.tendered!, size: 8),
-        if (order.change != null && order.change!.isPositive)
-          _amountRow('Change', order.change!, size: 8),
-        if (order.paymentReference != null &&
-            order.paymentReference!.isNotEmpty)
-          _text('Ref ${order.paymentReference}', size: 7),
-      ],
-    );
-  }
+  pw.Widget _payment() => pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+    children: <pw.Widget>[
+      for (final ReceiptLine line in paymentLines(order))
+        if (line.amount == null)
+          _text(line.label, size: 8)
+        else
+          _amountRow(
+            line.label,
+            line.amount!,
+            size: line.label.endsWith('payment') ? 9 : 8,
+          ),
+    ],
+  );
 
   pw.Widget _amountRow(
     String label,
@@ -277,6 +327,23 @@ class ReceiptDocument {
           ),
         ),
       );
+}
+
+/// One printed line: a label, and an amount unless it is a note.
+@immutable
+class ReceiptLine {
+  const ReceiptLine(this.label, this.amount, {this.emphasised = false});
+
+  final String label;
+
+  /// Null for a line that is words only, like a payment reference.
+  final Money? amount;
+
+  /// The total. Printed larger, because it is the number people look for.
+  final bool emphasised;
+
+  @override
+  String toString() => amount == null ? label : '$label ${amount!.format()}';
 }
 
 /// Decodes the footer image the owner saved into settings.

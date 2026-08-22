@@ -160,6 +160,13 @@ class ManagementHomeScreen extends ConsumerWidget {
             ),
             child: Text(businessName, style: theme.textTheme.headlineSmall),
           ),
+          // Until somebody is set up, the app is wide open — anyone holding
+          // the phone sees the takings. That is the right default (locking the
+          // owner out before she has an account would be broken, not safe) but
+          // it should not be a secret, and the way to fix it should not be
+          // eleven rows down a list.
+          if (!(ref.watch(hasUsersProvider).valueOrNull ?? true))
+            const _SetUpSignInPrompt(),
           const SectionHeader('Sections'),
           for (final ManagementEntry entry in managementEntries)
             _EntryTile(entry: entry),
@@ -182,6 +189,71 @@ class _EntryTile extends StatelessWidget {
       subtitle: Text(entry.description),
       trailing: const Icon(Icons.chevron_right),
       onTap: () => context.go(entry.route),
+    );
+  }
+}
+
+/// Shown on the Management home while nobody has a PIN.
+class _SetUpSignInPrompt extends StatelessWidget {
+  const _SetUpSignInPrompt();
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        0,
+        KuboSpacing.lg,
+        KuboSpacing.md,
+      ),
+      child: Material(
+        color: theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(KuboRadius.lg),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => context.go(Routes.staff),
+          child: Padding(
+            padding: const EdgeInsets.all(KuboSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    const Icon(Icons.lock_open_outlined, size: 20),
+                    const SizedBox(width: KuboSpacing.sm),
+                    Text(
+                      'Nobody has a PIN yet',
+                      style: theme.textTheme.titleSmall,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: KuboSpacing.xs),
+                Text(
+                  'Anyone holding this device can see your orders, costs and '
+                  'takings. Add yourself as the owner, then add your barista — '
+                  'they will only see the POS.',
+                  style: theme.textTheme.bodySmall,
+                ),
+                const SizedBox(height: KuboSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: FilledButton(
+                    onPressed: () => context.go(Routes.staff),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, KuboTouch.chip),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: KuboSpacing.lg,
+                      ),
+                    ),
+                    child: const Text('SET UP SIGN-IN'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -229,6 +229,78 @@ void main() {
       expect(line.lineTotal, order.subtotal);
     });
 
+    test('a plain sale prints no discount and no delivery line', () async {
+      final OrderRecord order = await sellWith();
+
+      expect(
+        ReceiptDocument.totalLines(order).map((ReceiptLine l) => l.label),
+        <String>['Subtotal', 'Total'],
+        reason: 'zero lines are noise, not information',
+      );
+      expect(
+        ReceiptDocument.paymentLines(order).map((ReceiptLine l) => l.label),
+        <String>['Cash payment'],
+        reason: 'no cash was tendered, so there is no change to state',
+      );
+    });
+
+    test('a discounted delivery prints both, in order', () async {
+      final OrderRecord order = await sellWith(
+        discount: DiscountKind.senior,
+        delivery: Money.of(50),
+      );
+
+      expect(
+        ReceiptDocument.totalLines(order).map((ReceiptLine l) => l.label),
+        <String>['Subtotal', 'Senior Citizen (20%)', 'Delivery fee', 'Total'],
+      );
+      expect(ReceiptDocument.totalLines(order).last.amount, order.total);
+    });
+
+    test(
+      'cash shows change, and GCash shows a reference only if given',
+      () async {
+        final CompletedOrder cash = await shop.sell(
+          OrderDraft(
+            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            paymentMethod: PaymentMethod.cash,
+            tendered: Money.of(200),
+          ),
+        );
+        final CompletedOrder gcashPlain = await shop.sell(
+          OrderDraft(
+            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            paymentMethod: PaymentMethod.gcash,
+            paymentConfirmed: true,
+          ),
+        );
+        final CompletedOrder gcashRef = await shop.sell(
+          OrderDraft(
+            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            paymentMethod: PaymentMethod.gcash,
+            paymentConfirmed: true,
+            paymentReference: 'ABC123',
+          ),
+        );
+
+        Future<List<String>> labels(int id) async =>
+            ReceiptDocument.paymentLines(
+              (await shop.sales.orderById(id))!,
+            ).map((ReceiptLine l) => l.label).toList();
+
+        expect(await labels(cash.id), <String>[
+          'Cash payment',
+          'Received',
+          'Change',
+        ]);
+        expect(await labels(gcashPlain.id), <String>['GCash payment']);
+        expect(await labels(gcashRef.id), <String>[
+          'GCash payment',
+          'GCash reference: ABC123',
+        ]);
+      },
+    );
+
     test('the peso sign is really printed, not a box', () async {
       // The PDF standard fonts have no ₱, so a receipt built on them prints an
       // empty box beside every amount. The document must therefore embed a
