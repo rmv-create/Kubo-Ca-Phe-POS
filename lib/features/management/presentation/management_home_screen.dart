@@ -95,6 +95,24 @@ const List<ManagementEntry> managementEntries = <ManagementEntry>[
     route: Routes.closing,
   ),
   ManagementEntry(
+    label: 'Payment methods',
+    description: 'Add, rename or retire how the shop takes money',
+    icon: Icons.credit_card_outlined,
+    route: Routes.paymentMethods,
+  ),
+  ManagementEntry(
+    label: 'Receipt',
+    description: 'Footer picture, VAT registration, delivery fee',
+    icon: Icons.receipt_outlined,
+    route: Routes.receiptSettings,
+  ),
+  ManagementEntry(
+    label: 'Who can sign in',
+    description: 'You, your barista, and what each of you sees',
+    icon: Icons.badge_outlined,
+    route: Routes.staff,
+  ),
+  ManagementEntry(
     label: 'Settings',
     description: 'Business name, trading day, costing method',
     icon: Icons.settings_outlined,

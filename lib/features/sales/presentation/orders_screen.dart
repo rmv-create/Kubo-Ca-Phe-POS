@@ -9,6 +9,8 @@ import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../menu/state/menu_actions.dart';
+import '../../receipts/presentation/name_this_order_sheet.dart';
+import '../../receipts/presentation/receipt_screen.dart';
 
 /// Every sale, and the two ways to undo one.
 class OrdersScreen extends ConsumerStatefulWidget {
@@ -236,8 +238,41 @@ class OrderDetailScreen extends ConsumerWidget {
                 value: order.isCosted ? order.grossProfit.format() : '—',
               ),
               _Row(label: 'Paid by', value: order.paymentMethod?.label ?? '—'),
+              if (order.hasDiscount)
+                _Row(
+                  label: order.discountLabel ?? 'Discount',
+                  value: '−${order.discount.format()}',
+                ),
+              if (order.deliveryFee.isPositive)
+                _Row(label: 'Delivery', value: order.deliveryFee.format()),
               if (order.customerName != null)
                 _Row(label: 'Customer', value: order.customerName!),
+
+              const SectionHeader('Receipt'),
+              ListTile(
+                leading: const Icon(Icons.receipt_long_outlined),
+                title: const Text('Print or send the receipt'),
+                subtitle: const Text('PDF, JPEG, or straight to a printer'),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) =>
+                        ReceiptScreen(orderId: order.id),
+                  ),
+                ),
+              ),
+              if (order.customerName == null && !order.isVoided)
+                ListTile(
+                  leading: const Icon(Icons.person_add_alt),
+                  title: const Text('Put this under a customer'),
+                  subtitle: const Text(
+                    'For someone who decided afterwards that they want to be '
+                    'remembered. Their visit counts from when they bought it.',
+                  ),
+                  onTap: () async {
+                    await NameThisOrderSheet.show(context, order);
+                    if (context.mounted) Navigator.of(context).pop();
+                  },
+                ),
               if (!order.isVoided) ...<Widget>[
                 const SectionHeader('Put it right'),
                 ListTile(

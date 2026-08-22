@@ -79,29 +79,33 @@ class _DiscountSheetState extends ConsumerState<DiscountSheet> {
               ),
               const SizedBox(height: KuboSpacing.lg),
 
-              for (final DiscountKind kind in <DiscountKind>[
-                DiscountKind.senior,
-                DiscountKind.pwd,
-              ])
-                RadioListTile<DiscountKind?>(
-                  value: kind,
-                  groupValue: _kind,
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(kind.label),
-                  subtitle: Text(
-                    '${(settings.statutoryDiscountRateBp / 100).toStringAsFixed(0)}% '
-                    '${settings.vatRegistered ? 'and VAT-exempt' : 'off the menu price'}',
-                  ),
-                  onChanged: (DiscountKind? value) =>
-                      setState(() => _kind = value),
-                ),
-              RadioListTile<DiscountKind?>(
-                value: null,
+              RadioGroup<DiscountKind?>(
                 groupValue: _kind,
-                contentPadding: EdgeInsets.zero,
-                title: const Text('No discount'),
                 onChanged: (DiscountKind? value) =>
-                    setState(() => _kind = null),
+                    setState(() => _kind = value),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    for (final DiscountKind kind in <DiscountKind>[
+                      DiscountKind.senior,
+                      DiscountKind.pwd,
+                    ])
+                      RadioListTile<DiscountKind?>(
+                        value: kind,
+                        contentPadding: EdgeInsets.zero,
+                        title: Text(kind.label),
+                        subtitle: Text(
+                          '${(settings.statutoryDiscountRateBp / 100).toStringAsFixed(0)}% '
+                          '${settings.vatRegistered ? 'and VAT-exempt' : 'off the menu price'}',
+                        ),
+                      ),
+                    const RadioListTile<DiscountKind?>(
+                      value: null,
+                      contentPadding: EdgeInsets.zero,
+                      title: Text('No discount'),
+                    ),
+                  ],
+                ),
               ),
 
               if (_kind != null) ...<Widget>[

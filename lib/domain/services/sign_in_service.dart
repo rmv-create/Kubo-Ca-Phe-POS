@@ -147,7 +147,7 @@ class SignInService {
 
   Future<bool> _isLastOwner(int userId) async {
     final List<Map<String, Object?>> rows = await _db.db.rawQuery(
-      "SELECT COUNT(*) AS n FROM app_users "
+      'SELECT COUNT(*) AS n FROM app_users '
       "WHERE role = 'owner' AND is_active = 1 AND id != ?",
       <Object?>[userId],
     );

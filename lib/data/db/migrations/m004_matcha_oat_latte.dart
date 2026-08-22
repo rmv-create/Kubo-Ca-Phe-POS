@@ -71,7 +71,7 @@ class M004MatchaOatLatte extends Migration {
 
   Future<void> _rename(DatabaseExecutor db, int productId) async {
     await db.rawUpdate(
-      "UPDATE products SET name = ?, description = ?, "
+      'UPDATE products SET name = ?, description = ?, '
       "updated_at = datetime('now') WHERE id = ?",
       <Object?>[
         _newName,
