@@ -183,6 +183,27 @@ void main() {
       expect(order.discountBeneficiaryName, 'Lola Remedios');
     });
 
+    test('the peso sign is really printed, not a box', () async {
+      // The PDF standard fonts have no ₱, so a receipt built on them prints an
+      // empty box beside every amount. The document must therefore embed a
+      // TrueType font — this fails the moment someone drops the bundled one.
+      final OrderRecord order = await sellWith();
+      final bytes = await ReceiptDocument(
+        order: order,
+        settings: shop.settings,
+      ).build();
+      final String raw = String.fromCharCodes(bytes);
+
+      // `/FontFile2` is the embedded TrueType program itself — proof the
+      // receipt carries its own glyphs rather than borrowing the reader's.
+      expect(raw, contains('/FontFile2'));
+      expect(
+        raw,
+        isNot(contains('Helvetica')),
+        reason: 'Helvetica has no ₱ and would print a box',
+      );
+    });
+
     test('a receipt for a guest order builds too', () async {
       final OrderRecord order = await sellWith();
       final bytes = await ReceiptDocument(

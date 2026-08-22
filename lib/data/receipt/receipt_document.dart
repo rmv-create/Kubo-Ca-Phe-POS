@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:intl/intl.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -35,9 +36,18 @@ class ReceiptDocument {
   static const double _widthMm = 80;
 
   Future<Uint8List> build() async {
+    // The PDF standard fonts have no ₱ — every amount would print as an empty
+    // box. These are a subset of Work Sans carrying the peso sign and the
+    // Vietnamese vowels in "Cà Phê"; see assets/fonts/README.md.
+    final pw.ThemeData theme = pw.ThemeData.withFont(
+      base: await _font('assets/fonts/ReceiptSans-Regular.ttf'),
+      bold: await _font('assets/fonts/ReceiptSans-Bold.ttf'),
+    );
+
     final pw.Document doc = pw.Document(
       title: 'Receipt ${order.orderNo}',
       author: settings.businessName,
+      theme: theme,
     );
 
     doc.addPage(
@@ -87,6 +97,13 @@ class ReceiptDocument {
 
     return doc.save();
   }
+
+  /// Loads a bundled font. Cached, because a busy morning prints a lot of
+  /// receipts and the bytes never change.
+  static final Map<String, pw.Font> _fonts = <String, pw.Font>{};
+
+  static Future<pw.Font> _font(String asset) async =>
+      _fonts[asset] ??= pw.Font.ttf(await rootBundle.load(asset));
 
   /// The nipa hut, drawn from the same outline the app uses on screen.
   pw.Widget _logo() => pw.Center(

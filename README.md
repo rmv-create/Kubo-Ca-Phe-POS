@@ -28,6 +28,7 @@ Built in phases. See `docs/ARCHITECTURE.md` for the full design and
 | 3 | POS: customers, the usual order, order building, cash/GCash, atomic order completion | **Done** |
 | 4 | Costing & Stock: ingredients, recipes and versions, cost history, inventory, purchases, suppliers, waste | **Done** |
 | 5 | Controls & Reports: refunds, voids, audit trail, daily closing, reporting, Excel exports | **Done** |
+| 6 | Receipts, discounts and people: PDF/JPEG/print receipts, Senior Citizen and PWD discounts, owner-configurable payment methods, delivery fees, sign-in with owner and barista roles | **Done** |
 
 Everything the business is — menu, prices, sizes, customisations, recipes, ingredients,
 costs, thresholds, suppliers — is **data, not code**. The owner sets all of it up in the
