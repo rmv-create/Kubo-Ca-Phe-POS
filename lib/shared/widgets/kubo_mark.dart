@@ -1,34 +1,36 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
+
+import '../brand/kubo_roof_path.dart';
 
 /// The nipa hut roof from the Kubo Cà Phê logo.
 ///
-/// Two brush strokes that cross above the apex and sweep out and down, drawn
-/// rather than bundled as an image so it takes the ink colour of whatever
-/// surface it sits on and stays crisp at any size and any screen density.
+/// The outline is her own brush artwork, traced to vector (see
+/// [kuboRoofPathData]) rather than bundled as a bitmap: it takes the ink colour
+/// of whatever surface it sits on and stays sharp at any size and any screen
+/// density, from a 20pt header to a 1024px app icon.
 class KuboMark extends StatelessWidget {
   const KuboMark({this.size = 24, this.color, super.key});
 
-  /// Height of the mark. Its width is twice this — the roof is wide and low.
+  /// Height of the mark. Its width follows the logo's own proportions.
   final double size;
 
   /// Defaults to the surface's own ink colour.
   final Color? color;
 
+  /// Width the mark occupies at a given [size].
+  static double widthFor(double size) =>
+      size * (kuboRoofWidth / kuboRoofHeight);
+
   @override
   Widget build(BuildContext context) {
     final Color ink = color ?? Theme.of(context).colorScheme.onSurface;
     return SizedBox(
-      width: size * 2,
+      width: widthFor(size),
       height: size,
-      child: CustomPaint(
-        painter: _RoofPainter(ink),
-        // The mark reads as decoration beside the shop's name; the name
-        // carries the meaning, so the drawing stays out of the accessibility
-        // tree rather than announcing itself twice.
-        isComplex: false,
-      ),
+      // The mark reads as decoration beside the shop's name; the name carries
+      // the meaning, so the drawing stays out of the accessibility tree rather
+      // than announcing itself twice.
+      child: CustomPaint(painter: _RoofPainter(ink)),
     );
   }
 }
@@ -38,35 +40,22 @@ class _RoofPainter extends CustomPainter {
 
   final Color color;
 
+  /// Parsing 11 KB of outline data on every repaint would be wasteful, and the
+  /// shape never changes — only its colour and scale do.
+  static final Path _outline = KuboRoofPath.parse(kuboRoofPathData);
+
   @override
   void paint(Canvas canvas, Size size) {
-    // Laid out on the logo's own 120 x 60 grid, then scaled.
-    final double sx = size.width / 120;
-    final double sy = size.height / 60;
-
-    // Thick enough to read as a brush at a glance, thin enough to stay sharp
-    // in a 20pt header.
-    final double stroke = math.max(1.8, size.height * 0.125);
-
-    final Paint brush = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = stroke
-      ..strokeCap = StrokeCap.round
-      ..isAntiAlias = true;
-
-    // Left stroke: starts low on the left, sweeps up and past the apex.
-    final Path left = Path()
-      ..moveTo(6 * sx, 55 * sy)
-      ..quadraticBezierTo(40 * sx, 34 * sy, 73 * sx, 4 * sy);
-
-    // Right stroke: the mirror, crossing the first near the top.
-    final Path right = Path()
-      ..moveTo(114 * sx, 55 * sy)
-      ..quadraticBezierTo(80 * sx, 34 * sy, 47 * sx, 4 * sy);
-
-    canvas.drawPath(left, brush);
-    canvas.drawPath(right, brush);
+    canvas.save();
+    canvas.scale(size.width / kuboRoofWidth, size.height / kuboRoofHeight);
+    canvas.drawPath(
+      _outline,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.fill
+        ..isAntiAlias = true,
+    );
+    canvas.restore();
   }
 
   @override
@@ -85,7 +74,7 @@ class KuboWordmark extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     return Row(
       children: <Widget>[
-        KuboMark(size: 22, color: theme.colorScheme.onSurface),
+        KuboMark(size: 20, color: theme.colorScheme.onSurface),
         const SizedBox(width: 10),
         Flexible(
           child: Column(

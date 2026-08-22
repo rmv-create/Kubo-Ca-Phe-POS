@@ -48,6 +48,7 @@ lib/
     waste/  suppliers/  purchases/  reports/  closing/  settings/  backup/
         presentation/          Screens + widgets (phone/tablet variants)
         state/                 Riverpod controllers (Notifier / AsyncNotifier)
+  shared/brand/                The logo mark as vector outline data
   shared/widgets/              Reusable UI: KuboButton, SectionHeader, MoneyText, ...
 ios/                           iOS + iPadOS target (single target, universal)
 test/

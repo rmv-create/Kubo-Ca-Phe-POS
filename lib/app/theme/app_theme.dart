@@ -20,45 +20,45 @@ abstract final class AppTheme {
       primary: isDark ? KuboColors.darkInk : KuboColors.ink,
       onPrimary: isDark ? KuboColors.darkPaper : KuboColors.paper,
       primaryContainer: isDark
-          ? KuboColors.darkKraftSoft
-          : KuboColors.kraftSoft,
+          ? KuboColors.darkAccentSoft
+          : KuboColors.accentSoft,
       onPrimaryContainer: isDark ? KuboColors.darkInk : KuboColors.ink,
-      // Secondary is kraft — the menu card. It marks what is chosen and what
-      // carries the order, never a whole screen.
-      secondary: isDark ? KuboColors.darkKraft : KuboColors.kraft,
+      // Secondary marks what is chosen — a selected payment method, the
+      // active tab. A weight, not a hue.
+      secondary: isDark ? KuboColors.darkAccent : KuboColors.accent,
       onSecondary: isDark ? KuboColors.darkInk : KuboColors.paper,
       secondaryContainer: isDark
-          ? KuboColors.darkKraftSoft
-          : KuboColors.kraftSoft,
+          ? KuboColors.darkAccentSoft
+          : KuboColors.accentSoft,
       onSecondaryContainer: isDark ? KuboColors.darkInk : KuboColors.ink,
-      tertiary: isDark ? KuboColors.darkKraftDeep : KuboColors.kraftDeep,
+      tertiary: isDark ? KuboColors.darkAccentDeep : KuboColors.accentDeep,
       onTertiary: isDark ? KuboColors.darkInk : KuboColors.paper,
       tertiaryContainer: isDark
-          ? KuboColors.darkKraftSoft
-          : KuboColors.kraftSoft,
+          ? KuboColors.darkAccentSoft
+          : KuboColors.accentSoft,
       onTertiaryContainer: isDark ? KuboColors.darkInk : KuboColors.ink,
-      // The seal red. Confirm this, or undo this — nothing else.
-      error: isDark ? KuboColors.darkSeal : KuboColors.seal,
+      // The one hue in the palette. Confirm this, or undo this — nothing else.
+      error: isDark ? KuboColors.darkAlert : KuboColors.alert,
       onError: isDark ? KuboColors.darkPaper : Colors.white,
-      errorContainer: isDark ? KuboColors.darkSealSoft : KuboColors.sealSoft,
-      onErrorContainer: isDark ? KuboColors.darkSeal : KuboColors.seal,
+      errorContainer: isDark ? KuboColors.darkAlertSoft : KuboColors.alertSoft,
+      onErrorContainer: isDark ? KuboColors.darkAlert : KuboColors.alert,
       surface: isDark ? KuboColors.darkPaper : KuboColors.paper,
       onSurface: isDark ? KuboColors.darkInk : KuboColors.ink,
       surfaceContainerLowest: isDark
           ? KuboColors.darkPaperSunk
-          : const Color(0xFFFFFDF9),
+          : KuboColors.paperRaised,
       surfaceContainerLow: isDark
           ? KuboColors.darkPaperRaised
           : KuboColors.paperRaised,
       surfaceContainer: isDark
-          ? KuboColors.darkPaperRaised
-          : const Color(0xFFEBE0CE),
+          ? KuboColors.darkPaperMuted
+          : KuboColors.paperMuted,
       surfaceContainerHigh: isDark
-          ? KuboColors.darkKraftSoft
+          ? KuboColors.darkAccentSoft
           : KuboColors.paperSunk,
       surfaceContainerHighest: isDark
-          ? KuboColors.darkKraftDeep
-          : KuboColors.kraftSoft,
+          ? KuboColors.darkAccentDeep
+          : KuboColors.accentSoft,
       onSurfaceVariant: isDark ? KuboColors.darkInkMuted : KuboColors.inkMuted,
       outline: isDark ? KuboColors.darkHairline : KuboColors.hairline,
       outlineVariant: isDark
@@ -68,7 +68,7 @@ abstract final class AppTheme {
       scrim: Colors.black,
       inverseSurface: isDark ? KuboColors.darkInk : KuboColors.ink,
       onInverseSurface: isDark ? KuboColors.darkPaper : KuboColors.paper,
-      inversePrimary: isDark ? KuboColors.ink : KuboColors.kraftSoft,
+      inversePrimary: isDark ? KuboColors.ink : KuboColors.accentSoft,
     );
 
     final TextTheme text = _textTheme(scheme);

@@ -10,17 +10,22 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Kubo Cà Phê">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" href="favicon.png">
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
-  <meta name="theme-color" content="#EFE6D6">
+  <meta name="theme-color" content="#F6F6F7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0B0B0C" media="(prefers-color-scheme: dark)">
   <title>Kubo Cà Phê</title>
   <link rel="manifest" href="manifest.json">
   <style>
-    /* The paper the logo is printed on, so the first paint is not white. */
-    html, body { margin: 0; padding: 0; height: 100%; background: #EFE6D6; }
+    /* The app's own ground, so the first paint is never a flash of white
+       — or, at night, a flash of anything. */
+    html, body { margin: 0; padding: 0; height: 100%; background: #F6F6F7; }
+    @media (prefers-color-scheme: dark) {
+      html, body { background: #0B0B0C; }
+    }
   </style>
 </head>
 <body>
