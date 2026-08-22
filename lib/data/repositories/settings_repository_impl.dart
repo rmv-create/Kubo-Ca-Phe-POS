@@ -54,6 +54,16 @@ class SettingsRepositoryImpl implements SettingsRepository {
         values[SettingKeys.pricesProvisional],
         d.pricesProvisional,
       ),
+      vatRegistered: _bool(values[SettingKeys.vatRegistered], d.vatRegistered),
+      vatRateBp:
+          int.tryParse(values[SettingKeys.vatRateBp] ?? '') ?? d.vatRateBp,
+      statutoryDiscountRateBp:
+          int.tryParse(values[SettingKeys.statutoryDiscountRateBp] ?? '') ??
+          d.statutoryDiscountRateBp,
+      deliveryFeeEnabled: _bool(
+        values[SettingKeys.deliveryFeeEnabled],
+        d.deliveryFeeEnabled,
+      ),
     );
   }
 
@@ -91,6 +101,40 @@ class SettingsRepositoryImpl implements SettingsRepository {
         txn,
         SettingKeys.lowStockAlertsEnabled,
         settings.lowStockAlertsEnabled ? '1' : '0',
+      );
+      // Everything below was readable but not writable until the settings
+      // screen grew controls for it. A `save` that quietly drops a field is a
+      // trap for the next person, so it now writes every field it loads.
+      await _put(
+        txn,
+        SettingKeys.orderNumberResetDaily,
+        settings.orderNumberResetDaily ? '1' : '0',
+      );
+      await _put(
+        txn,
+        SettingKeys.showCustomerName,
+        settings.showCustomerName ? '1' : '0',
+      );
+      await _put(
+        txn,
+        SettingKeys.pricesProvisional,
+        settings.pricesProvisional ? '1' : '0',
+      );
+      await _put(
+        txn,
+        SettingKeys.vatRegistered,
+        settings.vatRegistered ? '1' : '0',
+      );
+      await _put(txn, SettingKeys.vatRateBp, '${settings.vatRateBp}');
+      await _put(
+        txn,
+        SettingKeys.statutoryDiscountRateBp,
+        '${settings.statutoryDiscountRateBp}',
+      );
+      await _put(
+        txn,
+        SettingKeys.deliveryFeeEnabled,
+        settings.deliveryFeeEnabled ? '1' : '0',
       );
     });
   }

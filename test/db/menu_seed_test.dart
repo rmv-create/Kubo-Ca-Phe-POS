@@ -63,7 +63,8 @@ void main() {
         'Black': <int>[12900, 13900],
         'Spanish Latte': <int>[12900, 13900],
         'Caramel Macchiato with Cold Foam': <int>[12900, 13900],
-        'Matcha Latte': <int>[12900, 13900],
+        // Priced above the other Classics: it is made with oat.
+        'Matcha Oat Latte': <int>[13900, 14900],
         'Vietnamese Coffee': <int>[12900, 13900],
         'Vietnamese Sea Salt Cream': <int>[13900, 15900],
         'Vietnamese Egg Coffee': <int>[13900, 15900],
@@ -266,7 +267,6 @@ void main() {
       const List<String> milkDrinks = <String>[
         'Spanish Latte',
         'Caramel Macchiato with Cold Foam',
-        'Matcha Latte',
         'Vietnamese Sea Salt Cream',
         'Vietnamese Egg Coffee',
       ];
@@ -283,6 +283,42 @@ void main() {
           'Full Cream',
         ], reason: name);
       }
+    });
+
+    test(
+      'the Matcha Oat Latte comes with oat, and oat costs nothing on it',
+      () async {
+        final Product product = (await menu.products()).firstWhere(
+          (Product p) => p.name == 'Matcha Oat Latte',
+        );
+        final ResolvedCustomizationGroup milk = (await menu.resolvedGroupsFor(
+          product.id,
+        )).firstWhere((ResolvedCustomizationGroup g) => g.group.code == 'milk');
+
+        expect(milk.defaults.map((CustomizationOption o) => o.name), <String>[
+          'Oat',
+        ]);
+        // Oat is a ₱20 upgrade elsewhere. On the drink named after it, it is
+        // what the drink is, and charging for it would double-charge.
+        final CustomizationOption oat = milk.group.activeOptions.firstWhere(
+          (CustomizationOption o) => o.name == 'Oat',
+        );
+        expect(oat.priceDelta, Money.zero);
+      },
+    );
+
+    test('oat is still a paid upgrade on the other drinks', () async {
+      final Product product = (await menu.products()).firstWhere(
+        (Product p) => p.name == 'Spanish Latte',
+      );
+      final ResolvedCustomizationGroup milk = (await menu.resolvedGroupsFor(
+        product.id,
+      )).firstWhere((ResolvedCustomizationGroup g) => g.group.code == 'milk');
+      final CustomizationOption oat = milk.group.activeOptions.firstWhere(
+        (CustomizationOption o) => o.name == 'Oat',
+      );
+
+      expect(oat.priceDelta, Money.of(20));
     });
 
     test(

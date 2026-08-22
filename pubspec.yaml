@@ -41,6 +41,9 @@ dependencies:
   meta: ^1.16.0
 
   sqflite_common_ffi_web: any
+  pdf: ^3.12.0
+  printing: ^5.14.3
+  image: ^4.3.0
 dev_dependencies:
   flutter_test:
     sdk: flutter

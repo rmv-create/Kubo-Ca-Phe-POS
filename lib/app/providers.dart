@@ -9,25 +9,30 @@ import '../data/export/excel_export_service.dart';
 import '../data/repositories/customer_repository_impl.dart';
 import '../data/repositories/inventory_repository_impl.dart';
 import '../data/repositories/menu_repository_impl.dart';
+import '../data/repositories/payment_method_repository_impl.dart';
 import '../data/repositories/purchasing_repository_impl.dart';
 import '../data/repositories/recipe_repository_impl.dart';
 import '../data/repositories/settings_repository_impl.dart';
+import '../domain/entities/app_user.dart';
 import '../domain/entities/business_settings.dart';
 import '../domain/entities/customer.dart';
 import '../domain/entities/ingredient.dart';
 import '../domain/entities/menu.dart';
+import '../domain/entities/order_draft.dart';
 import '../domain/entities/purchasing.dart';
 import '../domain/entities/recipe.dart';
 import '../domain/entities/reporting.dart';
 import '../domain/repositories/customer_repository.dart';
 import '../domain/repositories/inventory_repository.dart';
 import '../domain/repositories/menu_repository.dart';
+import '../domain/repositories/payment_method_repository.dart';
 import '../domain/repositories/purchasing_repository.dart';
 import '../domain/repositories/recipe_repository.dart';
 import '../domain/repositories/settings_repository.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/reporting_service.dart';
 import '../domain/services/sales_service.dart';
+import '../domain/services/sign_in_service.dart';
 
 /// Infrastructure providers.
 ///
@@ -98,6 +103,45 @@ final Provider<String> todayBusinessDateProvider = Provider<String>(
   (Ref ref) =>
       ref.watch(businessDayProvider).dateOf(ref.watch(clockProvider).now()),
 );
+
+// ────────────────────────── payment methods ──────────────────────────
+
+final Provider<PaymentMethodRepository> paymentMethodRepositoryProvider =
+    Provider<PaymentMethodRepository>(
+      (Ref ref) => PaymentMethodRepositoryImpl(
+        ref.watch(databaseProvider),
+        ref.watch(clockProvider),
+      ),
+    );
+
+/// Bumped after the owner adds, renames or retires a method.
+final NotifierProvider<PaymentMethodRevision, int>
+paymentMethodRevisionProvider = NotifierProvider<PaymentMethodRevision, int>(
+  PaymentMethodRevision.new,
+);
+
+class PaymentMethodRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+/// The buttons the POS offers. Active only.
+final FutureProvider<List<PaymentMethod>> paymentMethodsProvider =
+    FutureProvider<List<PaymentMethod>>((Ref ref) {
+      ref.watch(paymentMethodRevisionProvider);
+      return ref.watch(paymentMethodRepositoryProvider).all();
+    });
+
+/// Every method including the retired ones, for the management screen.
+final FutureProvider<List<PaymentMethod>> allPaymentMethodsProvider =
+    FutureProvider<List<PaymentMethod>>((Ref ref) {
+      ref.watch(paymentMethodRevisionProvider);
+      return ref
+          .watch(paymentMethodRepositoryProvider)
+          .all(includeInactive: true);
+    });
 
 // ─────────────────────────────── menu ───────────────────────────────
 
@@ -232,10 +276,30 @@ class SalesRevision extends Notifier<int> {
   void bump() => state = state + 1;
 }
 
+/// Bumped after a customer is created or edited.
+final NotifierProvider<CustomerRevision, int> customerRevisionProvider =
+    NotifierProvider<CustomerRevision, int>(CustomerRevision.new);
+
+class CustomerRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+/// The customers seen most recently, for the moment before anything is typed.
+final FutureProvider<List<Customer>> recentCustomersProvider =
+    FutureProvider<List<Customer>>((Ref ref) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(customerRevisionProvider);
+      return ref.watch(customerRepositoryProvider).recent();
+    });
+
 /// Customer search. An empty query returns recent visitors.
 final FutureProviderFamily<List<Customer>, String> customerSearchProvider =
     FutureProvider.family<List<Customer>, String>((Ref ref, String query) {
       ref.watch(salesRevisionProvider);
+      ref.watch(customerRevisionProvider);
       return ref.watch(customerRepositoryProvider).search(query);
     });
 
@@ -346,12 +410,75 @@ final FutureProvider<List<Purchase>> purchasesProvider =
       return ref.watch(purchasingRepositoryProvider).purchases();
     });
 
+// ────────────────────────── people and access ──────────────────────────
+
+final Provider<SignInService> signInServiceProvider = Provider<SignInService>(
+  (Ref ref) => SignInService(
+    database: ref.watch(databaseProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final NotifierProvider<UserRevision, int> userRevisionProvider =
+    NotifierProvider<UserRevision, int>(UserRevision.new);
+
+class UserRevision extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void bump() => state = state + 1;
+}
+
+final FutureProvider<List<AppUser>> usersProvider =
+    FutureProvider<List<AppUser>>((Ref ref) {
+      ref.watch(userRevisionProvider);
+      return ref.watch(signInServiceProvider).users();
+    });
+
+/// Whether anyone has been set up. Until someone has, the app is open and the
+/// settings screen says so plainly rather than pretending to be locked.
+final FutureProvider<bool> hasUsersProvider = FutureProvider<bool>((Ref ref) {
+  ref.watch(userRevisionProvider);
+  return ref.watch(signInServiceProvider).hasAnyUser();
+});
+
+/// Whoever is signed in right now. Null means nobody — which, when no users
+/// exist, means everything is visible.
+final NotifierProvider<SignedInUser, AppUser?> signedInUserProvider =
+    NotifierProvider<SignedInUser, AppUser?>(SignedInUser.new);
+
+class SignedInUser extends Notifier<AppUser?> {
+  @override
+  AppUser? build() => null;
+
+  void set(AppUser? user) => state = user;
+
+  void signOut() => state = null;
+}
+
+/// What the person at the counter may open.
+///
+/// With nobody set up, everything is allowed: an app that locked the owner out
+/// of her own books before she had made an account would be broken, not safe.
+final Provider<bool> canManageProvider = Provider<bool>((Ref ref) {
+  final AppUser? user = ref.watch(signedInUserProvider);
+  if (user != null) return user.canManage;
+  return !(ref.watch(hasUsersProvider).valueOrNull ?? false);
+});
+
 // ─────────────────────────── sales and reports ───────────────────────────
 
 final FutureProviderFamily<List<OrderRecord>, String?> ordersProvider =
     FutureProvider.family<List<OrderRecord>, String?>((Ref ref, String? day) {
       ref.watch(salesRevisionProvider);
       return ref.watch(salesServiceProvider).orders(businessDate: day);
+    });
+
+/// One order, with its lines, discount and payment — what a receipt needs.
+final FutureProviderFamily<OrderRecord?, int> orderByIdProvider =
+    FutureProvider.family<OrderRecord?, int>((Ref ref, int id) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(salesServiceProvider).orderById(id);
     });
 
 final FutureProviderFamily<SalesSummary, String> dailySummaryProvider =

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../domain/entities/order_draft.dart';
 import '../../../shared/widgets/async_view.dart';
@@ -237,7 +238,10 @@ class OrderReviewSheet extends ConsumerWidget {
                       style: theme.textTheme.bodyMedium,
                     ),
                   ),
-                  MoneyText(draft.total, emphasised: true),
+                  MoneyText(
+                    draft.totalWith(ref.watch(settingsControllerProvider)),
+                    emphasised: true,
+                  ),
                 ],
               ),
             ),

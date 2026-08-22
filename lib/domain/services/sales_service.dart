@@ -7,6 +7,7 @@ import '../../core/quantity/quantity.dart';
 import '../../core/time/clock.dart';
 import '../../data/db/app_database.dart';
 import '../entities/business_settings.dart';
+import '../entities/customer.dart';
 import '../entities/ingredient.dart';
 import '../entities/order_draft.dart';
 import '../entities/reporting.dart';
@@ -59,6 +60,16 @@ class SalesService {
       SELECT o.*,
              (SELECT method FROM payments WHERE order_id = o.id LIMIT 1)
                AS method,
+             (SELECT method_name_snapshot FROM payments WHERE order_id = o.id LIMIT 1)
+               AS method_name,
+             (SELECT reference_no FROM payments WHERE order_id = o.id LIMIT 1)
+               AS payment_reference,
+             (SELECT tendered_centavos FROM payments WHERE order_id = o.id LIMIT 1)
+               AS tendered_centavos,
+             (SELECT change_centavos FROM payments WHERE order_id = o.id LIMIT 1)
+               AS change_centavos,
+             (SELECT c.mobile FROM customers c WHERE c.id = o.customer_id)
+               AS customer_mobile,
              (SELECT reason FROM order_voids WHERE order_id = o.id LIMIT 1)
                AS void_reason,
              (SELECT COUNT(*) FROM order_items
@@ -85,6 +96,16 @@ class SalesService {
       SELECT o.*,
              (SELECT method FROM payments WHERE order_id = o.id LIMIT 1)
                AS method,
+             (SELECT method_name_snapshot FROM payments WHERE order_id = o.id LIMIT 1)
+               AS method_name,
+             (SELECT reference_no FROM payments WHERE order_id = o.id LIMIT 1)
+               AS payment_reference,
+             (SELECT tendered_centavos FROM payments WHERE order_id = o.id LIMIT 1)
+               AS tendered_centavos,
+             (SELECT change_centavos FROM payments WHERE order_id = o.id LIMIT 1)
+               AS change_centavos,
+             (SELECT c.mobile FROM customers c WHERE c.id = o.customer_id)
+               AS customer_mobile,
              (SELECT reason FROM order_voids WHERE order_id = o.id LIMIT 1)
                AS void_reason,
              (SELECT COUNT(*) FROM order_items
@@ -136,6 +157,19 @@ class SalesService {
       );
     }
 
+    // The statutory discount, if one was applied. Read from its own table
+    // rather than recomputed: the rate or the shop's VAT position may have
+    // changed since, and the receipt has to say what was actually charged.
+    final List<Map<String, Object?>> discountRows = await _db.db.query(
+      'order_discounts',
+      where: 'order_id = ?',
+      whereArgs: <Object?>[id],
+      limit: 1,
+    );
+    final Map<String, Object?>? discountRow = discountRows.isEmpty
+        ? null
+        : discountRows.first;
+
     return OrderRecord(
       id: id,
       orderNo: row['order_no']! as String,
@@ -152,10 +186,210 @@ class SalesService {
       customerName: row['customer_name_snapshot'] as String?,
       paymentMethod: row['method'] == null
           ? null
-          : PaymentMethod.fromCode(row['method']! as String),
+          // The snapshot, so a receipt reprinted after the owner renames a
+          // method still reads the way it was handed to the customer.
+          : PaymentMethod.fromRow(
+              row['method']! as String,
+              row['method_name'] as String?,
+            ),
       voidReason: row['void_reason'] as String?,
+      subtotal: Money((row['subtotal_centavos'] as int?) ?? 0),
+      discount: Money((row['discount_centavos'] as int?) ?? 0),
+      deliveryFee: Money((row['delivery_fee_centavos'] as int?) ?? 0),
+      vat: Money((row['vat_centavos'] as int?) ?? 0),
+      vatRateBp: (row['vat_rate_bp'] as int?) ?? 0,
+      discountLabel: discountRow?['name'] as String?,
+      discountRateBp: (discountRow?['rate_bp'] as int?) ?? 0,
+      discountVatExempt: Money(
+        (discountRow?['vat_exempt_centavos'] as int?) ?? 0,
+      ),
+      discountBeneficiaryName: discountRow?['beneficiary_name'] as String?,
+      discountBeneficiaryIdNo: discountRow?['beneficiary_id_no'] as String?,
+      customerMobile: row['customer_mobile'] as String?,
+      paymentReference: row['payment_reference'] as String?,
+      tendered: row['tendered_centavos'] == null
+          ? null
+          : Money(row['tendered_centavos']! as int),
+      change: row['change_centavos'] == null
+          ? null
+          : Money(row['change_centavos']! as int),
       lines: lines,
     );
+  }
+
+  // ────────────────────────── naming an order ──────────────────────────
+
+  /// Attaches a customer to an order that was rung as a guest.
+  ///
+  /// This happens constantly at a small counter: someone tries a drink, likes
+  /// it, and only then wants to be remembered. Their first visit should count,
+  /// and the drink they just had should count towards their usual, so this
+  /// does everything completing the order with a customer would have done —
+  /// the visit, the spend, and the order pattern.
+  ///
+  /// Refuses to move an order that already belongs to someone: reassigning a
+  /// sale would corrupt two customers' histories at once. Detach it first if
+  /// it really was rung against the wrong person.
+  Future<void> attachCustomer({
+    required int orderId,
+    required int customerId,
+  }) async {
+    await _db.transaction<void>((Transaction txn) async {
+      final List<Map<String, Object?>> orderRows = await txn.query(
+        'orders',
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+        limit: 1,
+      );
+      if (orderRows.isEmpty) {
+        throw const NotFoundException('That order is no longer here.');
+      }
+      final Map<String, Object?> order = orderRows.first;
+      if (order['customer_id'] != null) {
+        throw const BusinessRuleException(
+          'This order is already under a customer.',
+        );
+      }
+      if (order['status'] != 'completed') {
+        throw const BusinessRuleException(
+          'A voided order cannot be put under a customer.',
+        );
+      }
+
+      final List<Map<String, Object?>> customerRows = await txn.query(
+        'customers',
+        where: 'id = ?',
+        whereArgs: <Object?>[customerId],
+        limit: 1,
+      );
+      if (customerRows.isEmpty) {
+        throw const NotFoundException('That customer is no longer here.');
+      }
+      final Map<String, Object?> customer = customerRows.first;
+
+      final String at = _clock.nowIso();
+      final String orderedAt = order['created_at']! as String;
+      final int total = order['total_centavos']! as int;
+      final int items = order['item_count']! as int;
+      final int orders = (customer['order_count']! as int) + 1;
+
+      await txn.update(
+        'orders',
+        <String, Object?>{
+          'customer_id': customerId,
+          'customer_name_snapshot': customer['name'],
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+
+      // The visit happened when the drink was bought, not when the name was
+      // given, so the customer's first and last visit are stamped from the
+      // order itself.
+      final String? firstVisit = customer['first_visit_at'] as String?;
+      final String? lastVisit = customer['last_visit_at'] as String?;
+      await txn.update(
+        'customers',
+        <String, Object?>{
+          'first_visit_at':
+              firstVisit == null || orderedAt.compareTo(firstVisit) < 0
+              ? orderedAt
+              : firstVisit,
+          'last_visit_at':
+              lastVisit == null || orderedAt.compareTo(lastVisit) > 0
+              ? orderedAt
+              : lastVisit,
+          'visit_count': (customer['visit_count']! as int) + 1,
+          'order_count': orders,
+          'item_count': (customer['item_count']! as int) + items,
+          'total_spend_centavos':
+              (customer['total_spend_centavos']! as int) + total,
+          'segment': CustomerSegment.fromOrderCount(orders).code,
+          'updated_at': at,
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[customerId],
+      );
+
+      await _learnPatternsFromOrder(
+        txn,
+        orderId: orderId,
+        customerId: customerId,
+        at: orderedAt,
+      );
+
+      await txn.insert('audit_log', <String, Object?>{
+        'at': at,
+        'business_date': order['business_date'],
+        'action': 'order_customer_attached',
+        'entity_type': 'order',
+        'entity_id': orderId,
+        'summary': '${order['order_no']} put under ${customer['name']}',
+      });
+    });
+  }
+
+  /// Rebuilds the customer's usual-order counts from an order already written.
+  ///
+  /// The same arithmetic [OrderService] does at completion, but reading the
+  /// saved lines rather than a draft.
+  Future<void> _learnPatternsFromOrder(
+    Transaction txn, {
+    required int orderId,
+    required int customerId,
+    required String at,
+  }) async {
+    final List<Map<String, Object?>> items = await txn.query(
+      'order_items',
+      where: 'order_id = ?',
+      whereArgs: <Object?>[orderId],
+    );
+
+    for (final Map<String, Object?> item in items) {
+      final int? productId = item['product_id'] as int?;
+      final int? sizeId = item['size_id'] as int?;
+      // A line whose product or size has since been deleted cannot be turned
+      // back into a pattern, and guessing would put the wrong drink in
+      // somebody's usual.
+      if (productId == null || sizeId == null) continue;
+
+      final List<Map<String, Object?>> optionRows = await txn.query(
+        'order_item_customizations',
+        columns: <String>['option_id'],
+        where: 'order_item_id = ? AND option_id IS NOT NULL',
+        whereArgs: <Object?>[item['id']],
+      );
+      final List<int> optionIds =
+          optionRows
+              .map((Map<String, Object?> o) => o['option_id']! as int)
+              .toList()
+            ..sort();
+      final String signature = orderSignature(
+        productId: productId,
+        sizeId: sizeId,
+        optionIds: optionIds,
+      );
+      final int quantity = item['quantity']! as int;
+
+      final int changed = await txn.rawUpdate(
+        'UPDATE customer_order_patterns '
+        'SET occurrence_count = occurrence_count + ?, last_ordered_at = ? '
+        'WHERE customer_id = ? AND signature = ?',
+        <Object?>[quantity, at, customerId, signature],
+      );
+      if (changed == 0) {
+        await txn.insert('customer_order_patterns', <String, Object?>{
+          'customer_id': customerId,
+          'signature': signature,
+          'product_id': productId,
+          'size_id': sizeId,
+          'option_ids_json': optionIds.join(','),
+          'occurrence_count': quantity,
+          'first_ordered_at': at,
+          'last_ordered_at': at,
+        });
+      }
+    }
   }
 
   // ─────────────────────────────── refunds ───────────────────────────────

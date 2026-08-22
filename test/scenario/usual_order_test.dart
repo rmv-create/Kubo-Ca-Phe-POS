@@ -61,7 +61,7 @@ void main() {
       await order('Spanish Latte', 'Grande');
       await order('Spanish Latte', 'Grande');
       await order('Spanish Latte', 'Grande');
-      await order('Matcha Latte', 'Grande');
+      await order('Matcha Oat Latte', 'Grande');
 
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
       expect(
@@ -158,8 +158,8 @@ void main() {
       await order('Spanish Latte', 'Grande');
       await order('Spanish Latte', 'Grande');
       await order('Spanish Latte', 'Grande');
-      await order('Matcha Latte', 'Grande');
-      await order('Matcha Latte', 'Grande');
+      await order('Matcha Oat Latte', 'Grande');
+      await order('Matcha Oat Latte', 'Grande');
 
       // Spanish Latte repeats more, so it is the calculated usual.
       expect(
@@ -173,7 +173,7 @@ void main() {
       await shop.customers.saveUsual(customerId: mariaId, patternId: matcha.id);
 
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
-      expect(usual.productName, 'Matcha Latte');
+      expect(usual.productName, 'Matcha Oat Latte');
       expect(usual.isSaved, isTrue);
     });
 
@@ -202,9 +202,9 @@ void main() {
     test('can be cleared, falling back to what repeats', () async {
       await order('Spanish Latte', 'Grande');
       await order('Spanish Latte', 'Grande');
-      await order('Matcha Latte', 'Grande');
-      await order('Matcha Latte', 'Grande');
-      await order('Matcha Latte', 'Grande');
+      await order('Matcha Oat Latte', 'Grande');
+      await order('Matcha Oat Latte', 'Grande');
+      await order('Matcha Oat Latte', 'Grande');
 
       final CustomerOrderPattern latte = (await shop.customers.patternsFor(
         mariaId,
@@ -218,7 +218,7 @@ void main() {
       await shop.customers.clearUsual(mariaId);
       expect(
         (await shop.customers.usualFor(mariaId))!.productName,
-        'Matcha Latte',
+        'Matcha Oat Latte',
       );
     });
 

@@ -1,6 +1,12 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
 import 'package:kubo_pos/core/time/clock.dart';
 import 'package:kubo_pos/data/db/app_database.dart';
+import 'package:kubo_pos/data/db/migrations/migration.dart';
+import 'package:kubo_pos/data/db/migrations/migration_runner.dart';
 import 'package:kubo_pos/data/db/seed/menu_seeder.dart';
+import 'package:path/path.dart' as p;
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 /// Opens a migrated, empty database in memory.
@@ -13,6 +19,27 @@ Future<AppDatabase> openTestDatabase() async {
   return AppDatabase.open(
     factory: databaseFactoryFfi,
     path: inMemoryDatabasePath,
+  );
+}
+
+/// Opens a database migrated only as far as [version].
+///
+/// Lets a test stand where a real installed app stands before an update, so
+/// the upgrade path is exercised rather than assumed.
+Future<AppDatabase> openTestDatabaseAt(int version) async {
+  sqfliteFfiInit();
+  // A real file, not `:memory:`: the ffi factory hands back the *same*
+  // connection for every in-memory open, so two of them would be one database.
+  final Directory dir = await Directory.systemTemp.createTemp('kubo_upgrade');
+  addTearDown(() => dir.delete(recursive: true));
+  return AppDatabase.open(
+    factory: databaseFactoryFfi,
+    path: p.join(dir.path, 'kubo.db'),
+    runner: MigrationRunner(
+      migrations: appMigrations
+          .where((Migration m) => m.version <= version)
+          .toList(),
+    ),
   );
 }
 
@@ -59,6 +86,10 @@ const Set<String> expectedTables = <String>{
   'order_voids',
   'daily_closings',
   'discounts',
+  'payment_methods',
+  'app_users',
+  'order_discounts',
+  'product_option_prices',
 };
 
 /// Opens a test database and writes the owner's menu into it, exactly as the

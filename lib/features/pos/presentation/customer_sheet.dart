@@ -385,7 +385,12 @@ class _UsualPanel extends ConsumerWidget {
     return <DraftOption>[
       for (final ResolvedCustomizationGroup g in groups)
         for (final CustomizationOption o in g.group.activeOptions)
-          if (optionIds.contains(o.id)) DraftOption(group: g.group, option: o),
+          if (optionIds.contains(o.id))
+            DraftOption(
+              group: g.group,
+              option: o,
+              isDefault: g.defaultOptionIds.contains(o.id),
+            ),
     ];
   }
 }

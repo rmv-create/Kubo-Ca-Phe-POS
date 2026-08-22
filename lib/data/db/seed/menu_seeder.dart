@@ -117,6 +117,7 @@ class MenuSeeder {
 
     // ── drinks, their prices, their rules and their defaults ──
     final Map<String, int> productOrder = <String, int>{};
+    final Map<String, int> productIds = <String, int>{};
     for (final SeedProduct product in MenuSeed.products) {
       final int categoryId = categoryIds[product.category]!;
       final int displayOrder = productOrder[product.category] ?? 0;
@@ -131,6 +132,7 @@ class MenuSeeder {
         'is_archived': 0,
         ...stamps(),
       });
+      productIds[product.name] = productId;
 
       for (final SeedSize size in MenuSeed.sizes) {
         final int price = size.code == 'small'
@@ -162,15 +164,37 @@ class MenuSeeder {
           ...stamps(),
         });
 
-        for (final String key in groupDefaults[group.code] ?? <String>[]) {
+        // A drink can name its own milk; otherwise the group's default stands.
+        final List<String> defaults =
+            group.code == 'milk' && product.defaultMilk != null
+            ? <String>['milk/${product.defaultMilk}']
+            : (groupDefaults[group.code] ?? <String>[]);
+
+        for (final String key in defaults) {
+          final int? optionId = optionIds[key];
+          if (optionId == null) continue;
           await txn.insert('product_default_options', <String, Object?>{
             'product_id': productId,
             'size_id': null,
-            'option_id': optionIds[key],
+            'option_id': optionId,
             ...stamps(),
           });
         }
       }
+    }
+
+    // ── options priced differently on one drink ──
+    for (final SeedOptionPrice override in MenuSeed.optionPriceOverrides) {
+      final int? productId = productIds[override.productName];
+      final int? optionId =
+          optionIds['${override.groupCode}/${override.optionName}'];
+      if (productId == null || optionId == null) continue;
+      await txn.insert('product_option_prices', <String, Object?>{
+        'product_id': productId,
+        'option_id': optionId,
+        'price_delta_centavos': override.price,
+        ...stamps(),
+      });
     }
 
     // ── settings taken from the worksheet ──

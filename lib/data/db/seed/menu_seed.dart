@@ -53,12 +53,16 @@ abstract final class MenuSeed {
     ),
     SeedProduct(
       category: classics,
-      name: 'Matcha Latte',
+      // Made with oat, so oat is what it costs — see the free-oat override in
+      // `optionPriceOverrides` below.
+      name: 'Matcha Oat Latte',
       description:
-          'Vibrant matcha with creamy milk. Smooth, earthy and lightly sweet.',
-      smallPrice: 12900,
-      grandePrice: 13900,
+          'Vibrant matcha with creamy oat milk. Smooth, earthy and lightly '
+          'sweet.',
+      smallPrice: 13900,
+      grandePrice: 14900,
       defaultSizeCode: 'grande',
+      defaultMilk: 'Oat',
     ),
     SeedProduct(
       category: specialty,
@@ -186,6 +190,19 @@ abstract final class MenuSeed {
     ),
   ];
 
+  /// Options that cost something different on one particular drink.
+  ///
+  /// Oat is a ₱20 upgrade everywhere except the Matcha Oat Latte, where it is
+  /// simply what the drink is made of.
+  static const List<SeedOptionPrice> optionPriceOverrides = <SeedOptionPrice>[
+    SeedOptionPrice(
+      productName: 'Matcha Oat Latte',
+      groupCode: 'milk',
+      optionName: 'Oat',
+      price: 0,
+    ),
+  ];
+
   /// Choices she left without a number, for the app to surface rather than
   /// quietly charge ₱0 forever.
   static List<String> get unpricedOptions => <String>[
@@ -216,6 +233,7 @@ class SeedProduct {
     required this.grandePrice,
     required this.defaultSizeCode,
     this.showsMilk = true,
+    this.defaultMilk,
   });
 
   final String category;
@@ -231,6 +249,9 @@ class SeedProduct {
   /// Black and Vietnamese Coffee are not made with a milk choice, so the group
   /// is simply not attached to them.
   final bool showsMilk;
+
+  /// The milk this drink comes with, when it is not the group's own default.
+  final String? defaultMilk;
 
   Money get small => Money(smallPrice);
   Money get grande => Money(grandePrice);
@@ -274,4 +295,21 @@ class SeedOption {
   final bool isDefault;
   final bool isActive;
   final bool needsPrice;
+}
+
+/// One option priced differently on one product.
+class SeedOptionPrice {
+  const SeedOptionPrice({
+    required this.productName,
+    required this.groupCode,
+    required this.optionName,
+    required this.price,
+  });
+
+  final String productName;
+  final String groupCode;
+  final String optionName;
+
+  /// Centavos this option adds to *this* product. Overrides the option's own.
+  final int price;
 }

@@ -77,7 +77,7 @@ void main() {
     test('starts empty and cannot be completed', () {
       expect(draft().isEmpty, isTrue);
       expect(draft().canComplete, isFalse);
-      expect(draft().total, Money.zero);
+      expect(draft().subtotal, Money.zero);
     });
 
     test('adds drinks and totals them', () {
@@ -90,10 +90,10 @@ void main() {
 
       expect(draft().items.length, 2);
       expect(draft().drinkCount, 2);
-      expect(draft().total, Money.of(220));
+      expect(draft().subtotal, Money.of(220));
     });
 
-    test('every line gets its own identity, even when identical', () {
+    test('the same drink twice is one line of two, not two lines', () {
       final DraftItem a = cart().addItem(
         product: _latte,
         size: _size,
@@ -104,12 +104,39 @@ void main() {
         size: _size,
         options: <DraftOption>[],
       );
-      expect(a.lineId, isNot(b.lineId));
-      expect(
-        a.signature,
-        b.signature,
-        reason: 'the same drink still has the same signature',
+
+      expect(draft().items, hasLength(1));
+      expect(draft().items.single.quantity, 2);
+      expect(b.lineId, a.lineId, reason: 'it landed on the line already there');
+      expect(draft().drinkCount, 2);
+    });
+
+    test('a differently made drink starts its own line', () {
+      cart().addItem(product: _latte, size: _size, options: <DraftOption>[]);
+      cart().addItem(
+        product: _latte,
+        size: _size,
+        options: <DraftOption>[_oat],
       );
+
+      expect(draft().items, hasLength(2));
+      expect(
+        draft().items.first.signature,
+        isNot(draft().items.last.signature),
+      );
+    });
+
+    test('duplicate still makes a separate line when she wants one', () {
+      final DraftItem a = cart().addItem(
+        product: _latte,
+        size: _size,
+        options: <DraftOption>[],
+      );
+      cart().duplicateItem(a.lineId);
+
+      expect(draft().items, hasLength(2));
+      expect(draft().items.first.lineId, isNot(draft().items.last.lineId));
+      expect(draft().items.first.signature, draft().items.last.signature);
     });
 
     test('quantity steps up and down', () {
@@ -121,7 +148,7 @@ void main() {
       cart().increment(item.lineId);
       cart().increment(item.lineId);
       expect(draft().items.single.quantity, 3);
-      expect(draft().total, Money.of(300));
+      expect(draft().subtotal, Money.of(300));
 
       cart().decrement(item.lineId);
       expect(draft().items.single.quantity, 2);
@@ -148,7 +175,7 @@ void main() {
       expect(draft().items.length, 2);
       expect(draft().items.last.options.single.option.name, 'Oat');
       expect(draft().items.last.lineId, isNot(item.lineId));
-      expect(draft().total, Money.of(240));
+      expect(draft().subtotal, Money.of(240));
     });
 
     test('a duplicate lands next to its original', () {
@@ -173,16 +200,17 @@ void main() {
         size: _size,
         options: <DraftOption>[],
       );
+      // Deliberately a different drink, or the two would merge into one line.
       final DraftItem b = cart().addItem(
         product: _latte,
         size: _size,
-        options: <DraftOption>[],
+        options: <DraftOption>[_oat],
       );
       cart().replaceItem(a.lineId, a.copyWith(options: <DraftOption>[_oat]));
 
       expect(draft().items.first.options.length, 1);
       expect(draft().items.last.lineId, b.lineId);
-      expect(draft().items.last.options, isEmpty);
+      expect(draft().items.last.options, <DraftOption>[_oat]);
     });
 
     test('removing takes out the right line', () {
@@ -214,17 +242,17 @@ void main() {
     test('GCash is not, until it is confirmed', () {
       cart().setPaymentMethod(PaymentMethod.gcash);
       expect(draft().canComplete, isFalse);
-      cart().setGcashConfirmed(true);
+      cart().setPaymentConfirmed(true);
       expect(draft().canComplete, isTrue);
     });
 
     test('switching away from GCash drops the confirmation', () {
       cart().setPaymentMethod(PaymentMethod.gcash);
-      cart().setGcashConfirmed(true);
+      cart().setPaymentConfirmed(true);
       cart().setPaymentMethod(PaymentMethod.cash);
       cart().setPaymentMethod(PaymentMethod.gcash);
       expect(
-        draft().gcashConfirmed,
+        draft().paymentConfirmed,
         isFalse,
         reason: 'a confirmation must never carry over to a new selection',
       );
@@ -234,19 +262,19 @@ void main() {
     test('change is worked out from what was handed over', () {
       cart().setPaymentMethod(PaymentMethod.cash);
       cart().setTendered(Money.of(500));
-      expect(draft().change, Money.of(400));
+      expect(draft().changeFrom(draft().subtotal), Money.of(400));
     });
 
     test('handing over too little is not negative change', () {
       cart().setPaymentMethod(PaymentMethod.cash);
       cart().setTendered(Money.of(50));
-      expect(draft().change, Money.zero);
+      expect(draft().changeFrom(draft().subtotal), Money.zero);
     });
 
     test('change only applies to cash', () {
       cart().setPaymentMethod(PaymentMethod.gcash);
       cart().setTendered(Money.of(500));
-      expect(draft().change, Money.zero);
+      expect(draft().changeFrom(draft().subtotal), Money.zero);
     });
   });
 
@@ -258,7 +286,7 @@ void main() {
     expect(draft().isEmpty, isTrue);
     expect(draft().paymentMethod, isNull);
     expect(draft().customer, isNull);
-    expect(draft().gcashConfirmed, isFalse);
-    expect(draft().total, Money.zero);
+    expect(draft().paymentConfirmed, isFalse);
+    expect(draft().subtotal, Money.zero);
   });
 }

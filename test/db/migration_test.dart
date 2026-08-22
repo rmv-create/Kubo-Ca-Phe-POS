@@ -71,6 +71,49 @@ void main() {
       }
     });
 
+    test(
+      'upgrading an existing shop keeps the money it already took',
+      () async {
+        // m003 rebuilds `payments` to drop a CHECK constraint. Rebuilding a
+        // table is the one migration shape that can silently lose rows, so this
+        // walks the real upgrade path: stop at v2, take a payment, then finish.
+        final AppDatabase old = await openTestDatabaseAt(2);
+        addTearDown(old.close);
+
+        final int orderId = await old.db.insert('orders', <String, Object?>{
+          'order_no': 'K-0001',
+          'created_at': '2026-03-15T02:00:00Z',
+          'business_date': '2026-03-15',
+          'status': 'completed',
+          'total_centavos': 13900,
+        });
+        await old.db.insert('payments', <String, Object?>{
+          'order_id': orderId,
+          'method': 'gcash',
+          'amount_centavos': 13900,
+          'status': 'confirmed',
+          'reference_no': 'ABC123',
+          'created_at': '2026-03-15T02:00:00Z',
+          'confirmed_at': '2026-03-15T02:00:00Z',
+        });
+
+        const MigrationRunner runner = MigrationRunner();
+        final MigrationOutcome outcome = await runner.run(old.db);
+        expect(outcome.applied, contains('3_payments_people_and_discounts'));
+
+        final List<Map<String, Object?>> payments = await old.db.query(
+          'payments',
+        );
+        expect(payments, hasLength(1));
+        expect(payments.single['amount_centavos'], 13900);
+        expect(payments.single['reference_no'], 'ABC123');
+        expect(payments.single['order_id'], orderId);
+        // The rebuild backfills what the button said, for reprinting receipts.
+        expect(payments.single['method_name_snapshot'], 'GCash');
+        expect(await old.integrityCheck(), isTrue);
+      },
+    );
+
     test('the database reports itself intact', () async {
       expect(await database.integrityCheck(), isTrue);
     });
@@ -201,7 +244,7 @@ void main() {
       );
     });
 
-    test('a payment method outside cash or gcash is rejected', () async {
+    test('a payment method the shop does not offer is rejected', () async {
       final int orderId = await database.db.insert('orders', <String, Object?>{
         'order_no': 'X-0002',
         'created_at': '2026-03-15T00:00:00Z',

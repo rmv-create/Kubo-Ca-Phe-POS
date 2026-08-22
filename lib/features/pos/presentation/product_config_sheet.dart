@@ -207,7 +207,12 @@ class _ProductConfigSheetState extends ConsumerState<ProductConfigSheet> {
     final List<DraftOption> chosen = <DraftOption>[
       for (final ResolvedCustomizationGroup g in groups)
         for (final CustomizationOption o in g.group.activeOptions)
-          if (_selected.contains(o.id)) DraftOption(group: g.group, option: o),
+          if (_selected.contains(o.id))
+            DraftOption(
+              group: g.group,
+              option: o,
+              isDefault: g.defaultOptionIds.contains(o.id),
+            ),
     ];
 
     final CartController cart = ref.read(cartProvider.notifier);

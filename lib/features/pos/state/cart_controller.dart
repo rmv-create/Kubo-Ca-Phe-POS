@@ -1,9 +1,11 @@
+import 'package:collection/collection.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/money/money.dart';
 import '../../../domain/entities/customer.dart';
 import '../../../domain/entities/menu.dart';
 import '../../../domain/entities/order_draft.dart';
+import '../../../domain/services/discount_engine.dart';
 
 /// The order being built, held entirely in memory.
 ///
@@ -23,22 +25,40 @@ class CartController extends Notifier<OrderDraft> {
 
   // ─────────────────────────────── items ───────────────────────────────
 
-  /// Adds a drink. Returns the line so the caller can scroll to it.
+  /// Adds a drink. Returns the line it landed on, so the caller can show it.
+  ///
+  /// Two of the same drink, made the same way, are one line of two — not two
+  /// lines of one. Ordering a second identical Spanish Latte therefore bumps
+  /// the quantity of the line already there. Where the customer genuinely
+  /// wants them tracked apart, [duplicateItem] still makes a separate line.
   DraftItem addItem({
     required Product product,
     required ProductSize size,
     required List<DraftOption> options,
     int quantity = 1,
   }) {
-    final DraftItem item = DraftItem(
+    final int wanted = quantity < 1 ? 1 : quantity;
+    final DraftItem candidate = DraftItem(
       lineId: _newLineId(),
       product: product,
       size: size,
-      quantity: quantity < 1 ? 1 : quantity,
+      quantity: wanted,
       options: options,
     );
-    state = state.copyWith(items: <DraftItem>[...state.items, item]);
-    return item;
+
+    final DraftItem? existing = state.items
+        .where((DraftItem i) => i.signature == candidate.signature)
+        .lastOrNull;
+    if (existing != null) {
+      final DraftItem merged = existing.copyWith(
+        quantity: existing.quantity + wanted,
+      );
+      replaceItem(existing.lineId, merged);
+      return merged;
+    }
+
+    state = state.copyWith(items: <DraftItem>[...state.items, candidate]);
+    return candidate;
   }
 
   void replaceItem(String lineId, DraftItem replacement) {
@@ -102,37 +122,62 @@ class CartController extends Notifier<OrderDraft> {
 
   // ─────────────────────────────── payment ───────────────────────────────
 
-  /// Choosing GCash never marks an order paid — the confirmation is separate,
-  /// and is cleared here so switching methods cannot carry one over.
+  /// Choosing a method never marks an order paid — the confirmation is
+  /// separate, and is cleared here so switching methods cannot carry one over.
   void setPaymentMethod(PaymentMethod? method) {
     if (method == null) {
       state = state.copyWith(
         clearPaymentMethod: true,
-        gcashConfirmed: false,
+        paymentConfirmed: false,
         clearTendered: true,
       );
       return;
     }
     state = state.copyWith(
       paymentMethod: method,
-      gcashConfirmed: false,
-      gcashReference: '',
+      paymentConfirmed: false,
+      paymentReference: '',
       clearTendered: true,
     );
   }
 
-  void setGcashConfirmed(bool confirmed) {
-    state = state.copyWith(gcashConfirmed: confirmed);
+  void setPaymentConfirmed(bool confirmed) {
+    state = state.copyWith(paymentConfirmed: confirmed);
   }
 
-  void setGcashReference(String reference) {
-    state = state.copyWith(gcashReference: reference);
+  void setPaymentReference(String reference) {
+    state = state.copyWith(paymentReference: reference);
   }
 
   void setTendered(Money? amount) {
     state = amount == null
         ? state.copyWith(clearTendered: true)
         : state.copyWith(tendered: amount);
+  }
+
+  // ───────────────────────── discount & delivery ─────────────────────────
+
+  /// Chooses a Senior Citizen or PWD discount, or clears it.
+  ///
+  /// The amount is never set here. It is derived from the order and the shop's
+  /// VAT position every time it is read, so it cannot fall out of step with
+  /// what was actually ordered.
+  void setDiscount(
+    DiscountKind? kind, {
+    String? beneficiaryName,
+    String? beneficiaryIdNo,
+  }) {
+    state = kind == null
+        ? state.copyWith(clearDiscount: true)
+        : state.copyWith(
+            discountKind: kind,
+            discountBeneficiaryName: beneficiaryName,
+            discountBeneficiaryIdNo: beneficiaryIdNo,
+          );
+  }
+
+  void setDeliveryFee(Money fee) {
+    state = state.copyWith(deliveryFee: fee.isNegative ? Money.zero : fee);
   }
 
   /// Back to an empty order, ready for the next customer.

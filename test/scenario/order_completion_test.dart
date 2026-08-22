@@ -73,7 +73,7 @@ void main() {
             lineId: 'b',
           ),
           await shop.item(
-            'Matcha Latte',
+            'Matcha Oat Latte',
             'Grande',
             lineId: 'c',
             options: <DraftOption>[
@@ -82,8 +82,9 @@ void main() {
           ),
         ],
       );
-      // 139 + (159 x 2) + (139 + 20)
-      expect(draft.total, Money.of(616));
+      // Grande Spanish Latte 139, two Sea Salt Creams at 159, and a Grande
+      // Matcha Oat Latte 149 with ₱20 of sea salt cream on it.
+      expect(draft.subtotal, Money.of(626));
       expect(draft.drinkCount, 4);
     });
   });
@@ -102,7 +103,9 @@ void main() {
       final OrderDraft draft = OrderDraft(
         items: <DraftItem>[await shop.item('Black', 'Grande')],
       );
-      expect(draft.whyNotComplete(), 'Choose Cash or GCash.');
+      // The methods are the owner's to configure now, so the prompt no
+      // longer names two of them.
+      expect(draft.whyNotComplete(), 'Choose how it was paid.');
       await expectLater(
         shop.sell(draft),
         throwsA(isA<BusinessRuleException>()),
@@ -134,8 +137,8 @@ void main() {
       final OrderDraft draft = OrderDraft(
         items: <DraftItem>[await shop.item('Black', 'Grande')],
         paymentMethod: PaymentMethod.gcash,
-        gcashConfirmed: true,
-        gcashReference: 'REF123',
+        paymentConfirmed: true,
+        paymentReference: 'REF123',
       );
       final CompletedOrder order = await shop.sell(draft);
       expect(order.paymentMethod, PaymentMethod.gcash);

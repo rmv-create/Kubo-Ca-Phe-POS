@@ -139,7 +139,7 @@ void main() {
         items: <DraftItem>[
           await shop.item('Spanish Latte', 'Grande', lineId: 'a'),
           await shop.item(
-            'Matcha Latte',
+            'Matcha Oat Latte',
             'Small',
             lineId: 'b',
             options: <DraftOption>[
@@ -156,8 +156,9 @@ void main() {
       'payments',
     )).single;
     expect(payment['amount_centavos'], stored.centavos);
-    // 139 + (129 + 20)
-    expect(stored, Money.of(288));
+    // Grande Spanish Latte 139, plus a Small Matcha Oat Latte 139 with
+    // ₱20 of sea salt cream on it.
+    expect(stored, Money.of(298));
   });
 
   test('the line totals add up to the order total', () async {

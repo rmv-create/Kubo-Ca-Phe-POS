@@ -10,6 +10,7 @@ import '../entities/customer.dart';
 import '../entities/ingredient.dart';
 import '../entities/order_draft.dart';
 import 'costing_engine.dart';
+import 'discount_engine.dart';
 import 'inventory_engine.dart';
 
 /// Turns a finished draft into a permanent record, in one transaction.
@@ -35,11 +36,12 @@ class OrderService {
   /// Commits [draft] and returns the record that was written.
   ///
   /// Throws a [BusinessRuleException] before touching the database if the
-  /// order is not fit to complete — most importantly, a GCash order whose
-  /// payment has not been confirmed.
+  /// order is not fit to complete — most importantly, an order paid by a
+  /// method whose money has not been confirmed as arrived.
   Future<CompletedOrder> complete(
     OrderDraft draft, {
     required BusinessSettings settings,
+    int? takenByUserId,
   }) async {
     final String? blocker = draft.whyNotComplete();
     if (blocker != null) throw BusinessRuleException(blocker);
@@ -50,7 +52,13 @@ class OrderService {
     final String businessDate = BusinessDay(
       cutoffHour: settings.businessDayCutoffHour,
     ).dateOf(now);
-    final Money total = draft.total;
+
+    // Computed once, here, and written down. Recomputing a discount later —
+    // after the shop registers for VAT, or after the statutory rate changes —
+    // would silently rewrite what the customer was charged.
+    final DiscountBreakdown discount = draft.discountWith(settings);
+    final Money subtotal = draft.subtotal;
+    final Money total = discount.amountDue + draft.deliveryFee;
 
     return _db.transaction<CompletedOrder>((Transaction txn) async {
       final _OrderNumber number = await _nextOrderNumber(
@@ -67,9 +75,21 @@ class OrderService {
         'customer_id': draft.customer?.id,
         'customer_name_snapshot': draft.customer?.name,
         'status': 'completed',
-        'subtotal_centavos': total.centavos,
-        'discount_centavos': 0,
+        'subtotal_centavos': subtotal.centavos,
+        'discount_centavos': discount.discountAmount.centavos,
         'total_centavos': total.centavos,
+        'vat_rate_bp': settings.effectiveVatRateBp,
+        // A VAT-exempt sale carries no VAT at all; an ordinary sale in a
+        // VAT-registered shop carries the VAT already inside the menu price.
+        'vat_centavos': discount.isEmpty
+            ? _vatWithin(subtotal, settings.effectiveVatRateBp)
+            : 0,
+        'vat_exempt_sales_centavos': discount.isEmpty
+            ? 0
+            : discount.discountableBase.centavos,
+        'net_of_vat_centavos': discount.discountableBase.centavos,
+        'delivery_fee_centavos': draft.deliveryFee.centavos,
+        'taken_by_user_id': takenByUserId,
         // Filled in below, once every line has been costed.
         'cogs_centavos': 0,
         'gross_profit_centavos': 0,
@@ -162,26 +182,44 @@ class OrderService {
         'orders',
         <String, Object?>{
           'cogs_centavos': totalCogs,
-          // Profit is only claimed on the lines that were actually costed.
+          // Profit is only claimed on the lines that were actually costed, and
+          // is measured against what the drinks actually earned —
+          // after any discount, and excluding the delivery fee, which is not
+          // margin on coffee.
           'gross_profit_centavos':
-              _costedRevenue(draft, uncostedLines) - totalCogs,
+              _costedRevenue(discount.amountDue, uncostedLines) - totalCogs,
         },
         where: 'id = ?',
         whereArgs: <Object?>[orderId],
       );
 
+      if (!discount.isEmpty) {
+        await txn.insert('order_discounts', <String, Object?>{
+          'order_id': orderId,
+          'kind': discount.kind!.code,
+          'name': discount.kind!.label,
+          'rate_bp': discount.rateBp,
+          'amount_centavos': discount.discountAmount.centavos,
+          'vat_exempt_centavos': discount.vatRemoved.centavos,
+          'beneficiary_name': draft.discountBeneficiaryName,
+          'beneficiary_id_no': draft.discountBeneficiaryIdNo,
+          'created_at': at,
+        });
+      }
+
       await txn.insert('payments', <String, Object?>{
         'order_id': orderId,
         'method': method.code,
+        'method_name_snapshot': method.label,
         'amount_centavos': total.centavos,
-        // Cash is settled the moment it is in the tin. GCash reached this line
-        // only because the owner ticked the confirmation.
+        // Cash is settled the moment it is in the tin. A method that needs
+        // confirming reached this line only because the owner ticked it.
         'status': 'confirmed',
-        'reference_no': draft.gcashReference,
+        'reference_no': draft.paymentReference,
         'tendered_centavos': draft.tendered?.centavos,
         'change_centavos': draft.tendered == null
             ? null
-            : draft.change.centavos,
+            : draft.changeFrom(total).centavos,
         'created_at': at,
         'confirmed_at': at,
       });
@@ -339,9 +377,18 @@ class OrderService {
 ///
 /// Gross profit is only claimed against those: counting an uncosted drink's
 /// full price as profit would flatter every report that reads this number.
-int _costedRevenue(OrderDraft draft, int uncostedLines) {
-  if (uncostedLines == 0) return draft.total.centavos;
+int _costedRevenue(Money drinksRevenue, int uncostedLines) {
+  if (uncostedLines == 0) return drinksRevenue.centavos;
   return 0;
+}
+
+/// The VAT already inside a VAT-inclusive amount.
+int _vatWithin(Money inclusive, int rateBp) {
+  if (rateBp <= 0) return 0;
+  final int net =
+      ((inclusive.centavos * 10000) + (10000 + rateBp) ~/ 2) ~/
+      (10000 + rateBp);
+  return inclusive.centavos - net;
 }
 
 class _OrderNumber {

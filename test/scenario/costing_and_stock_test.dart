@@ -109,14 +109,14 @@ void main() {
       'an ingredient with no price makes the whole drink uncosted',
       () async {
         final Ingredient mystery = await shop.addIngredient('Unpriced syrup');
-        await shop.setRecipe('Matcha Latte', 'Grande', <Ingredient, double>{
+        await shop.setRecipe('Matcha Oat Latte', 'Grande', <Ingredient, double>{
           milk: 240,
           mystery: 10,
         });
 
         final CompletedOrder order = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Matcha Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Grande')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -398,14 +398,14 @@ void main() {
           openingStock: 0,
           tracked: false,
         );
-        await shop.setRecipe('Matcha Latte', 'Grande', <Ingredient, double>{
+        await shop.setRecipe('Matcha Oat Latte', 'Grande', <Ingredient, double>{
           milk: 200,
           ice: 150,
         });
 
         final CompletedOrder order = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Matcha Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Grande')],
             paymentMethod: PaymentMethod.cash,
           ),
         );

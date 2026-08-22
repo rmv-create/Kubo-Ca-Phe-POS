@@ -19,9 +19,23 @@ class OrderRecord {
     required this.itemCount,
     required this.uncostedLines,
     required this.lines,
+    this.subtotal = Money.zero,
+    this.discount = Money.zero,
+    this.deliveryFee = Money.zero,
+    this.vat = Money.zero,
+    this.vatRateBp = 0,
+    this.discountLabel,
+    this.discountRateBp = 0,
+    this.discountVatExempt = Money.zero,
+    this.discountBeneficiaryName,
+    this.discountBeneficiaryIdNo,
     this.customerId,
     this.customerName,
+    this.customerMobile,
     this.paymentMethod,
+    this.paymentReference,
+    this.tendered,
+    this.change,
     this.voidReason,
   });
 
@@ -44,10 +58,36 @@ class OrderRecord {
   final int uncostedLines;
 
   final List<OrderLineRecord> lines;
+
+  /// The menu total of the drinks, before anything was taken off or added.
+  final Money subtotal;
+
+  /// What the discount took off, and what kind it was.
+  final Money discount;
+  final String? discountLabel;
+  final int discountRateBp;
+
+  /// The VAT the customer did not pay because the sale was exempt.
+  final Money discountVatExempt;
+  final String? discountBeneficiaryName;
+  final String? discountBeneficiaryIdNo;
+
+  final Money deliveryFee;
+
+  /// VAT inside this sale, and the rate assumed when it was rung.
+  final Money vat;
+  final int vatRateBp;
+
   final int? customerId;
   final String? customerName;
+  final String? customerMobile;
   final PaymentMethod? paymentMethod;
+  final String? paymentReference;
+  final Money? tendered;
+  final Money? change;
   final String? voidReason;
+
+  bool get hasDiscount => discount.isPositive;
 
   bool get isVoided => status == 'voided';
   bool get isRefunded => refunded.isPositive;

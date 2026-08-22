@@ -228,12 +228,12 @@ void main() {
     ) async {
       await pumpPos(tester, iPadLandscape);
 
-      await tester.tap(find.text('MATCHA LATTE'));
+      await tester.tap(find.text('MATCHA OAT LATTE'));
       await settle(tester);
 
       expect(find.byType(BottomSheet), findsNothing);
       expect(find.text('SIZE'), findsOneWidget);
-      expect(find.text('MATCHA LATTE'), findsWidgets);
+      expect(find.text('MATCHA OAT LATTE'), findsWidgets);
     });
 
     testWidgets('portrait drops the configuration pane', (

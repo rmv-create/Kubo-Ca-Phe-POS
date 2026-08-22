@@ -283,7 +283,7 @@ void main() {
         OrderDraft(
           items: <DraftItem>[await shop.item('Black', 'Grande')],
           paymentMethod: PaymentMethod.gcash,
-          gcashConfirmed: true,
+          paymentConfirmed: true,
         ),
       );
       await shop.stock.recordWaste(
@@ -362,7 +362,7 @@ void main() {
         price: Money.of(9000),
         openingStock: 1000,
       );
-      await shop.setRecipe('Matcha Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Matcha Oat Latte', 'Grande', <Ingredient, double>{
         gold: 12, // ₱108.00 to make, sold at ₱139
         cup: 1,
       });
@@ -370,7 +370,7 @@ void main() {
       for (int i = 0; i < 5; i++) {
         await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Matcha Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Grande')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -387,7 +387,7 @@ void main() {
 
       expect(
         sellers.first.productName,
-        'Matcha Latte',
+        'Matcha Oat Latte',
         reason: 'five sold beats three',
       );
       expect(

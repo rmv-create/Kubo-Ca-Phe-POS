@@ -664,6 +664,7 @@ class MenuRepositoryImpl implements MenuRepository {
       productId,
       sizeId: sizeId,
     );
+    final Map<int, Money> overrides = await _optionPricesFor(productId);
 
     // A size-specific rule wins over the "all sizes" rule for the same group.
     final Map<int, ProductCustomizationRule> chosen =
@@ -684,7 +685,7 @@ class MenuRepositoryImpl implements MenuRepository {
       if (group == null) continue;
       resolved.add(
         ResolvedCustomizationGroup(
-          group: group,
+          group: _repriced(group, overrides),
           isVisible: rule.isVisible,
           isRequired: rule.requiredFor(group),
           isProactive: rule.proactiveFor(group),
@@ -703,6 +704,48 @@ class MenuRepositoryImpl implements MenuRepository {
           a.displayOrder.compareTo(b.displayOrder),
     );
     return resolved;
+  }
+
+  /// Options this product prices differently from everyone else.
+  ///
+  /// Oat is a ₱20 upgrade on a Spanish Latte and free on a Matcha Oat Latte,
+  /// because on the second one it is the drink rather than an addition to it.
+  Future<Map<int, Money>> _optionPricesFor(int productId) async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'product_option_prices',
+      columns: <String>['option_id', 'price_delta_centavos'],
+      where: 'product_id = ?',
+      whereArgs: <Object?>[productId],
+    );
+    return <int, Money>{
+      for (final Map<String, Object?> row in rows)
+        row['option_id']! as int: Money(row['price_delta_centavos']! as int),
+    };
+  }
+
+  /// The group with this product's own prices applied.
+  ///
+  /// Done once here so everything downstream — the sheet, the order line, the
+  /// order snapshot, the receipt — sees one price and cannot disagree.
+  CustomizationGroup _repriced(
+    CustomizationGroup group,
+    Map<int, Money> overrides,
+  ) {
+    if (overrides.isEmpty) return group;
+    if (!group.options.any(
+      (CustomizationOption o) => overrides.containsKey(o.id),
+    )) {
+      return group;
+    }
+    return group.copyWith(
+      options: group.options
+          .map(
+            (CustomizationOption o) => overrides.containsKey(o.id)
+                ? o.copyWith(priceDelta: overrides[o.id])
+                : o,
+          )
+          .toList(),
+    );
   }
 
   // ─────────────────────────────── helpers ───────────────────────────────
