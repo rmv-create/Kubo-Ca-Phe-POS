@@ -142,6 +142,12 @@ class ReceiptDocument {
     );
   }
 
+  /// The drinks, itemised.
+  ///
+  /// The price beside a drink is the drink's own; anything a modification
+  /// added is its own line underneath with its own charge. Every figure in the
+  /// right-hand column adds up to the subtotal, so a customer can check the
+  /// arithmetic rather than take the total on trust.
   List<pw.Widget> _items() => <pw.Widget>[
     for (final OrderLineRecord line in order.lines) ...<pw.Widget>[
       pw.Row(
@@ -149,15 +155,30 @@ class ReceiptDocument {
         children: <pw.Widget>[
           pw.SizedBox(width: 18, child: _text('${line.quantity}x', size: 9)),
           pw.Expanded(child: _text(line.title, size: 9, bold: true)),
-          _text(line.lineTotal.format(), size: 9),
+          _text(line.baseTotal.format(), size: 9),
         ],
       ),
-      // Every modification, spelled out. "Less sweet" and "extra shot" are
-      // the whole reason a customer checks a receipt.
-      for (final String option in line.options)
+      // On a line of more than one, the price above is for all of them, so
+      // the price of a single drink is spelled out too.
+      if (line.quantity > 1)
+        pw.Padding(
+          padding: const pw.EdgeInsets.only(left: 18),
+          child: _text('${line.unitBasePrice.format()} each', size: 7),
+        ),
+
+      // Every modification, spelled out — "less sweet" and "extra shot" are
+      // the whole reason a customer reads a receipt — and the ones that cost
+      // something say so.
+      for (final OrderLineOption option in line.options)
         pw.Padding(
           padding: const pw.EdgeInsets.only(left: 18, top: 1),
-          child: _text('· $option', size: 8),
+          child: pw.Row(
+            children: <pw.Widget>[
+              pw.Expanded(child: _text('· ${option.name}', size: 8)),
+              if (option.isCharged)
+                _text('+${option.totalFor(line.quantity).format()}', size: 8),
+            ],
+          ),
         ),
       pw.SizedBox(height: 5),
     ],

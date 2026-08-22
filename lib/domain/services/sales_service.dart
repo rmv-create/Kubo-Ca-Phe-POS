@@ -127,7 +127,7 @@ class SalesService {
     for (final Map<String, Object?> line in lineRows) {
       final List<Map<String, Object?>> optionRows = await _db.db.query(
         'order_item_customizations',
-        columns: <String>['option_name_snapshot'],
+        columns: <String>['option_name_snapshot', 'price_delta_centavos'],
         where: 'order_item_id = ?',
         whereArgs: <Object?>[line['id']],
         orderBy: 'display_order',
@@ -139,14 +139,17 @@ class SalesService {
           sizeName: line['size_name_snapshot']! as String,
           quantity: line['quantity']! as int,
           refundedQuantity: line['refunded_quantity']! as int,
+          unitBasePrice: Money(line['unit_base_price_centavos']! as int),
           unitPrice: Money(line['unit_price_centavos']! as int),
           lineTotal: Money(line['line_total_centavos']! as int),
           lineCogs: Money(line['line_cogs_centavos']! as int),
           isCosted: line['recipe_version_id'] != null,
           options: optionRows
               .map(
-                (Map<String, Object?> o) =>
-                    o['option_name_snapshot']! as String,
+                (Map<String, Object?> o) => OrderLineOption(
+                  name: o['option_name_snapshot']! as String,
+                  priceDelta: Money(o['price_delta_centavos']! as int),
+                ),
               )
               .toList(),
         ),

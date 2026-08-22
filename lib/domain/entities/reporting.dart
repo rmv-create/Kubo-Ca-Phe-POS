@@ -104,6 +104,7 @@ class OrderLineRecord {
     required this.sizeName,
     required this.quantity,
     required this.refundedQuantity,
+    required this.unitBasePrice,
     required this.unitPrice,
     required this.lineTotal,
     required this.lineCogs,
@@ -116,14 +117,43 @@ class OrderLineRecord {
   final String sizeName;
   final int quantity;
   final int refundedQuantity;
+
+  /// The drink's own price for this size, before anything was added to it.
+  final Money unitBasePrice;
+
+  /// What one of these cost in the end — base plus every modification.
   final Money unitPrice;
+
   final Money lineTotal;
   final Money lineCogs;
-  final List<String> options;
+  final List<OrderLineOption> options;
   final bool isCosted;
 
   int get remainingQuantity => quantity - refundedQuantity;
   String get title => '$sizeName $productName';
+
+  /// Just the names, for the places that only list them.
+  List<String> get optionNames =>
+      options.map((OrderLineOption o) => o.name).toList();
+
+  /// The drink before its modifications, times how many were sold.
+  Money get baseTotal => unitBasePrice * quantity;
+}
+
+/// One modification as it was sold, with what it added.
+@immutable
+class OrderLineOption {
+  const OrderLineOption({required this.name, required this.priceDelta});
+
+  final String name;
+
+  /// What this added to *one* drink. Zero for the many that are free.
+  final Money priceDelta;
+
+  bool get isCharged => priceDelta.isPositive;
+
+  /// What it added to the whole line.
+  Money totalFor(int quantity) => priceDelta * quantity;
 }
 
 /// One trading day or month, summed.

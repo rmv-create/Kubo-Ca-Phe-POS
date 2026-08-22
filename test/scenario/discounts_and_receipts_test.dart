@@ -177,10 +177,56 @@ void main() {
 
       // Every free modification is on the order it was built from, which is
       // what the document prints.
-      expect(order.lines.single.options, contains('Less Sweet'));
+      expect(order.lines.single.optionNames, contains('Less Sweet'));
       expect(order.customerName, 'Maria Santos');
       expect(order.deliveryFee, Money.of(50));
       expect(order.discountBeneficiaryName, 'Lola Remedios');
+    });
+
+    test('a modification that costs something is itemised', () async {
+      final CompletedOrder done = await shop.sell(
+        OrderDraft(
+          items: <DraftItem>[
+            await shop.item(
+              'Spanish Latte',
+              'Grande',
+              quantity: 2,
+              options: <DraftOption>[
+                await shop.draftOption('milk', 'Oat'),
+                await shop.draftOption('sweetness', 'Less Sweet'),
+              ],
+            ),
+          ],
+          paymentMethod: PaymentMethod.cash,
+        ),
+      );
+      final OrderRecord order = (await shop.sales.orderById(done.id))!;
+      final OrderLineRecord line = order.lines.single;
+
+      // The drink's own price and the modification's charge are separate
+      // figures that add up to the line — which is what "itemised" means.
+      expect(line.unitBasePrice, Money.of(139));
+      expect(line.baseTotal, Money.of(278));
+
+      final OrderLineOption oat = line.options.firstWhere(
+        (OrderLineOption o) => o.name == 'Oat',
+      );
+      expect(oat.isCharged, isTrue);
+      expect(oat.priceDelta, Money.of(20));
+      expect(oat.totalFor(line.quantity), Money.of(40));
+
+      // Free ones carry no charge, so nothing is printed beside them.
+      final OrderLineOption lessSweet = line.options.firstWhere(
+        (OrderLineOption o) => o.name == 'Less Sweet',
+      );
+      expect(lessSweet.isCharged, isFalse);
+
+      // And the parts reconcile: base + charged modifications = the line.
+      final Money charged = line.options
+          .map((OrderLineOption o) => o.totalFor(line.quantity))
+          .fold(Money.zero, (Money a, Money b) => a + b);
+      expect(line.baseTotal + charged, line.lineTotal);
+      expect(line.lineTotal, order.subtotal);
     });
 
     test('the peso sign is really printed, not a box', () async {

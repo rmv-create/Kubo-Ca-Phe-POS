@@ -81,7 +81,16 @@ class _OrderLine extends ConsumerWidget {
                   ),
                   if (notable.isNotEmpty)
                     Text(
-                      notable.map((DraftOption o) => o.option.name).join(' · '),
+                      // What a modification adds is named beside it, so the
+                      // price on the right is never a surprise.
+                      notable
+                          .map(
+                            (DraftOption o) => o.priceDelta.isZero
+                                ? o.option.name
+                                : '${o.option.name} '
+                                      '+${(o.priceDelta * item.quantity).format()}',
+                          )
+                          .join(' · '),
                       style: theme.textTheme.bodySmall,
                     ),
                   const SizedBox(height: KuboSpacing.sm),
