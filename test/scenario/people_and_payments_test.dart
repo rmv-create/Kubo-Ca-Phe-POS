@@ -135,15 +135,15 @@ void main() {
       final AppUser owner = await signIn.addUser(
         name: 'Owner',
         role: UserRole.owner,
-        pin: '1234',
+        pin: '123456',
       );
 
-      expect(await signIn.signIn(userId: owner.id, pin: '1234'), isNotNull);
-      expect(await signIn.signIn(userId: owner.id, pin: '4321'), isNull);
+      expect(await signIn.signIn(userId: owner.id, pin: '123456'), isNotNull);
+      expect(await signIn.signIn(userId: owner.id, pin: '654321'), isNull);
     });
 
     test('the PIN is not readable in the database', () async {
-      await signIn.addUser(name: 'Owner', role: UserRole.owner, pin: '1234');
+      await signIn.addUser(name: 'Owner', role: UserRole.owner, pin: '123456');
 
       final Map<String, Object?> row = (await shop.db.db.query(
         'app_users',
@@ -154,7 +154,7 @@ void main() {
       await signIn.addUser(
         name: 'Barista',
         role: UserRole.barista,
-        pin: '1234',
+        pin: '123456',
       );
       final List<Map<String, Object?>> both = await shop.db.db.query(
         'app_users',
@@ -166,34 +166,63 @@ void main() {
       final AppUser owner = await signIn.addUser(
         name: 'Owner',
         role: UserRole.owner,
-        pin: '1234',
+        pin: '123456',
       );
       final AppUser barista = await signIn.addUser(
         name: 'Barista',
         role: UserRole.barista,
-        pin: '5678',
+        pin: '567890',
       );
 
       expect(owner.canManage, isTrue);
       expect(barista.canManage, isFalse);
     });
 
-    test('a PIN that is too short, or not digits, is refused', () async {
+    test('a PIN is six digits — not five, not seven, not letters', () async {
+      for (final String bad in <String>[
+        '12345',
+        '1234567',
+        'abcdef',
+        '12 456',
+        '+12345',
+        '',
+      ]) {
+        await expectLater(
+          signIn.addUser(name: 'Try $bad', role: UserRole.owner, pin: bad),
+          throwsA(isA<BusinessRuleException>()),
+          reason: '"$bad" is not a six-digit PIN',
+        );
+      }
+
+      // And the one that is.
+      expect(
+        await signIn.addUser(name: 'Good', role: UserRole.owner, pin: '013579'),
+        isNotNull,
+        reason: 'a leading zero is a digit like any other',
+      );
+    });
+
+    test('a changed PIN is held to the same rule', () async {
+      final AppUser owner = await signIn.addUser(
+        name: 'Owner',
+        role: UserRole.owner,
+        pin: '123456',
+      );
+
       await expectLater(
-        signIn.addUser(name: 'A', role: UserRole.owner, pin: '12'),
+        signIn.setPin(userId: owner.id, pin: '1234'),
         throwsA(isA<BusinessRuleException>()),
       );
-      await expectLater(
-        signIn.addUser(name: 'B', role: UserRole.owner, pin: 'abcd'),
-        throwsA(isA<BusinessRuleException>()),
-      );
+      await signIn.setPin(userId: owner.id, pin: '999888');
+      expect(await signIn.signIn(userId: owner.id, pin: '999888'), isNotNull);
+      expect(await signIn.signIn(userId: owner.id, pin: '123456'), isNull);
     });
 
     test('the last owner cannot switch themselves off', () async {
       final AppUser owner = await signIn.addUser(
         name: 'Owner',
         role: UserRole.owner,
-        pin: '1234',
+        pin: '123456',
       );
 
       await expectLater(
@@ -203,15 +232,15 @@ void main() {
     });
 
     test('a switched-off person cannot sign in', () async {
-      await signIn.addUser(name: 'Owner', role: UserRole.owner, pin: '1111');
+      await signIn.addUser(name: 'Owner', role: UserRole.owner, pin: '111111');
       final AppUser barista = await signIn.addUser(
         name: 'Barista',
         role: UserRole.barista,
-        pin: '5678',
+        pin: '567890',
       );
       await signIn.setActive(userId: barista.id, isActive: false);
 
-      expect(await signIn.signIn(userId: barista.id, pin: '5678'), isNull);
+      expect(await signIn.signIn(userId: barista.id, pin: '567890'), isNull);
     });
   });
 

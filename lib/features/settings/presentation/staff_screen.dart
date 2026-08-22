@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
@@ -74,10 +75,10 @@ class StaffScreen extends ConsumerWidget {
               ),
               child: Text(
                 'This keeps your barista out of your books. It is not a lock '
-                'against someone determined: a four-digit PIN is short, and '
-                'anyone holding the phone — or a public link to the app — '
-                'could work through it. Keep the device itself locked, and '
-                'keep the web link private.',
+                'against someone determined: six digits is a million guesses, '
+                'and a computer with the database file makes those in a '
+                'moment. Keep the device itself locked, and keep the web link '
+                'private.',
                 style: theme.textTheme.bodySmall,
               ),
             ),
@@ -180,11 +181,16 @@ class _UserSheetState extends ConsumerState<_UserSheet> {
               controller: _pin,
               keyboardType: TextInputType.number,
               obscureText: true,
-              maxLength: 8,
+              maxLength: SignInService.pinLength,
+              // Digits only, so a stray letter cannot be typed and then
+              // rejected on save.
+              inputFormatters: <TextInputFormatter>[
+                FilteringTextInputFormatter.digitsOnly,
+              ],
               decoration: InputDecoration(
                 labelText: existing == null ? 'PIN' : 'New PIN',
                 helperText:
-                    'At least ${SignInService.minPinLength} digits'
+                    '${SignInService.pinLength} digits'
                     '${existing == null ? '' : '. Leave blank to keep the old one.'}',
               ),
             ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../domain/entities/app_user.dart';
+import '../../../domain/services/sign_in_service.dart';
 import '../../../shared/widgets/kubo_mark.dart';
 
 /// Pick a name, tap a PIN.
@@ -90,11 +92,20 @@ class _SignInSheetState extends ConsumerState<SignInSheet> {
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineMedium,
                 decoration: InputDecoration(
-                  hintText: 'PIN',
+                  hintText: '${SignInService.pinLength} digits',
                   errorText: _error,
                   counterText: '',
                 ),
-                maxLength: 8,
+                maxLength: SignInService.pinLength,
+                inputFormatters: <TextInputFormatter>[
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                // The PIN is a known length, so the sixth digit is the whole
+                // instruction. Making her reach for a button afterwards would
+                // be a tap the app already has enough information to skip.
+                onChanged: (String value) {
+                  if (value.length == SignInService.pinLength) _submit(chosen);
+                },
                 onSubmitted: (_) => _submit(chosen),
               ),
               const SizedBox(height: KuboSpacing.lg),

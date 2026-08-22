@@ -18,12 +18,15 @@ import '../entities/app_user.dart';
 /// recipes or exporting the customer list. That is the actual problem the
 /// owner has, and it solves it.
 ///
-/// It does **not** protect the data from someone determined. A four-digit PIN
-/// has ten thousand possibilities, and anyone holding the device — or the
-/// database file, or a shared web link — can work through them offline. The
-/// PIN is stored as a salted SHA-256 hash so it is not readable at a glance,
-/// and that is the honest limit of it. Anything genuinely confidential belongs
-/// behind the device's own passcode and a private link, not behind this.
+/// It does **not** protect the data from someone determined. Six digits is a
+/// million possibilities, which is a long evening by hand and no time at all
+/// for a computer holding the database file. The PIN is stored as a salted
+/// SHA-256 hash so it is not readable at a glance, and that is the honest
+/// limit of it: SHA-256 is fast by design, which is the wrong property for
+/// this job — a real defence would use a deliberately slow hash and a lockout
+/// after repeated failures. Neither is worth building for a two-person shop
+/// whose device already has a passcode. Anything genuinely confidential
+/// belongs behind that passcode and a private link, not behind this.
 class SignInService {
   const SignInService({required AppDatabase database, required Clock clock})
     : _db = database,
@@ -32,9 +35,12 @@ class SignInService {
   final AppDatabase _db;
   final Clock _clock;
 
-  /// Minimum PIN length. Four is what a phone lock screen asks for and what
-  /// someone will actually use ten times a day.
-  static const int minPinLength = 4;
+  /// How many digits a PIN has. Six, at the owner's request.
+  ///
+  /// Fixed rather than a minimum, so the keypad, the field and the message all
+  /// agree on one number, and so signing in can submit itself the moment the
+  /// sixth digit lands instead of asking for a second tap.
+  static const int pinLength = 6;
 
   /// Everyone who can sign in.
   Future<List<AppUser>> users({bool includeInactive = false}) async {
@@ -155,9 +161,13 @@ class SignInService {
   }
 
   void _checkPin(String pin) {
-    if (pin.length < minPinLength || int.tryParse(pin) == null) {
+    // Digits only, and exactly [pinLength] of them. `int.tryParse` would
+    // accept "+123456" and "  123456 ", neither of which anyone can type back
+    // in on a numeric keypad.
+    if (pin.length != pinLength ||
+        !RegExp('^[0-9]{$pinLength}\$').hasMatch(pin)) {
       throw const BusinessRuleException(
-        'The PIN must be at least $minPinLength digits.',
+        'The PIN must be exactly $pinLength digits.',
       );
     }
   }
