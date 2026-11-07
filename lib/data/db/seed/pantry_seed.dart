@@ -243,9 +243,12 @@ abstract final class PantrySeed {
     ),
   ];
 
-  /// What goes into each drink, off sheet 5. Her "Large" is the app's
-  /// Large. Where she listed an ingredient twice in one drink — the
-  /// milk in a cold foam, say — the two lines are added together.
+  /// What goes into each drink, from the corrected recipe sheet she
+  /// sent on 7 November. Sizes are her own: Small and Large.
+  ///
+  /// Where she lists an ingredient twice in one drink — the milk in a
+  /// cold foam, say — the two lines are added together, because a
+  /// recipe holds one figure per ingredient.
   static const List<PantryRecipe> recipes = <PantryRecipe>[
     PantryRecipe(
       drink: 'Iced Black',
@@ -447,40 +450,41 @@ abstract final class PantrySeed {
       drink: 'Ca Phe Sua Da',
       size: 'Large',
       lines: <String, double>{
-        'Sang Tao 1': 55,
-        'Water': 405,
-        'Vinamilk Condensed': 92.5,
-        'Ice': 360,
+        'Sang Tao 1': 33,
+        'Water': 235,
+        'Vinamilk Condensed': 48,
+        'Ice': 180,
         'Electricity & Gas': 1,
         'Large cup 16oz': 1,
         'Paper Cover': 1,
         'Straw': 1,
-        'Nestle All Purpose Cream': 25,
-        'Alaska Fresh Milk': 37.5,
-        'Sea Salt': 0.75,
       },
     ),
     PantryRecipe(
       drink: 'Ca Phe Sua Da',
       size: 'Small',
       lines: <String, double>{
-        'Sang Tao 1': 41.25,
-        'Water': 303.75,
-        'Vinamilk Condensed': 69.375,
-        'Ice': 270,
+        'Sang Tao 1': 24.75,
+        'Water': 176.25,
+        'Vinamilk Condensed': 36,
+        'Ice': 135,
         'Electricity & Gas': 1,
         'Small cup 12oz': 1,
         'Paper Cover': 1,
         'Straw': 1,
-        'Nestle All Purpose Cream': 18.75,
-        'Alaska Fresh Milk': 28.125,
-        'Sea Salt': 0.5625,
       },
     ),
     PantryRecipe(
       drink: 'Ca Phe Muoi',
       size: 'Large',
       lines: <String, double>{
+        'Sang Tao 1': 22,
+        'Water': 170,
+        'Vinamilk Condensed': 44.5,
+        'Ice': 180,
+        'Nestle All Purpose Cream': 25,
+        'Alaska Fresh Milk': 37.5,
+        'Sea Salt': 0.75,
         'Electricity & Gas': 1,
         'Large cup 16oz': 1,
         'Paper Cover': 1,
@@ -491,6 +495,13 @@ abstract final class PantrySeed {
       drink: 'Ca Phe Muoi',
       size: 'Small',
       lines: <String, double>{
+        'Sang Tao 1': 16.5,
+        'Water': 127.5,
+        'Vinamilk Condensed': 33.375,
+        'Ice': 135,
+        'Nestle All Purpose Cream': 18.75,
+        'Alaska Fresh Milk': 28.125,
+        'Sea Salt': 0.5625,
         'Electricity & Gas': 1,
         'Small cup 12oz': 1,
         'Paper Cover': 1,

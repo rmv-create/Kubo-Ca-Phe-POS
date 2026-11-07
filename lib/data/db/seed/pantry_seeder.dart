@@ -4,6 +4,7 @@ import '../../../core/money/money.dart';
 import '../../../core/money/unit_cost.dart';
 import '../../../core/quantity/quantity.dart';
 import '../../../core/time/clock.dart';
+import '../../../domain/entities/business_settings.dart';
 import '../../../domain/entities/ingredient.dart';
 import '../../../domain/services/inventory_engine.dart';
 import '../app_database.dart';
@@ -20,21 +21,113 @@ import 'pantry_seed.dart';
 /// Recipes are written as version 1 of each drink, through the same tables
 /// the recipe editor uses, so editing one afterwards starts version 2 and
 /// everything already sold keeps the cost it was sold at.
+///
+/// When she sends a corrected sheet, [seedVersion] goes up and the recipes
+/// she has not touched are rewritten in place on the next launch. One she
+/// *has* edited is left exactly as she left it: the app does not overrule
+/// her own work with a file she sent before she changed her mind.
 class PantrySeeder {
   const PantrySeeder(this._db, this._clock);
 
   final AppDatabase _db;
   final Clock _clock;
 
-  /// Returns true if it seeded, false if there was already a pantry.
+  /// Which edition of the worksheet is in [PantrySeed].
+  ///
+  /// 1 — the first setup workbook.
+  /// 2 — the corrected recipe sheet of 7 November, which moved the sea salt
+  ///     cream from Ca Phe Sua Da to Ca Phe Muoi, where it belongs.
+  static const int seedVersion = 2;
+
+  /// The note every recipe written from the worksheet carries. A recipe
+  /// without it is one she wrote, and is never touched.
+  static const String _fromWorksheet = 'From the setup worksheet';
+
+  /// Returns true if it wrote anything.
   Future<bool> seedIfEmpty() async {
     final List<Map<String, Object?>> existing = await _db.db.rawQuery(
       'SELECT 1 FROM ingredients LIMIT 1',
     );
-    if (existing.isNotEmpty) return false;
+    if (existing.isEmpty) {
+      await _db.transaction(_seed);
+      await _stampVersion();
+      return true;
+    }
 
-    await _db.transaction(_seed);
+    if (await _storedVersion() >= seedVersion) return false;
+    await _db.transaction(_refreshRecipes);
+    await _stampVersion();
     return true;
+  }
+
+  Future<int> _storedVersion() async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'app_settings',
+      columns: <String>['value'],
+      where: 'key = ?',
+      whereArgs: <Object?>[SettingKeys.pantrySeedVersion],
+      limit: 1,
+    );
+    if (rows.isEmpty) return 1;
+    return int.tryParse(rows.first['value'] as String? ?? '') ?? 1;
+  }
+
+  Future<void> _stampVersion() =>
+      _db.db.insert('app_settings', <String, Object?>{
+        'key': SettingKeys.pantrySeedVersion,
+        'value': '$seedVersion',
+        'updated_at': _clock.nowIso(),
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+  /// Rewrites the worksheet recipes she has not edited.
+  ///
+  /// In place, on the version that is already live: these recipes have no
+  /// history worth keeping — they were a transcription of a sheet that turned
+  /// out to be wrong — and anything already sold carries its own cost on the
+  /// order line regardless.
+  Future<void> _refreshRecipes(Transaction txn) async {
+    final String now = _clock.nowIso();
+    final Map<String, int> ingredientIds = <String, int>{
+      for (final Map<String, Object?> row in await txn.query(
+        'ingredients',
+        columns: <String>['id', 'name'],
+      ))
+        row['name']! as String: row['id']! as int,
+    };
+
+    for (final PantryRecipe recipe in PantrySeed.recipes) {
+      final List<Map<String, Object?>> rows = await txn.rawQuery(
+        '''
+        SELECT r.id AS recipe_id, v.id AS version_id,
+               (SELECT COUNT(*) FROM recipe_versions WHERE recipe_id = r.id)
+                 AS versions
+        FROM recipes r
+        JOIN recipe_versions v ON v.recipe_id = r.id
+        JOIN products p ON p.id = r.product_id
+        JOIN sizes s ON s.id = r.size_id
+        WHERE p.name = ? COLLATE NOCASE AND s.name = ? COLLATE NOCASE
+          AND v.note = ?
+        LIMIT 1
+        ''',
+        <Object?>[recipe.drink, recipe.size, _fromWorksheet],
+      );
+      // Not there, or she has saved a version of her own over it.
+      if (rows.isEmpty || (rows.first['versions']! as int) > 1) continue;
+
+      final int versionId = rows.first['version_id']! as int;
+      await txn.delete(
+        'recipe_items',
+        where: 'recipe_version_id = ?',
+        whereArgs: <Object?>[versionId],
+      );
+      await _writeLines(txn, versionId, recipe, ingredientIds, now);
+      await txn.update(
+        'recipe_versions',
+        <String, Object?>{'updated_at': now},
+        where: 'id = ?',
+        whereArgs: <Object?>[versionId],
+      );
+    }
   }
 
   Future<void> _seed(Transaction txn) async {
@@ -146,11 +239,21 @@ class PantrySeeder {
       'version_no': 1,
       'effective_from': now,
       'status': 'active',
-      'note': 'From the setup worksheet',
+      'note': _fromWorksheet,
       'created_at': now,
       'updated_at': now,
     });
 
+    await _writeLines(txn, versionId, recipe, ingredientIds, now);
+  }
+
+  Future<void> _writeLines(
+    Transaction txn,
+    int versionId,
+    PantryRecipe recipe,
+    Map<String, int> ingredientIds,
+    String now,
+  ) async {
     for (final MapEntry<String, double> line in recipe.lines.entries) {
       final int? ingredientId = ingredientIds[line.key];
       if (ingredientId == null || line.value <= 0) continue;

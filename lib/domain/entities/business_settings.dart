@@ -227,6 +227,10 @@ abstract final class SettingKeys {
   static const String showCustomerName = 'pos.show_customer_name';
   static const String pricesProvisional = 'menu.prices_provisional';
   static const String menuSeeded = 'data.menu_seeded';
+
+  /// Which edition of her setup worksheet the pantry was written from, so a
+  /// corrected sheet can replace the recipes she has not edited herself.
+  static const String pantrySeedVersion = 'data.pantry_seed_version';
   static const String vatRegistered = 'tax.vat_registered';
   static const String vatRateBp = 'tax.vat_rate_bp';
   static const String statutoryDiscountRateBp =
