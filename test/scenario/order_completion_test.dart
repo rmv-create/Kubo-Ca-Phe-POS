@@ -241,7 +241,7 @@ void main() {
   });
 
   group('order numbers', () {
-    test('run K-0001 onwards', () async {
+    test('run KUBO-1001 onwards, as she wrote on the app', () async {
       for (int i = 1; i <= 3; i++) {
         final CompletedOrder order = await shop.sell(
           OrderDraft(
@@ -249,7 +249,7 @@ void main() {
             paymentMethod: PaymentMethod.cash,
           ),
         );
-        expect(order.orderNo, 'K-000$i');
+        expect(order.orderNo, 'KUBO-${1000 + i}');
       }
     });
 
@@ -267,7 +267,7 @@ void main() {
           paymentMethod: PaymentMethod.cash,
         ),
       );
-      expect(next.orderNo, 'K-0002');
+      expect(next.orderNo, 'KUBO-1002');
     });
 
     test('carry the day when the counter is set to restart daily', () async {
@@ -283,7 +283,9 @@ void main() {
         ),
         using: daily,
       );
-      expect(first.orderNo, 'K-0315-0001');
+      // A counter that restarts every morning counts the day, so it starts
+      // at 1 whatever the shop's own first number was.
+      expect(first.orderNo, 'KUBO-0315-0001');
 
       shop.clock.advance(const Duration(days: 1));
       final CompletedOrder next = await shop.sell(
@@ -293,7 +295,7 @@ void main() {
         ),
         using: daily,
       );
-      expect(next.orderNo, 'K-0316-0001');
+      expect(next.orderNo, 'KUBO-0316-0001');
       expect(next.orderNo, isNot(first.orderNo));
     });
 

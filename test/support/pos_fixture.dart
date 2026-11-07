@@ -131,7 +131,7 @@ class PosFixture {
   final OrderService orders;
 
   BusinessSettings settings = BusinessSettings.defaults.copyWith(
-    orderNumberPrefix: 'K',
+    orderNumberPrefix: 'KUBO',
     orderNumberResetDaily: false,
   );
 

@@ -382,22 +382,24 @@ void main() {
 
   group('settings from the worksheet', () {
     test(
-      'order numbers are K-0001 onwards and do not reset each day',
+      'order numbers are KUBO-1001 onwards and do not reset each day',
       () async {
         final List<Map<String, Object?>> rows = await database.db.query(
           'app_settings',
-          where: 'key IN (?, ?)',
+          where: 'key IN (?, ?, ?)',
           whereArgs: <Object?>[
             SettingKeys.orderNumberPrefix,
             SettingKeys.orderNumberResetDaily,
+            SettingKeys.orderNumberStart,
           ],
         );
         final Map<String, String> settings = <String, String>{
           for (final Map<String, Object?> r in rows)
             r['key']! as String: r['value']! as String,
         };
-        expect(settings[SettingKeys.orderNumberPrefix], 'K');
+        expect(settings[SettingKeys.orderNumberPrefix], 'KUBO');
         expect(settings[SettingKeys.orderNumberResetDaily], '0');
+        expect(settings[SettingKeys.orderNumberStart], '1001');
       },
     );
 

@@ -391,6 +391,25 @@ void main() {
     expect(methods.last['needs_confirmation'], 1);
   });
 
+  test('an unused shop takes the new numbering; a trading one does '
+      'not', () async {
+    // Renumbering orders that already exist would give two receipts the
+    // same number, so where there is history the sequence stays put.
+    final AppDatabase trading = await tradingShopOnVersion5();
+    await const MigrationRunner().run(trading.db);
+    expect(
+      await _setting(trading, 'orders.number_prefix'),
+      isNot('KUBO'),
+      reason: 'this shop has already rung something up',
+    );
+
+    final AppDatabase fresh = await openTestDatabaseAt(5);
+    addTearDown(fresh.close);
+    await const MigrationRunner().run(fresh.db);
+    expect(await _setting(fresh, 'orders.number_prefix'), 'KUBO');
+    expect(await _setting(fresh, 'orders.number_start'), '1001');
+  });
+
   test('an upgraded shop and a new one end up with the same menu', () async {
     // The migration carries its own frozen copy of the card so that it does
     // the same thing in a year as it does today. This is what stops that copy
@@ -404,4 +423,15 @@ void main() {
 
     expect(await menuOf(upgraded), await menuOf(fresh));
   });
+}
+
+Future<String?> _setting(AppDatabase db, String key) async {
+  final List<Map<String, Object?>> rows = await db.db.query(
+    'app_settings',
+    columns: <String>['value'],
+    where: 'key = ?',
+    whereArgs: <Object?>[key],
+    limit: 1,
+  );
+  return rows.isEmpty ? null : rows.first['value'] as String?;
 }

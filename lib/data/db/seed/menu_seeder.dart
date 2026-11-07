@@ -208,7 +208,8 @@ class MenuSeeder {
     // Her sheet: "prices and cost are not decided yet, I've put tentative
     // price". The app says so on screen until she confirms them.
     await put(SettingKeys.pricesProvisional, '1');
-    await put(SettingKeys.orderNumberPrefix, 'K');
+    await put(SettingKeys.orderNumberPrefix, 'KUBO');
+    await put(SettingKeys.orderNumberStart, '1001');
     await put(SettingKeys.orderNumberResetDaily, '0');
     await put(SettingKeys.showCustomerName, '1');
   }

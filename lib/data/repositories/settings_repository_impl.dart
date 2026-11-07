@@ -27,6 +27,9 @@ class SettingsRepositoryImpl implements SettingsRepository {
       ),
       orderNumberPrefix:
           values[SettingKeys.orderNumberPrefix] ?? d.orderNumberPrefix,
+      orderNumberStart:
+          int.tryParse(values[SettingKeys.orderNumberStart] ?? '') ??
+          d.orderNumberStart,
       backupRetentionCount:
           int.tryParse(values[SettingKeys.backupRetentionCount] ?? '') ??
           d.backupRetentionCount,
@@ -84,6 +87,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
         '${settings.businessDayCutoffHour}',
       );
       await _put(txn, SettingKeys.costingMethod, settings.costingMethod.code);
+      await _put(
+        txn,
+        SettingKeys.orderNumberStart,
+        '${settings.orderNumberStart}',
+      );
       await _put(
         txn,
         SettingKeys.orderNumberPrefix,

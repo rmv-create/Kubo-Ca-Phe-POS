@@ -290,7 +290,17 @@ class OrderService {
           )
         : await txn.rawQuery('SELECT MAX(sequence_no) AS m FROM orders');
 
-    final int next = ((rows.first['m'] as int?) ?? 0) + 1;
+    // The first order of the shop's life takes the number she chose — hers
+    // start at 1001 — and every one after it follows the last. A counter
+    // that restarts each morning is a count of the day, so it starts at 1
+    // and the date in the number keeps it unique.
+    final int last = (rows.first['m'] as int?) ?? 0;
+    final int start = settings.orderNumberStart < 1
+        ? 1
+        : settings.orderNumberStart;
+    final int next = (last == 0 && !settings.orderNumberResetDaily)
+        ? start
+        : last + 1;
     final String digits = next.toString().padLeft(4, '0');
     final String prefix = settings.orderNumberPrefix.trim();
 

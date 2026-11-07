@@ -33,6 +33,7 @@ class BusinessSettings {
     required this.businessDayCutoffHour,
     required this.costingMethod,
     required this.orderNumberPrefix,
+    required this.orderNumberStart,
     required this.backupRetentionCount,
     required this.autoBackupDaily,
     required this.discountsEnabled,
@@ -60,7 +61,9 @@ class BusinessSettings {
     currencySymbol: '₱',
     businessDayCutoffHour: 4,
     costingMethod: CostingMethod.latestCost,
-    orderNumberPrefix: '',
+    // "KUBO-1001" — her own, written on the app.
+    orderNumberPrefix: 'KUBO',
+    orderNumberStart: 1001,
     backupRetentionCount: 14,
     autoBackupDaily: true,
     // V1 ships with discounts switched off; the POS shows no discount control.
@@ -105,6 +108,10 @@ class BusinessSettings {
 
   final CostingMethod costingMethod;
   final String orderNumberPrefix;
+
+  /// The number the first order takes. Hers start at 1001, so the shop's
+  /// first receipt reads KUBO-1001 rather than KUBO-0001.
+  final int orderNumberStart;
   final int backupRetentionCount;
   final bool autoBackupDaily;
   final bool discountsEnabled;
@@ -167,6 +174,7 @@ class BusinessSettings {
     int? businessDayCutoffHour,
     CostingMethod? costingMethod,
     String? orderNumberPrefix,
+    int? orderNumberStart,
     int? backupRetentionCount,
     bool? autoBackupDaily,
     bool? discountsEnabled,
@@ -191,6 +199,7 @@ class BusinessSettings {
     businessDayCutoffHour: businessDayCutoffHour ?? this.businessDayCutoffHour,
     costingMethod: costingMethod ?? this.costingMethod,
     orderNumberPrefix: orderNumberPrefix ?? this.orderNumberPrefix,
+    orderNumberStart: orderNumberStart ?? this.orderNumberStart,
     backupRetentionCount: backupRetentionCount ?? this.backupRetentionCount,
     autoBackupDaily: autoBackupDaily ?? this.autoBackupDaily,
     discountsEnabled: discountsEnabled ?? this.discountsEnabled,
@@ -218,6 +227,7 @@ abstract final class SettingKeys {
   static const String businessDayCutoffHour = 'business.day_cutoff_hour';
   static const String costingMethod = 'costing.method';
   static const String orderNumberPrefix = 'orders.number_prefix';
+  static const String orderNumberStart = 'orders.number_start';
   static const String backupRetentionCount = 'backup.retention_count';
   static const String autoBackupDaily = 'backup.auto_daily';
   static const String lastAutoBackupDate = 'backup.last_auto_date';

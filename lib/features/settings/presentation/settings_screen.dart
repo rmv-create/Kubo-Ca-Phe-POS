@@ -18,6 +18,17 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _nameController;
   late final TextEditingController _prefixController;
+  late final TextEditingController _startController;
+
+  /// The first number can only be chosen before the first sale: changing it
+  /// afterwards would give two receipts the same number.
+  bool _hasSold = true;
+
+  Future<void> _checkIfSold() async {
+    final bool sold =
+        (await ref.read(salesServiceProvider).orders(limit: 1)).isNotEmpty;
+    if (mounted) setState(() => _hasSold = sold);
+  }
 
   @override
   void initState() {
@@ -25,12 +36,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final BusinessSettings settings = ref.read(settingsControllerProvider);
     _nameController = TextEditingController(text: settings.businessName);
     _prefixController = TextEditingController(text: settings.orderNumberPrefix);
+    _startController = TextEditingController(
+      text: '${settings.orderNumberStart}',
+    );
+    unawaited(_checkIfSold());
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _prefixController.dispose();
+    _startController.dispose();
     super.dispose();
   }
 
@@ -111,11 +127,37 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               controller: _prefixController,
               decoration: const InputDecoration(
                 labelText: 'Order number prefix',
-                helperText: 'Optional, e.g. K — order numbers become K-0001',
+                helperText:
+                    'Optional, e.g. KUBO — order numbers become KUBO-1001',
               ),
               textInputAction: TextInputAction.done,
               onSubmitted: (String value) =>
                   _save(settings.copyWith(orderNumberPrefix: value.trim())),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              KuboSpacing.lg,
+              KuboSpacing.sm,
+              KuboSpacing.lg,
+              0,
+            ),
+            child: TextField(
+              controller: _startController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'First order number',
+                helperText:
+                    'Where the counter starts. Fixed once you have '
+                    'rung something up.',
+              ),
+              enabled: !_hasSold,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (String value) {
+                final int? start = int.tryParse(value.trim());
+                if (start == null || start < 1) return;
+                _save(settings.copyWith(orderNumberStart: start));
+              },
             ),
           ),
           const SectionHeader('Costing'),
