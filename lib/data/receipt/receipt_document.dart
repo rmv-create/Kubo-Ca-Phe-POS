@@ -81,12 +81,16 @@ class ReceiptDocument {
             ..._totals(),
             pw.SizedBox(height: 8),
             _payment(),
+            ..._note(),
             if (order.isVoided) ...<pw.Widget>[
               pw.SizedBox(height: 8),
               _centred('VOIDED', size: 12, bold: true),
               if (order.voidReason != null)
                 _centred(order.voidReason!, size: 8),
             ],
+            ..._thanks(),
+            ..._qr(),
+            ..._contact(),
             if (footerImage != null) ...<pw.Widget>[
               pw.SizedBox(height: 12),
               pw.Center(
@@ -225,6 +229,14 @@ class ReceiptDocument {
   /// Cash has change; anything settled through a phone has a reference, and
   /// only when one was actually typed in. Neither appears on the other.
   static List<ReceiptLine> paymentLines(OrderRecord order) {
+    // An order she sent out before the money arrived says so, plainly, and
+    // says what is owed. Nothing invents a payment method for it.
+    if (order.isUnpaid) {
+      return <ReceiptLine>[
+        const ReceiptLine('NOT YET PAID', null),
+        ReceiptLine('Amount due', order.total, emphasised: true),
+      ];
+    }
     final PaymentMethod? method = order.paymentMethod;
     final String? reference = order.paymentReference;
     return <ReceiptLine>[
@@ -271,7 +283,10 @@ class ReceiptDocument {
     children: <pw.Widget>[
       for (final ReceiptLine line in paymentLines(order))
         if (line.amount == null)
-          _text(line.label, size: 8)
+          if (order.isUnpaid)
+            _centred(line.label, size: 11, bold: true)
+          else
+            _text(line.label, size: 8)
         else
           _amountRow(
             line.label,
@@ -280,6 +295,62 @@ class ReceiptDocument {
           ),
     ],
   );
+
+  /// Her own note on this order — "leave at the gate", "no straw" — kept
+  /// verbatim and given its own label so it does not read as part of the
+  /// total.
+  List<pw.Widget> _note() {
+    final String note = order.note?.trim() ?? '';
+    if (note.isEmpty) return const <pw.Widget>[];
+    return <pw.Widget>[pw.SizedBox(height: 8), _text('Note: $note', size: 8)];
+  }
+
+  /// One line of thanks. Short on purpose: a receipt is 72mm wide and the
+  /// customer is reading it on a phone.
+  List<pw.Widget> _thanks() {
+    final String thanks = settings.receiptThankYou.trim();
+    if (thanks.isEmpty) return const <pw.Widget>[];
+    return <pw.Widget>[pw.SizedBox(height: 10), _centred(thanks, size: 9)];
+  }
+
+  /// The QR code, drawn from the link in settings rather than pasted in as a
+  /// picture — so changing where it points is typing, not image editing, and
+  /// the code stays sharp at any print size.
+  List<pw.Widget> _qr() {
+    final String data = settings.receiptQrData.trim();
+    if (data.isEmpty) return const <pw.Widget>[];
+    return <pw.Widget>[
+      pw.SizedBox(height: 8),
+      pw.Center(
+        child: pw.BarcodeWidget(
+          barcode: pw.Barcode.qrCode(),
+          data: data,
+          width: 24 * PdfPageFormat.mm,
+          height: 24 * PdfPageFormat.mm,
+          drawText: false,
+        ),
+      ),
+    ];
+  }
+
+  /// Where to find her: the page, the handle, the address. Each printed only
+  /// if she has filled it in, because a receipt with an empty "Address:" on it
+  /// looks like a mistake.
+  List<pw.Widget> _contact() {
+    final List<String> lines = <String>[
+      if (settings.receiptFacebook.trim().isNotEmpty)
+        'FB: ${settings.receiptFacebook.trim()}',
+      if (settings.receiptInstagram.trim().isNotEmpty)
+        'IG: ${settings.receiptInstagram.trim()}',
+      if (settings.receiptAddress.trim().isNotEmpty)
+        settings.receiptAddress.trim(),
+    ];
+    if (lines.isEmpty) return const <pw.Widget>[];
+    return <pw.Widget>[
+      pw.SizedBox(height: 6),
+      for (final String line in lines) _centred(line, size: 8),
+    ];
+  }
 
   pw.Widget _amountRow(
     String label,

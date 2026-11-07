@@ -36,6 +36,8 @@ class OrderRecord {
     this.tendered,
     this.change,
     this.voidReason,
+    this.paymentState = 'paid',
+    this.note,
   });
 
   final int id;
@@ -84,6 +86,15 @@ class OrderRecord {
   final Money? tendered;
   final Money? change;
   final String? voidReason;
+
+  /// `paid` or `unpaid`. An unpaid order is a real sale whose money has not
+  /// arrived; it carries no payment method until it does.
+  final String paymentState;
+
+  /// Whatever the owner wrote on this one order, printed on the receipt.
+  final String? note;
+
+  bool get isUnpaid => paymentState == 'unpaid';
 
   bool get hasDiscount => discount.isPositive;
 
@@ -172,6 +183,8 @@ class SalesSummary {
     required this.refunds,
     required this.voids,
     required this.uncostedOrders,
+    this.unpaid = Money.zero,
+    this.unpaidOrderCount = 0,
   });
 
   static const SalesSummary empty = SalesSummary(
@@ -204,6 +217,18 @@ class SalesSummary {
   /// Orders containing at least one line that could not be costed. Reported
   /// rather than hidden: profit here is understated by whatever they cost.
   final int uncostedOrders;
+
+  /// Sales in this period whose money has not arrived.
+  ///
+  /// Counted in [revenue], because the drinks were made and sold, but in
+  /// neither [cash] nor [gcash], because nothing has been received. This is
+  /// the figure that explains the difference between the two, so it is stated
+  /// rather than left for her to work out.
+  final Money unpaid;
+  final int unpaidOrderCount;
+
+  /// What actually came in: everything taken, less what is still owed.
+  Money get collected => cash + gcash;
 
   Money get netRevenue => revenue - refunds;
 

@@ -90,6 +90,8 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
           ),
         ),
         const SizedBox(height: KuboSpacing.sm),
+        _UnpaidToggle(draft: draft),
+        const SizedBox(height: KuboSpacing.sm),
         SizedBox(
           height: KuboTouch.primaryAction,
           child: FilledButton(
@@ -100,7 +102,12 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2.5),
                   )
-                : Text(draft.whyNotComplete() ?? 'COMPLETE ORDER'),
+                : Text(
+                    draft.whyNotComplete() ??
+                        (draft.unpaid
+                            ? 'COMPLETE · NOT PAID YET'
+                            : 'COMPLETE ORDER'),
+                  ),
           ),
         ),
       ],
@@ -130,7 +137,7 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
             duration: const Duration(seconds: 4),
             content: Text(
               '${order.orderNo} · ${order.total.format()} · '
-              '${order.paymentMethod.label}',
+              '${order.paymentMethod?.label ?? 'awaiting payment'}',
             ),
             action: SnackBarAction(
               label: 'RECEIPT',
@@ -247,6 +254,28 @@ class _DiscountAndDeliveryBar extends ConsumerWidget {
             ),
           ),
         ),
+        const SizedBox(width: KuboSpacing.sm),
+        SizedBox(
+          width: KuboTouch.chip,
+          height: KuboTouch.chip,
+          child: OutlinedButton(
+            onPressed: draft.isEmpty
+                ? null
+                : () => _askNote(context, cart, draft.note),
+            style: OutlinedButton.styleFrom(
+              padding: EdgeInsets.zero,
+              foregroundColor: draft.note == null
+                  ? null
+                  : Theme.of(context).colorScheme.primary,
+            ),
+            child: Icon(
+              draft.note == null
+                  ? Icons.sticky_note_2_outlined
+                  : Icons.sticky_note_2,
+              size: 18,
+            ),
+          ),
+        ),
         if (settings.deliveryFeeEnabled) ...<Widget>[
           const SizedBox(width: KuboSpacing.sm),
           Expanded(
@@ -269,6 +298,47 @@ class _DiscountAndDeliveryBar extends ConsumerWidget {
         ],
       ],
     );
+  }
+
+  /// A note on this one order: "leave at the gate", "for Tita's birthday".
+  /// It prints on the receipt and stays with the order.
+  Future<void> _askNote(
+    BuildContext context,
+    CartController cart,
+    String? current,
+  ) async {
+    final TextEditingController controller = TextEditingController(
+      text: current ?? '',
+    );
+    final String? entered = await showDialog<String>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Note for this order'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          maxLines: 3,
+          minLines: 1,
+          textCapitalization: TextCapitalization.sentences,
+          decoration: const InputDecoration(
+            hintText: 'Leave at the gate · no straw · for pick-up at 3pm',
+            helperText: 'Printed on the receipt',
+          ),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(''),
+            child: const Text('No note'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (entered != null) cart.setNote(entered);
   }
 
   Future<void> _askDeliveryFee(
@@ -305,6 +375,42 @@ class _DiscountAndDeliveryBar extends ConsumerWidget {
     );
     controller.dispose();
     if (entered != null) cart.setDeliveryFee(entered);
+  }
+}
+
+/// Finish the order now, take the money later.
+///
+/// An online order runs the other way round from the counter: the drinks are
+/// rung up, the receipt goes out over Messenger, and the customer pays against
+/// it. This is the one switch that lets the order be finished honestly in that
+/// order, and the receipt then says NOT YET PAID on its face.
+class _UnpaidToggle extends ConsumerWidget {
+  const _UnpaidToggle({required this.draft});
+
+  final OrderDraft draft;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    final bool on = draft.unpaid;
+
+    return SizedBox(
+      height: KuboTouch.chip,
+      child: OutlinedButton.icon(
+        onPressed: draft.isEmpty
+            ? null
+            : () => ref.read(cartProvider.notifier).setUnpaid(!on),
+        icon: Icon(
+          on ? Icons.check_box : Icons.check_box_outline_blank,
+          size: 18,
+        ),
+        label: const Text('Not paid yet — send the receipt first'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: on ? theme.colorScheme.primary : null,
+          side: on ? BorderSide(color: theme.colorScheme.primary) : null,
+        ),
+      ),
+    );
   }
 }
 

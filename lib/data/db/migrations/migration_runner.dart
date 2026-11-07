@@ -4,6 +4,7 @@ import 'm001_initial_schema.dart';
 import 'm002_customisation_prompting.dart';
 import 'm003_payments_people_and_discounts.dart';
 import 'm004_matcha_oat_latte.dart';
+import 'm005_unpaid_orders.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -15,6 +16,7 @@ const List<Migration> appMigrations = <Migration>[
   M002CustomisationPrompting(),
   M003PaymentsPeopleAndDiscounts(),
   M004MatchaOatLatte(),
+  M005UnpaidOrders(),
 ];
 
 /// The schema version a freshly built app expects.

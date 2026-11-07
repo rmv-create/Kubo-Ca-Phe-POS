@@ -68,6 +68,72 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
               KuboSpacing.lg,
               0,
             ),
+            child: Text('What it says', style: theme.textTheme.titleMedium),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              KuboSpacing.lg,
+              KuboSpacing.xs,
+              KuboSpacing.lg,
+              KuboSpacing.md,
+            ),
+            child: Text(
+              'Anything left blank is left off the receipt entirely, rather '
+              'than printed as an empty line.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          _TextSetting(
+            label: 'Thank-you line',
+            helper: 'One short line, under the totals',
+            value: settings.receiptThankYou,
+            onSaved: (String v) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(receiptThankYou: v)),
+          ),
+          _TextSetting(
+            label: 'QR code points to',
+            helper: 'Your page or a review link. The code is drawn from this.',
+            value: settings.receiptQrData,
+            keyboardType: TextInputType.url,
+            onSaved: (String v) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(receiptQrData: v)),
+          ),
+          _TextSetting(
+            label: 'Facebook',
+            helper: 'Printed as you type it — e.g. fb.com/yourpage',
+            value: settings.receiptFacebook,
+            onSaved: (String v) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(receiptFacebook: v)),
+          ),
+          _TextSetting(
+            label: 'Instagram',
+            helper: 'e.g. @yourhandle',
+            value: settings.receiptInstagram,
+            onSaved: (String v) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(receiptInstagram: v)),
+          ),
+          _TextSetting(
+            label: 'Address',
+            helper: 'As it should read on a receipt',
+            value: settings.receiptAddress,
+            maxLines: 2,
+            onSaved: (String v) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(receiptAddress: v)),
+          ),
+
+          const Divider(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              KuboSpacing.lg,
+              KuboSpacing.lg,
+              KuboSpacing.lg,
+              0,
+            ),
             child: Text('Footer picture', style: theme.textTheme.titleMedium),
           ),
           Padding(
@@ -247,4 +313,80 @@ class _FooterPreview extends StatelessWidget {
             ),
     );
   }
+}
+
+/// One line of receipt text, saved when she leaves the field.
+///
+/// Saved on the way out rather than on every keystroke: each save is a write
+/// to the settings table, and "Salamat!" should not be five of them.
+class _TextSetting extends StatefulWidget {
+  const _TextSetting({
+    required this.label,
+    required this.value,
+    required this.onSaved,
+    this.helper,
+    this.maxLines = 1,
+    this.keyboardType,
+  });
+
+  final String label;
+  final String? helper;
+  final String value;
+  final int maxLines;
+  final TextInputType? keyboardType;
+  final void Function(String) onSaved;
+
+  @override
+  State<_TextSetting> createState() => _TextSettingState();
+}
+
+class _TextSettingState extends State<_TextSetting> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.value,
+  );
+  late final FocusNode _focus = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!_focus.hasFocus) _save();
+    });
+  }
+
+  void _save() {
+    final String typed = _controller.text.trim();
+    if (typed != widget.value) widget.onSaved(typed);
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(
+      KuboSpacing.lg,
+      KuboSpacing.xs,
+      KuboSpacing.lg,
+      KuboSpacing.sm,
+    ),
+    child: TextField(
+      controller: _controller,
+      focusNode: _focus,
+      maxLines: widget.maxLines,
+      minLines: 1,
+      keyboardType: widget.keyboardType,
+      textCapitalization: TextCapitalization.sentences,
+      onSubmitted: (_) => _save(),
+      decoration: InputDecoration(
+        labelText: widget.label,
+        helperText: widget.helper,
+        helperMaxLines: 2,
+      ),
+    ),
+  );
 }

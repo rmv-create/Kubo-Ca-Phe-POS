@@ -80,6 +80,13 @@ class ReportingService {
       }
     }
 
+    final List<Map<String, Object?>> unpaidRows = await _db.db.rawQuery('''
+      SELECT COUNT(*) AS n, IFNULL(SUM(total_centavos), 0) AS total
+      FROM orders
+      WHERE status = 'completed' AND payment_state = 'unpaid'
+        AND ${where('')}
+      ''', args);
+
     final List<Map<String, Object?>> wasteRows = await _db.db.rawQuery(
       'SELECT IFNULL(SUM(value_centavos), 0) AS total FROM waste '
       'WHERE ${where('')}',
@@ -107,6 +114,8 @@ class ReportingService {
       gcash: Money(gcash),
       cogs: Money(row['cogs']! as int),
       grossProfit: Money(row['profit']! as int),
+      unpaid: Money(unpaidRows.first['total']! as int),
+      unpaidOrderCount: unpaidRows.first['n']! as int,
       waste: Money(wasteRows.first['total']! as int),
       refunds: Money(row['refunded']! as int),
       voids: Money(voidRows.first['total']! as int),

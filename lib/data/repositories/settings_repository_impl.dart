@@ -64,6 +64,12 @@ class SettingsRepositoryImpl implements SettingsRepository {
         values[SettingKeys.deliveryFeeEnabled],
         d.deliveryFeeEnabled,
       ),
+      receiptThankYou: values[SettingKeys.receiptThankYou] ?? d.receiptThankYou,
+      receiptAddress: values[SettingKeys.receiptAddress] ?? d.receiptAddress,
+      receiptFacebook: values[SettingKeys.receiptFacebook] ?? d.receiptFacebook,
+      receiptInstagram:
+          values[SettingKeys.receiptInstagram] ?? d.receiptInstagram,
+      receiptQrData: values[SettingKeys.receiptQrData] ?? d.receiptQrData,
     );
   }
 
@@ -136,6 +142,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
         SettingKeys.deliveryFeeEnabled,
         settings.deliveryFeeEnabled ? '1' : '0',
       );
+      await _put(txn, SettingKeys.receiptThankYou, settings.receiptThankYou);
+      await _put(txn, SettingKeys.receiptAddress, settings.receiptAddress);
+      await _put(txn, SettingKeys.receiptFacebook, settings.receiptFacebook);
+      await _put(txn, SettingKeys.receiptInstagram, settings.receiptInstagram);
+      await _put(txn, SettingKeys.receiptQrData, settings.receiptQrData);
     });
   }
 

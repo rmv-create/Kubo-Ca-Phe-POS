@@ -192,6 +192,8 @@ class SalesService {
               row['method_name'] as String?,
             ),
       voidReason: row['void_reason'] as String?,
+      paymentState: (row['payment_state'] as String?) ?? 'paid',
+      note: row['note'] as String?,
       subtotal: Money((row['subtotal_centavos'] as int?) ?? 0),
       discount: Money((row['discount_centavos'] as int?) ?? 0),
       deliveryFee: Money((row['delivery_fee_centavos'] as int?) ?? 0),
@@ -213,6 +215,118 @@ class SalesService {
           : Money(row['change_centavos']! as int),
       lines: lines,
     );
+  }
+
+  // ───────────────────────── paying afterwards ─────────────────────────
+
+  /// Every order still waiting to be paid, oldest first.
+  ///
+  /// Oldest first on purpose: the one that has been outstanding longest is the
+  /// one that needs chasing, and a newest-first list buries it.
+  Future<List<OrderRecord>> unpaidOrders({int limit = 100}) async {
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
+      SELECT o.*,
+             NULL AS method, NULL AS method_name, NULL AS payment_reference,
+             NULL AS tendered_centavos, NULL AS change_centavos,
+             (SELECT reason FROM order_voids WHERE order_id = o.id LIMIT 1)
+               AS void_reason,
+             (SELECT COUNT(*) FROM order_items
+               WHERE order_id = o.id AND recipe_version_id IS NULL)
+               AS uncosted
+      FROM orders o
+      WHERE o.payment_state = 'unpaid' AND o.status = 'completed'
+      ORDER BY o.created_at ASC, o.id ASC
+      LIMIT ?
+      ''',
+      <Object?>[limit],
+    );
+    final List<OrderRecord> records = <OrderRecord>[];
+    for (final Map<String, Object?> row in rows) {
+      records.add(await _record(row));
+    }
+    return records;
+  }
+
+  /// Records the money arriving for an order that was completed unpaid.
+  ///
+  /// The payment is dated *now*, not back-dated to the order: that is when the
+  /// money actually landed, and the cash count for today has to agree with
+  /// the tin. The sale itself stays on the day it was made.
+  ///
+  /// Refuses an order that is already paid rather than taking the money twice.
+  Future<void> recordPayment({
+    required int orderId,
+    required PaymentMethod method,
+    String? reference,
+    Money? tendered,
+  }) async {
+    final DateTime now = _clock.now();
+    final String at = now.toUtc().toIso8601String();
+
+    await _db.transaction<void>((Transaction txn) async {
+      final List<Map<String, Object?>> rows = await txn.query(
+        'orders',
+        columns: <String>[
+          'order_no',
+          'status',
+          'payment_state',
+          'total_centavos',
+          'business_date',
+        ],
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+        limit: 1,
+      );
+      if (rows.isEmpty) {
+        throw const BusinessRuleException('That order no longer exists.');
+      }
+      final Map<String, Object?> order = rows.first;
+      if (order['payment_state'] != 'unpaid') {
+        throw const BusinessRuleException(
+          'That order has already been paid for.',
+        );
+      }
+      if (order['status'] == 'voided') {
+        throw const BusinessRuleException(
+          'That order was voided. There is nothing to pay.',
+        );
+      }
+
+      final Money total = Money(order['total_centavos']! as int);
+      final Money? paid = method.takesTendered ? tendered : null;
+      final Money change = paid == null || paid <= total
+          ? Money.zero
+          : paid - total;
+
+      await txn.insert('payments', <String, Object?>{
+        'order_id': orderId,
+        'method': method.code,
+        'method_name_snapshot': method.label,
+        'amount_centavos': total.centavos,
+        'status': 'confirmed',
+        'reference_no': reference,
+        'tendered_centavos': paid?.centavos,
+        'change_centavos': paid == null ? null : change.centavos,
+        'created_at': at,
+        'confirmed_at': at,
+      });
+      await txn.update(
+        'orders',
+        <String, Object?>{'payment_state': 'paid'},
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+      await txn.insert('audit_log', <String, Object?>{
+        'at': at,
+        // Dated to the day the money arrived, for the same reason.
+        'business_date': _businessDateOf(now),
+        'action': 'payment_recorded',
+        'entity_type': 'order',
+        'entity_id': orderId,
+        'summary': '${order['order_no']} · ${total.format()} · ${method.label}',
+      });
+    });
   }
 
   // ────────────────────────── naming an order ──────────────────────────

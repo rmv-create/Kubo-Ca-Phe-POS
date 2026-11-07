@@ -8,6 +8,7 @@ import '../../../domain/entities/menu.dart';
 import '../../../domain/repositories/menu_repository.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../stock/presentation/recipes_screen.dart';
 import '../state/menu_actions.dart';
 
 /// Everything about one drink: its name, its category, what it costs at each
@@ -45,6 +46,8 @@ class ProductEditorScreen extends ConsumerWidget {
               _DetailTiles(data: d, product: product),
               const SectionHeader('Sizes and prices'),
               _SizesSection(data: d, product: product),
+              const SectionHeader('How it is made'),
+              _RecipeTiles(product: product),
               const SectionHeader('Choices this drink offers'),
               _GroupsSection(data: d, product: product),
               const SectionHeader('Availability'),
@@ -53,6 +56,58 @@ class ProductEditorScreen extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+/// A way into the recipe for each size, from the drink itself.
+///
+/// The recipe is the drink's cost, so this is where she will look for it —
+/// rather than remembering that recipes live under Stock. Each size has its
+/// own recipe, because a Grande is not a Small doubled.
+class _RecipeTiles extends StatelessWidget {
+  const _RecipeTiles({required this.product});
+
+  final Product product;
+
+  @override
+  Widget build(BuildContext context) {
+    if (product.sizes.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KuboSpacing.lg,
+          0,
+          KuboSpacing.lg,
+          KuboSpacing.md,
+        ),
+        child: Text(
+          'Give the drink a size and a price first; a recipe is written per '
+          'size.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      );
+    }
+    return Column(
+      children: <Widget>[
+        for (final ProductSize ps in product.sizes)
+          ListTile(
+            leading: const Icon(Icons.science_outlined),
+            title: Text('${ps.size.name} recipe'),
+            subtitle: const Text(
+              'What goes in, and what it costs. Editing starts a new version, '
+              'so orders already sold keep the cost they were sold at.',
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => RecipeEditorScreen(
+                  productId: product.id,
+                  sizeId: ps.size.id,
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

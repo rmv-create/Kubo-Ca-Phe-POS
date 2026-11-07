@@ -46,7 +46,7 @@ class OrderService {
     final String? blocker = draft.whyNotComplete();
     if (blocker != null) throw BusinessRuleException(blocker);
 
-    final PaymentMethod method = draft.paymentMethod!;
+    final PaymentMethod? method = draft.unpaid ? null : draft.paymentMethod!;
     final DateTime now = _clock.now();
     final String at = now.toUtc().toIso8601String();
     final String businessDate = BusinessDay(
@@ -75,6 +75,8 @@ class OrderService {
         'customer_id': draft.customer?.id,
         'customer_name_snapshot': draft.customer?.name,
         'status': 'completed',
+        'payment_state': draft.unpaid ? 'unpaid' : 'paid',
+        'note': draft.note,
         'subtotal_centavos': subtotal.centavos,
         'discount_centavos': discount.discountAmount.centavos,
         'total_centavos': total.centavos,
@@ -207,22 +209,27 @@ class OrderService {
         });
       }
 
-      await txn.insert('payments', <String, Object?>{
-        'order_id': orderId,
-        'method': method.code,
-        'method_name_snapshot': method.label,
-        'amount_centavos': total.centavos,
-        // Cash is settled the moment it is in the tin. A method that needs
-        // confirming reached this line only because the owner ticked it.
-        'status': 'confirmed',
-        'reference_no': draft.paymentReference,
-        'tendered_centavos': draft.tendered?.centavos,
-        'change_centavos': draft.tendered == null
-            ? null
-            : draft.changeFrom(total).centavos,
-        'created_at': at,
-        'confirmed_at': at,
-      });
+      // An unpaid order writes no payment at all. A zero or pending row would
+      // put a method on a receipt that nobody has paid with yet, and would
+      // have to be unpicked when the money does arrive.
+      if (method != null) {
+        await txn.insert('payments', <String, Object?>{
+          'order_id': orderId,
+          'method': method.code,
+          'method_name_snapshot': method.label,
+          'amount_centavos': total.centavos,
+          // Cash is settled the moment it is in the tin. A method that needs
+          // confirming reached this line only because the owner ticked it.
+          'status': 'confirmed',
+          'reference_no': draft.paymentReference,
+          'tendered_centavos': draft.tendered?.centavos,
+          'change_centavos': draft.tendered == null
+              ? null
+              : draft.changeFrom(total).centavos,
+          'created_at': at,
+          'confirmed_at': at,
+        });
+      }
 
       final Customer? customer = draft.customer;
       if (customer != null) {
@@ -250,7 +257,7 @@ class OrderService {
         'summary':
             '${number.formatted} · ${draft.drinkCount} '
             'drink${draft.drinkCount == 1 ? '' : 's'} · '
-            '${total.format()} · ${method.label}',
+            '${total.format()} · ${method?.label ?? 'UNPAID'}',
       });
 
       return CompletedOrder(

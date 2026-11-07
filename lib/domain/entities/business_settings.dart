@@ -44,6 +44,11 @@ class BusinessSettings {
     required this.vatRateBp,
     required this.statutoryDiscountRateBp,
     required this.deliveryFeeEnabled,
+    required this.receiptThankYou,
+    required this.receiptAddress,
+    required this.receiptFacebook,
+    required this.receiptInstagram,
+    required this.receiptQrData,
   });
 
   /// Values used before the owner has configured anything. The business name
@@ -72,7 +77,19 @@ class BusinessSettings {
     // Twenty per cent, set by RA 9994 and RA 10754. Configurable because a
     // statute can change; it is not a promotion the owner should tune.
     statutoryDiscountRateBp: 2000,
-    deliveryFeeEnabled: false,
+    // She delivers, so the fee is offered from the start rather than hidden
+    // behind a switch she would have to go looking for.
+    deliveryFeeEnabled: true,
+    receiptThankYou: 'Salamat! Thank you for your order.',
+    // Blank on purpose. The shop's address and social handles are hers to
+    // type in — inventing either would put a wrong address on a real receipt.
+    receiptAddress: '',
+    receiptFacebook: '',
+    receiptInstagram: '',
+    // The link behind the QR she already uses on her menu card. The code is
+    // drawn from this text at print time, so changing the link changes the
+    // code and there is no image to re-upload.
+    receiptQrData: 'https://www.facebook.com/profile.php?id=61595992611233',
   );
 
   final String businessName;
@@ -119,6 +136,22 @@ class BusinessSettings {
   /// Whether the POS offers a delivery fee line on the order.
   final bool deliveryFeeEnabled;
 
+  /// One short line of thanks at the foot of the receipt. Empty prints
+  /// nothing rather than an empty gap.
+  final String receiptThankYou;
+
+  /// Where the shop is, as it should read on a receipt. Free text, because a
+  /// Philippine address is not a form.
+  final String receiptAddress;
+
+  /// Facebook page and Instagram handle, printed as typed.
+  final String receiptFacebook;
+  final String receiptInstagram;
+
+  /// What the QR code on the receipt points at — her page, or a review link.
+  /// Empty prints no code.
+  final String receiptQrData;
+
   /// The VAT rate to actually apply. Zero unless the shop is registered.
   int get effectiveVatRateBp => vatRegistered ? vatRateBp : 0;
 
@@ -138,6 +171,11 @@ class BusinessSettings {
     int? vatRateBp,
     int? statutoryDiscountRateBp,
     bool? deliveryFeeEnabled,
+    String? receiptThankYou,
+    String? receiptAddress,
+    String? receiptFacebook,
+    String? receiptInstagram,
+    String? receiptQrData,
   }) => BusinessSettings(
     businessName: businessName ?? this.businessName,
     currencyCode: currencyCode,
@@ -157,6 +195,11 @@ class BusinessSettings {
     statutoryDiscountRateBp:
         statutoryDiscountRateBp ?? this.statutoryDiscountRateBp,
     deliveryFeeEnabled: deliveryFeeEnabled ?? this.deliveryFeeEnabled,
+    receiptThankYou: receiptThankYou ?? this.receiptThankYou,
+    receiptAddress: receiptAddress ?? this.receiptAddress,
+    receiptFacebook: receiptFacebook ?? this.receiptFacebook,
+    receiptInstagram: receiptInstagram ?? this.receiptInstagram,
+    receiptQrData: receiptQrData ?? this.receiptQrData,
   );
 }
 
@@ -185,4 +228,10 @@ abstract final class SettingKeys {
   /// printed at the foot of every receipt. Held as base64 PNG in the settings
   /// table rather than as a file, so it travels inside her backups.
   static const String receiptFooterImage = 'receipt.footer_image_png';
+
+  static const String receiptThankYou = 'receipt.thank_you';
+  static const String receiptAddress = 'receipt.address';
+  static const String receiptFacebook = 'receipt.facebook';
+  static const String receiptInstagram = 'receipt.instagram';
+  static const String receiptQrData = 'receipt.qr_data';
 }

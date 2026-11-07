@@ -125,6 +125,10 @@ class CartController extends Notifier<OrderDraft> {
   /// Choosing a method never marks an order paid — the confirmation is
   /// separate, and is cleared here so switching methods cannot carry one over.
   void setPaymentMethod(PaymentMethod? method) {
+    // Tapping a method is her saying it has been paid after all.
+    if (method != null && state.unpaid) {
+      state = state.copyWith(unpaid: false);
+    }
     if (method == null) {
       state = state.copyWith(
         clearPaymentMethod: true,
@@ -139,6 +143,23 @@ class CartController extends Notifier<OrderDraft> {
       paymentReference: '',
       clearTendered: true,
     );
+  }
+
+  /// Finishes the order without a payment, for an order she will send a
+  /// receipt for and be paid against later.
+  ///
+  /// Turning it on clears any method already tapped, so the order cannot go in
+  /// claiming to be both unpaid and paid in cash.
+  void setUnpaid(bool unpaid) {
+    state = unpaid
+        ? state.copyWith(
+            unpaid: true,
+            clearPaymentMethod: true,
+            paymentConfirmed: false,
+            paymentReference: '',
+            clearTendered: true,
+          )
+        : state.copyWith(unpaid: false);
   }
 
   void setPaymentConfirmed(bool confirmed) {
@@ -174,6 +195,17 @@ class CartController extends Notifier<OrderDraft> {
             discountBeneficiaryName: beneficiaryName,
             discountBeneficiaryIdNo: beneficiaryIdNo,
           );
+  }
+
+  // ──────────────────────────────── note ────────────────────────────────
+
+  /// Her note for this one order. Blank clears it rather than printing an
+  /// empty "Note:" on the receipt.
+  void setNote(String? note) {
+    final String trimmed = note?.trim() ?? '';
+    state = trimmed.isEmpty
+        ? state.copyWith(clearNote: true)
+        : state.copyWith(note: trimmed);
   }
 
   void setDeliveryFee(Money fee) {

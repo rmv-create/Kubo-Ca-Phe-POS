@@ -159,6 +159,16 @@ class SummaryCard extends StatelessWidget {
         ),
         _StatRow(label: 'Cash', value: summary.cash.format()),
         _StatRow(label: 'GCash', value: summary.gcash.format()),
+        // Shown only when there is some, and immediately under the two
+        // figures it explains the gap in.
+        if (summary.unpaid.isPositive)
+          _StatRow(
+            label:
+                'Still owed · '
+                '${summary.unpaidOrderCount} '
+                'order${summary.unpaidOrderCount == 1 ? '' : 's'}',
+            value: summary.unpaid.format(),
+          ),
         const Divider(indent: KuboSpacing.lg, endIndent: KuboSpacing.lg),
         _StatRow(label: 'Cost of goods', value: summary.cogs.format()),
         _StatRow(

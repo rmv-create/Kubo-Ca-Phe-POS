@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../domain/entities/order_draft.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
@@ -54,11 +55,26 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   : 'Completed orders appear here.',
             );
           }
-          return ListView.separated(
-            itemCount: data.length,
-            separatorBuilder: (_, __) => const Divider(height: 1),
-            itemBuilder: (BuildContext context, int index) =>
-                _OrderTile(order: data[index]),
+          final List<OrderRecord> unpaid =
+              ref.watch(unpaidOrdersProvider).valueOrNull ??
+              const <OrderRecord>[];
+          // Pinned above the day's orders, however the list is filtered: an
+          // order waiting to be paid for is the one thing on this screen she
+          // has to do something about, and it should not scroll away.
+          return ListView(
+            padding: const EdgeInsets.only(bottom: KuboSpacing.xxxl),
+            children: <Widget>[
+              if (unpaid.isNotEmpty) ...<Widget>[
+                const SectionHeader('Awaiting payment'),
+                for (final OrderRecord order in unpaid)
+                  _OrderTile(order: order),
+                const Divider(height: 1),
+              ],
+              for (final OrderRecord order in data) ...<Widget>[
+                _OrderTile(order: order),
+                const Divider(height: 1),
+              ],
+            ],
           );
         },
       ),
@@ -94,7 +110,9 @@ class _OrderTile extends StatelessWidget {
           else if (order.isFullyRefunded)
             _Tag(label: 'Refunded', color: theme.colorScheme.error)
           else if (order.isRefunded)
-            _Tag(label: 'Part refunded', color: theme.colorScheme.error),
+            _Tag(label: 'Part refunded', color: theme.colorScheme.error)
+          else if (order.isUnpaid)
+            _Tag(label: 'Unpaid', color: theme.colorScheme.primary),
         ],
       ),
       subtitle: Text(
@@ -102,6 +120,7 @@ class _OrderTile extends StatelessWidget {
           '${order.itemCount} drink${order.itemCount == 1 ? '' : 's'}',
           if (order.customerName != null) order.customerName!,
           if (order.paymentMethod != null) order.paymentMethod!.label,
+          if (order.isUnpaid) 'not paid yet',
           order.createdAt.toLocal().toString().substring(11, 16),
         ].join(' · '),
       ),
@@ -197,6 +216,16 @@ class OrderDetailScreen extends ConsumerWidget {
                   body: order.voidReason ?? '',
                   isError: true,
                 ),
+              if (order.isUnpaid && !order.isVoided)
+                _Banner(
+                  title: 'Waiting to be paid',
+                  body:
+                      'The drinks are counted and the stock has come out, so '
+                      'this is a real sale — but ${order.total.format()} has '
+                      'not arrived. It is not in the cash or GCash totals '
+                      'until you record the payment below.',
+                  isError: false,
+                ),
               if (!order.isCosted)
                 _Banner(
                   title: 'Not fully costed',
@@ -241,7 +270,13 @@ class OrderDetailScreen extends ConsumerWidget {
                 label: 'Gross profit',
                 value: order.isCosted ? order.grossProfit.format() : '—',
               ),
-              _Row(label: 'Paid by', value: order.paymentMethod?.label ?? '—'),
+              _Row(
+                label: 'Paid by',
+                value:
+                    order.paymentMethod?.label ??
+                    (order.isUnpaid ? 'not paid yet' : '—'),
+                emphasise: order.isUnpaid,
+              ),
               if (order.hasDiscount)
                 _Row(
                   label: order.discountLabel ?? 'Discount',
@@ -251,6 +286,8 @@ class OrderDetailScreen extends ConsumerWidget {
                 _Row(label: 'Delivery', value: order.deliveryFee.format()),
               if (order.customerName != null)
                 _Row(label: 'Customer', value: order.customerName!),
+              if ((order.note ?? '').trim().isNotEmpty)
+                _Row(label: 'Note', value: order.note!.trim()),
 
               const SectionHeader('Receipt'),
               ListTile(
@@ -264,6 +301,16 @@ class OrderDetailScreen extends ConsumerWidget {
                   ),
                 ),
               ),
+              if (order.isUnpaid && !order.isVoided)
+                ListTile(
+                  leading: const Icon(Icons.payments_outlined),
+                  title: const Text('Record the payment'),
+                  subtitle: Text(
+                    'When the ${order.total.format()} arrives. Counted on the '
+                    'day it lands, not back-dated to the order.',
+                  ),
+                  onTap: () => _recordPayment(context, ref, order),
+                ),
               if (order.customerName == null && !order.isVoided)
                 ListTile(
                   leading: const Icon(Icons.person_add_alt),
@@ -309,6 +356,74 @@ class OrderDetailScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Takes the money for an order that was finished unpaid.
+  ///
+  /// Nothing is typed in twice: the amount is the order's own total, so a
+  /// receipt that has already gone to the customer cannot disagree with what
+  /// she records here.
+  Future<void> _recordPayment(
+    BuildContext context,
+    WidgetRef ref,
+    OrderRecord order,
+  ) async {
+    final List<PaymentMethod> methods =
+        ref.read(paymentMethodsProvider).valueOrNull ?? PaymentMethod.builtIn;
+    final PaymentMethod? method = await showDialog<PaymentMethod>(
+      context: context,
+      builder: (BuildContext context) => SimpleDialog(
+        title: Text('How was ${order.total.format()} paid?'),
+        children: <Widget>[
+          for (final PaymentMethod m in methods)
+            SimpleDialogOption(
+              onPressed: () => Navigator.of(context).pop(m),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(m.label),
+              ),
+            ),
+        ],
+      ),
+    );
+    if (method == null || !context.mounted) return;
+
+    String? reference;
+    if (method.takesReference) {
+      reference = await promptForText(
+        context,
+        title: '${method.label} reference',
+        label: 'Reference number',
+        helper: 'Optional — leave blank if you did not note it down',
+        initial: '',
+      );
+      // A cancelled prompt cancels the whole thing: she may have picked the
+      // wrong method.
+      if (reference == null || !context.mounted) return;
+    }
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref
+          .read(salesServiceProvider)
+          .recordPayment(
+            orderId: order.id,
+            method: method,
+            reference: (reference ?? '').trim().isEmpty
+                ? null
+                : reference!.trim(),
+          );
+      ref.read(salesRevisionProvider.notifier).bump();
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            '${order.orderNo} paid · ${order.total.format()} · ${method.label}',
+          ),
+        ),
+      );
+    } on AppException catch (error) {
+      messenger.showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Future<void> _refund(

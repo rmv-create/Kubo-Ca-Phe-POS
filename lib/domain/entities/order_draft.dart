@@ -240,6 +240,8 @@ class OrderDraft {
     this.discountBeneficiaryName,
     this.discountBeneficiaryIdNo,
     this.deliveryFee = Money.zero,
+    this.unpaid = false,
+    this.note,
   });
 
   /// Null means a guest. A sale is never blocked on a customer.
@@ -267,6 +269,18 @@ class OrderDraft {
 
   /// Charged on top, after any discount. Never discounted itself.
   final Money deliveryFee;
+
+  /// The order is finished but the money has not arrived.
+  ///
+  /// This is how an online order works: the drinks are rung up, the receipt
+  /// goes out over Messenger, and the customer pays against it. The sale is
+  /// real — the coffee was made and the stock came out — so it is recorded as
+  /// a sale; it simply has no payment yet, and no payment is invented for it.
+  final bool unpaid;
+
+  /// Whatever she wants on this one order: "leave at the gate", "for Tita's
+  /// birthday", "no straw". Printed on the receipt, kept with the order.
+  final String? note;
 
   bool get isEmpty => items.isEmpty;
 
@@ -301,6 +315,9 @@ class OrderDraft {
   /// act on — or null when it can.
   String? whyNotComplete() {
     if (items.isEmpty) return 'Add a drink first.';
+    // An unpaid order is deliberately missing the one thing that would
+    // otherwise block it.
+    if (unpaid) return null;
     final PaymentMethod? method = paymentMethod;
     if (method == null) return 'Choose how it was paid.';
     if (method.needsConfirmation && !paymentConfirmed) {
@@ -324,6 +341,9 @@ class OrderDraft {
     String? discountBeneficiaryName,
     String? discountBeneficiaryIdNo,
     Money? deliveryFee,
+    bool? unpaid,
+    String? note,
+    bool clearNote = false,
   }) => OrderDraft(
     customer: clearCustomer ? null : (customer ?? this.customer),
     items: items ?? this.items,
@@ -341,6 +361,8 @@ class OrderDraft {
         ? null
         : (discountBeneficiaryIdNo ?? this.discountBeneficiaryIdNo),
     deliveryFee: deliveryFee ?? this.deliveryFee,
+    unpaid: unpaid ?? this.unpaid,
+    note: clearNote ? null : (note ?? this.note),
   );
 }
 
@@ -372,12 +394,17 @@ class CompletedOrder {
     this.customerName,
   });
 
+  /// True when the money has not arrived yet.
+  bool get isUnpaid => paymentMethod == null;
+
   final int id;
   final String orderNo;
   final DateTime createdAt;
   final String businessDate;
   final Money total;
   final int drinkCount;
-  final PaymentMethod paymentMethod;
+
+  /// Null on an unpaid order: nothing took the money, so nothing is claimed.
+  final PaymentMethod? paymentMethod;
   final String? customerName;
 }

@@ -474,6 +474,14 @@ final FutureProviderFamily<List<OrderRecord>, String?> ordersProvider =
       return ref.watch(salesServiceProvider).orders(businessDate: day);
     });
 
+/// Orders finished before the money arrived, oldest first. Oldest first
+/// because that is the one that needs chasing.
+final FutureProvider<List<OrderRecord>> unpaidOrdersProvider =
+    FutureProvider<List<OrderRecord>>((Ref ref) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(salesServiceProvider).unpaidOrders();
+    });
+
 /// One order, with its lines, discount and payment — what a receipt needs.
 final FutureProviderFamily<OrderRecord?, int> orderByIdProvider =
     FutureProvider.family<OrderRecord?, int>((Ref ref, int id) {
