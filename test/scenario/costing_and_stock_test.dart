@@ -85,7 +85,7 @@ void main() {
         'Pinch C',
         price: Money.of(4),
       );
-      await shop.setRecipe('Black', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Iced Black', 'Grande', <Ingredient, double>{
         a: 1,
         b: 1,
         c: 1,
@@ -93,7 +93,7 @@ void main() {
 
       final CompletedOrder order = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -146,9 +146,7 @@ void main() {
     test('a drink with no recipe is not claimed as pure profit', () async {
       final CompletedOrder order = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[
-            await shop.item('Vietnamese Egg Coffee', 'Grande'),
-          ],
+          items: <DraftItem>[await shop.item('Ca Phe Trung', 'Grande')],
           paymentMethod: PaymentMethod.cash,
         ),
       );

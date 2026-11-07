@@ -53,7 +53,7 @@ void main() {
       displayOrder: 0,
       isActive: true,
       isArchived: false,
-      sizes: (await shop.product('Black')).sizes,
+      sizes: (await shop.product('Iced Black')).sizes,
     );
     final Customer refreshed = (await shop.customers.byId(mariaId))!;
 
@@ -62,11 +62,11 @@ void main() {
         OrderDraft(
           customer: refreshed,
           items: <DraftItem>[
-            await shop.item('Black', 'Grande', lineId: 'good'),
+            await shop.item('Iced Black', 'Grande', lineId: 'good'),
             DraftItem(
               lineId: 'bad',
               product: ghost,
-              size: (await shop.product('Black')).sizes.first,
+              size: (await shop.product('Iced Black')).sizes.first,
               quantity: 1,
               options: const <DraftOption>[],
             ),
@@ -97,7 +97,7 @@ void main() {
     await expectLater(
       shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.gcash,
           // Not confirmed.
         ),
@@ -113,7 +113,7 @@ void main() {
       for (int i = 0; i < 2; i++) {
         await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -156,9 +156,9 @@ void main() {
       'payments',
     )).single;
     expect(payment['amount_centavos'], stored.centavos);
-    // Grande Spanish Latte 139, plus a Small Matcha Oat Latte 139 with
+    // Grande Spanish Latte 139, plus a Small Matcha Oat Latte 149 with
     // ₱20 of sea salt cream on it.
-    expect(stored, Money.of(298));
+    expect(stored, Money.of(308));
   });
 
   test('the line totals add up to the order total', () async {
@@ -166,7 +166,7 @@ void main() {
       OrderDraft(
         items: <DraftItem>[
           await shop.item('Spanish Latte', 'Grande', quantity: 2, lineId: 'a'),
-          await shop.item('Black', 'Small', lineId: 'b'),
+          await shop.item('Iced Black', 'Small', lineId: 'b'),
         ],
         paymentMethod: PaymentMethod.cash,
       ),
@@ -189,7 +189,7 @@ void main() {
   test('every completed order leaves an audit entry', () async {
     final CompletedOrder order = await shop.sell(
       OrderDraft(
-        items: <DraftItem>[await shop.item('Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
         paymentMethod: PaymentMethod.cash,
       ),
     );

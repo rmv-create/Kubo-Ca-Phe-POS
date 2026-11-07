@@ -55,7 +55,7 @@ void main() {
       () async {
         await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
             paymentMethod: PaymentMethod.gcash,
             paymentConfirmed: true,
           ),
@@ -77,7 +77,7 @@ void main() {
     test('a method that has taken money cannot be deleted', () async {
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -113,7 +113,7 @@ void main() {
     test('a receipt keeps the name the button had on the day', () async {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.gcash,
           paymentConfirmed: true,
         ),
@@ -308,7 +308,7 @@ void main() {
       () async {
         final CompletedOrder done = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -333,7 +333,7 @@ void main() {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
           customer: (await shop.customers.byId(first))!,
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -347,7 +347,7 @@ void main() {
     test('the order itself now carries the name, for the receipt', () async {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.cash,
         ),
       );

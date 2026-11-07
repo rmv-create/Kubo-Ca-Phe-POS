@@ -151,7 +151,7 @@ void main() {
     test('setting a price twice updates rather than duplicating', () async {
       final int id = await menu.createProduct(
         categoryId: categoryId,
-        name: 'Black',
+        name: 'Iced Black',
       );
       await menu.setProductSize(
         productId: id,

@@ -23,13 +23,19 @@ abstract final class MenuSeed {
 
   /// Q1 of the worksheet was answered **B — two sizes on everything**.
   /// The default size is the one printed on her menu card.
+  ///
+  /// Names, prices and descriptions are her menu card's own, confirmed by her
+  /// after she had been using the app: "the final (current/latest) price now
+  /// is the one on the photo". Two descriptions repeat the drink above them
+  /// on her sheet; they are carried over as written rather than rewritten.
+  /// An install that predates this carries the same change as migration 6.
   static const List<SeedProduct> products = <SeedProduct>[
     SeedProduct(
       category: classics,
-      name: 'Black',
+      name: 'Iced Black',
       description: 'Phin-brewed coffee served black. Bold, smooth and clean.',
-      smallPrice: 12900,
-      grandePrice: 13900,
+      smallPrice: 10900,
+      grandePrice: 12900,
       defaultSizeCode: 'grande',
       showsMilk: false,
     ),
@@ -38,17 +44,28 @@ abstract final class MenuSeed {
       name: 'Spanish Latte',
       description:
           'Bold phin coffee with creamy milk and a touch of sweetness.',
-      smallPrice: 12900,
+      smallPrice: 11900,
       grandePrice: 13900,
       defaultSizeCode: 'grande',
     ),
     SeedProduct(
       category: classics,
-      name: 'Caramel Macchiato with Cold Foam',
+      name: 'Cinnamon Oat Latte',
       description:
-          'Smooth milk, vanilla and caramel with our signature cold foam.',
+          'Bold phin coffee with creamy milk and a touch of sweetness.',
       smallPrice: 12900,
-      grandePrice: 13900,
+      grandePrice: 14900,
+      defaultSizeCode: 'grande',
+      defaultMilk: 'Oat',
+    ),
+    SeedProduct(
+      category: classics,
+      name: 'Caramel Macchiato',
+      description:
+          'Smooth milk, bold coffee, and caramel with our signature cold '
+          'foam.',
+      smallPrice: 14900,
+      grandePrice: 16900,
       defaultSizeCode: 'grande',
     ),
     SeedProduct(
@@ -57,43 +74,52 @@ abstract final class MenuSeed {
       // `optionPriceOverrides` below.
       name: 'Matcha Oat Latte',
       description:
-          'Vibrant matcha with creamy oat milk. Smooth, earthy and lightly '
-          'sweet.',
-      smallPrice: 13900,
-      grandePrice: 14900,
+          'Vibrant matcha with creamy milk. Smooth, earthy and lightly sweet.',
+      smallPrice: 14900,
+      grandePrice: 16900,
+      defaultSizeCode: 'grande',
+      defaultMilk: 'Oat',
+    ),
+    SeedProduct(
+      category: classics,
+      name: 'Sea Salt Matcha Oat Latte',
+      description:
+          'Vibrant matcha with creamy milk. Smooth, earthy and lightly sweet.',
+      smallPrice: 16900,
+      grandePrice: 18900,
       defaultSizeCode: 'grande',
       defaultMilk: 'Oat',
     ),
     SeedProduct(
       category: specialty,
-      name: 'Vietnamese Coffee',
+      name: 'Ca Phe Sua Da',
       description:
           'Traditional phin coffee with sweetened condensed milk. '
           'Strong, bold and comforting.',
-      smallPrice: 12900,
-      grandePrice: 13900,
+      smallPrice: 12400,
+      grandePrice: 14400,
       // The card prints this one at 12 oz, unlike every other drink.
       defaultSizeCode: 'small',
       showsMilk: false,
     ),
     SeedProduct(
       category: specialty,
-      name: 'Vietnamese Sea Salt Cream',
+      name: 'Ca Phe Muoi',
       description:
           'Strong phin coffee with smooth sea salt cream. '
           'Rich, creamy and perfectly balanced.',
-      smallPrice: 13900,
-      grandePrice: 15900,
+      smallPrice: 12900,
+      grandePrice: 14900,
       defaultSizeCode: 'grande',
     ),
     SeedProduct(
       category: specialty,
-      name: 'Vietnamese Egg Coffee',
+      name: 'Ca Phe Trung',
       description:
           'Classic Hanoi-style egg coffee. '
           'Creamy, velvety and deliciously indulgent.',
-      smallPrice: 13900,
-      grandePrice: 15900,
+      smallPrice: 14900,
+      grandePrice: 16900,
       defaultSizeCode: 'grande',
     ),
   ];
@@ -192,11 +218,23 @@ abstract final class MenuSeed {
 
   /// Options that cost something different on one particular drink.
   ///
-  /// Oat is a ₱20 upgrade everywhere except the Matcha Oat Latte, where it is
-  /// simply what the drink is made of.
+  /// Oat is a ₱20 upgrade everywhere except on a drink whose own name says
+  /// it is made with oat, where it is simply what the drink is made of.
   static const List<SeedOptionPrice> optionPriceOverrides = <SeedOptionPrice>[
     SeedOptionPrice(
+      productName: 'Cinnamon Oat Latte',
+      groupCode: 'milk',
+      optionName: 'Oat',
+      price: 0,
+    ),
+    SeedOptionPrice(
       productName: 'Matcha Oat Latte',
+      groupCode: 'milk',
+      optionName: 'Oat',
+      price: 0,
+    ),
+    SeedOptionPrice(
+      productName: 'Sea Salt Matcha Oat Latte',
       groupCode: 'milk',
       optionName: 'Oat',
       price: 0,
@@ -246,7 +284,7 @@ class SeedProduct {
 
   final String defaultSizeCode;
 
-  /// Black and Vietnamese Coffee are not made with a milk choice, so the group
+  /// Iced Black and Ca Phe Sua Da are not made with a milk choice, so the group
   /// is simply not attached to them.
   final bool showsMilk;
 

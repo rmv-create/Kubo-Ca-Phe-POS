@@ -35,7 +35,9 @@ void main() {
       price: Money.of(1200),
       openingStock: 5000,
     );
-    await shop.setRecipe('Black', 'Grande', <Ingredient, double>{beans: 20});
+    await shop.setRecipe('Iced Black', 'Grande', <Ingredient, double>{
+      beans: 20,
+    });
 
     final int mariaId = await shop.customers.create(
       name: 'Maria Santos',
@@ -44,7 +46,9 @@ void main() {
     await shop.sell(
       OrderDraft(
         customer: (await shop.customers.byId(mariaId))!,
-        items: <DraftItem>[await shop.item('Black', 'Grande', quantity: 2)],
+        items: <DraftItem>[
+          await shop.item('Iced Black', 'Grande', quantity: 2),
+        ],
         paymentMethod: PaymentMethod.cash,
       ),
     );
@@ -92,10 +96,10 @@ void main() {
     expect(text, contains('DAILY SALES'));
     expect(text, contains('Revenue'));
     expect(text, contains('Gross profit'));
-    expect(text, contains('Black'));
-    // 2 x ₱139.00 revenue, 2 x ₱24.00 cost. Excel normalises a whole-peso
+    expect(text, contains('Iced Black'));
+    // 2 x ₱129.00 revenue, 2 x ₱24.00 cost. Excel normalises a whole-peso
     // amount back to an integer on decode, so both forms are accepted.
-    expect(text.any((String v) => v == '278' || v == '278.0'), isTrue);
+    expect(text.any((String v) => v == '258' || v == '258.0'), isTrue);
     expect(text.any((String v) => v == '48' || v == '48.0'), isTrue);
   });
 

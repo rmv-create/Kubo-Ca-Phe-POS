@@ -186,10 +186,10 @@ void main() {
       await shop.customers.saveUsual(customerId: mariaId, patternId: latte.id);
 
       // She orders something different, several times.
-      await order('Vietnamese Egg Coffee', 'Grande');
-      await order('Vietnamese Egg Coffee', 'Grande');
-      await order('Vietnamese Egg Coffee', 'Grande');
-      await order('Vietnamese Egg Coffee', 'Grande');
+      await order('Ca Phe Trung', 'Grande');
+      await order('Ca Phe Trung', 'Grande');
+      await order('Ca Phe Trung', 'Grande');
+      await order('Ca Phe Trung', 'Grande');
 
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
       expect(

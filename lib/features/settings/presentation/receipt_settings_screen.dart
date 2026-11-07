@@ -102,7 +102,7 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
           ),
           _TextSetting(
             label: 'Facebook',
-            helper: 'Printed as you type it — e.g. fb.com/yourpage',
+            helper: 'Printed as you type it',
             value: settings.receiptFacebook,
             onSaved: (String v) => ref
                 .read(settingsControllerProvider.notifier)
@@ -115,6 +115,15 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
             onSaved: (String v) => ref
                 .read(settingsControllerProvider.notifier)
                 .update(settings.copyWith(receiptInstagram: v)),
+          ),
+          _TextSetting(
+            label: 'Phone',
+            helper: 'The shop\'s number, for anyone chasing their order',
+            value: settings.receiptPhone,
+            keyboardType: TextInputType.phone,
+            onSaved: (String v) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(receiptPhone: v)),
           ),
           _TextSetting(
             label: 'Address',

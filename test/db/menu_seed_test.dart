@@ -39,9 +39,9 @@ void main() {
       expect(sizes.map((DrinkSize s) => s.volumeOz), <double>[12, 16]);
     });
 
-    test('all seven drinks, each priced at both sizes', () async {
+    test('all nine drinks, each priced at both sizes', () async {
       final List<Product> products = await menu.products();
-      expect(products.length, 7);
+      expect(products.length, 9);
       for (final Product p in products) {
         expect(
           p.sizes.length,
@@ -59,15 +59,16 @@ void main() {
 
     test('the prices she wrote down, to the centavo', () async {
       final Map<String, List<int>> expected = <String, List<int>>{
-        // drink: [small, grande] in centavos
-        'Black': <int>[12900, 13900],
-        'Spanish Latte': <int>[12900, 13900],
-        'Caramel Macchiato with Cold Foam': <int>[12900, 13900],
-        // Priced above the other Classics: it is made with oat.
-        'Matcha Oat Latte': <int>[13900, 14900],
-        'Vietnamese Coffee': <int>[12900, 13900],
-        'Vietnamese Sea Salt Cream': <int>[13900, 15900],
-        'Vietnamese Egg Coffee': <int>[13900, 15900],
+        // drink: [small, grande] in centavos, off her menu card
+        'Iced Black': <int>[10900, 12900],
+        'Spanish Latte': <int>[11900, 13900],
+        'Cinnamon Oat Latte': <int>[12900, 14900],
+        'Caramel Macchiato': <int>[14900, 16900],
+        'Matcha Oat Latte': <int>[14900, 16900],
+        'Sea Salt Matcha Oat Latte': <int>[16900, 18900],
+        'Ca Phe Sua Da': <int>[12400, 14400],
+        'Ca Phe Muoi': <int>[12900, 14900],
+        'Ca Phe Trung': <int>[14900, 16900],
       };
 
       final List<Product> products = await menu.products();
@@ -95,10 +96,10 @@ void main() {
     });
 
     test(
-      'Vietnamese Coffee defaults to Small — the card prints it at 12 oz',
+      'Ca Phe Sua Da defaults to Small — the card prints it at 12 oz',
       () async {
         final Product product = (await menu.products()).firstWhere(
-          (Product p) => p.name == 'Vietnamese Coffee',
+          (Product p) => p.name == 'Ca Phe Sua Da',
         );
         expect(product.defaultSize!.size.name, 'Small');
       },
@@ -107,7 +108,7 @@ void main() {
     test('every other drink defaults to Grande', () async {
       final List<Product> products = await menu.products();
       for (final Product p in products) {
-        if (p.name == 'Vietnamese Coffee') continue;
+        if (p.name == 'Ca Phe Sua Da') continue;
         expect(p.defaultSize!.size.name, 'Grande', reason: p.name);
       }
     });
@@ -248,8 +249,8 @@ void main() {
   });
 
   group('per-drink rules', () {
-    test('Black and Vietnamese Coffee offer no milk at all', () async {
-      for (final String name in <String>['Black', 'Vietnamese Coffee']) {
+    test('Iced Black and Ca Phe Sua Da offer no milk at all', () async {
+      for (final String name in <String>['Iced Black', 'Ca Phe Sua Da']) {
         final Product product = (await menu.products()).firstWhere(
           (Product p) => p.name == name,
         );
@@ -266,9 +267,9 @@ void main() {
     test('the milk drinks offer milk, pre-set to Full Cream', () async {
       const List<String> milkDrinks = <String>[
         'Spanish Latte',
-        'Caramel Macchiato with Cold Foam',
-        'Vietnamese Sea Salt Cream',
-        'Vietnamese Egg Coffee',
+        'Caramel Macchiato',
+        'Ca Phe Muoi',
+        'Ca Phe Trung',
       ];
       for (final String name in milkDrinks) {
         final Product product = (await menu.products()).firstWhere(
@@ -399,7 +400,7 @@ void main() {
     test('it never runs twice', () async {
       final bool again = await MenuSeeder(database, testClock()).seedIfEmpty();
       expect(again, isFalse);
-      expect((await menu.products()).length, 7);
+      expect((await menu.products()).length, 9);
     });
 
     test("it refuses to overwrite the owner's edits", () async {
@@ -409,7 +410,7 @@ void main() {
       await MenuSeeder(database, testClock()).seedIfEmpty();
 
       final List<Product> after = await menu.products();
-      expect(after.length, 7, reason: 'no duplicate menu was inserted');
+      expect(after.length, 9, reason: 'no duplicate menu was inserted');
       expect(
         after.any((Product p) => p.name == 'Renamed by the owner'),
         isTrue,

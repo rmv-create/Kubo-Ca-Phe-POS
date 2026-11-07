@@ -33,7 +33,7 @@ void main() {
       price: Money.of(250),
       openingStock: 200,
     );
-    await shop.setRecipe('Black', 'Grande', <Ingredient, double>{
+    await shop.setRecipe('Iced Black', 'Grande', <Ingredient, double>{
       beans: 20, // ₱24.00
       cup: 1, //  ₱5.00
     });
@@ -48,7 +48,7 @@ void main() {
     OrderDraft(
       customer: customer,
       items: <DraftItem>[
-        await shop.item('Black', 'Grande', quantity: quantity),
+        await shop.item('Iced Black', 'Grande', quantity: quantity),
       ],
       paymentMethod: PaymentMethod.cash,
     ),
@@ -58,7 +58,7 @@ void main() {
     test('give money back without deleting the sale', () async {
       final CompletedOrder order = await sellBlack(quantity: 2);
       final OrderRecord before = (await shop.sales.orderById(order.id))!;
-      expect(before.total, Money.of(278));
+      expect(before.total, Money.of(258));
 
       await shop.sales.refund(
         orderId: order.id,
@@ -67,9 +67,9 @@ void main() {
       );
 
       final OrderRecord after = (await shop.sales.orderById(order.id))!;
-      expect(after.total, Money.of(278), reason: 'the sale is unchanged');
-      expect(after.refunded, Money.of(139));
-      expect(after.netTotal, Money.of(139));
+      expect(after.total, Money.of(258), reason: 'the sale is unchanged');
+      expect(after.refunded, Money.of(129));
+      expect(after.netTotal, Money.of(129));
       expect(after.status, 'completed');
       expect(after.lines.single.refundedQuantity, 1);
       expect(after.lines.single.remainingQuantity, 1);
@@ -174,8 +174,8 @@ void main() {
       );
 
       final SalesSummary day = await shop.reports.forDay(order.businessDate);
-      expect(day.revenue, Money.of(139), reason: 'the sale still happened');
-      expect(day.refunds, Money.of(139), reason: 'and so did the refund');
+      expect(day.revenue, Money.of(129), reason: 'the sale still happened');
+      expect(day.refunds, Money.of(129), reason: 'and so did the refund');
       expect(day.netRevenue, Money.zero);
       expect(day.orderCount, 1);
     });
@@ -195,7 +195,7 @@ void main() {
       final SalesSummary day = await shop.reports.forDay(order.businessDate);
       expect(day.orderCount, 0);
       expect(day.revenue, Money.zero);
-      expect(day.voids, Money.of(139));
+      expect(day.voids, Money.of(129));
     });
 
     test('put every ingredient back', () async {
@@ -281,7 +281,7 @@ void main() {
       await sellBlack(quantity: 2);
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
           paymentMethod: PaymentMethod.gcash,
           paymentConfirmed: true,
         ),
@@ -297,9 +297,9 @@ void main() {
 
       expect(day.orderCount, 3);
       expect(day.drinkCount, 4);
-      expect(day.revenue, Money.of(556)); // 139 + 278 + 139
-      expect(day.cash, Money.of(417));
-      expect(day.gcash, Money.of(139));
+      expect(day.revenue, Money.of(516)); // 129 + 258 + 129
+      expect(day.cash, Money.of(387));
+      expect(day.gcash, Money.of(129));
       expect(
         day.cash + day.gcash,
         day.revenue,
@@ -316,13 +316,13 @@ void main() {
 
       final DailyClosing closing = await shop.reports.closeDay(today);
       expect(closing.summary.orderCount, 1);
-      expect(closing.summary.revenue, Money.of(139));
+      expect(closing.summary.revenue, Money.of(129));
 
       // A later sale belongs to the day it happened on; the closed record
       // keeps the figures as they stood.
       await sellBlack();
       final DailyClosing? stored = await shop.reports.closingFor(today);
-      expect(stored!.summary.revenue, Money.of(139));
+      expect(stored!.summary.revenue, Money.of(129));
     });
 
     test('a day cannot be closed twice', () async {
@@ -336,18 +336,16 @@ void main() {
     });
 
     test('an uncosted order is counted and flagged, not hidden', () async {
-      // Vietnamese Egg Coffee has no recipe.
+      // Ca Phe Trung has no recipe.
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[
-            await shop.item('Vietnamese Egg Coffee', 'Grande'),
-          ],
+          items: <DraftItem>[await shop.item('Ca Phe Trung', 'Grande')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
       final SalesSummary day = await shop.reports.forDay(shop.reports.today);
       expect(day.orderCount, 1);
-      expect(day.revenue, Money.of(159));
+      expect(day.revenue, Money.of(169));
       expect(day.cogs, Money.zero);
       expect(day.grossProfit, Money.zero, reason: 'not the whole price');
       expect(day.uncostedOrders, 1, reason: 'and the owner is told');
@@ -392,7 +390,7 @@ void main() {
       );
       expect(
         profitable.first.productName,
-        'Black',
+        'Iced Black',
         reason: 'three at ₱110 profit beats five at ₱26',
       );
       expect(
@@ -413,9 +411,9 @@ void main() {
 
       final ProductPerformance black = (await shop.reports.productPerformance(
         month: shop.reports.thisMonth,
-      )).firstWhere((ProductPerformance p) => p.productName == 'Black');
+      )).firstWhere((ProductPerformance p) => p.productName == 'Iced Black');
       expect(black.unitsSold, 2);
-      expect(black.revenue, Money.of(278));
+      expect(black.revenue, Money.of(258));
     });
   });
 

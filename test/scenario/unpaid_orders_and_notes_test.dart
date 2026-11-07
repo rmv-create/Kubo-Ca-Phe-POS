@@ -263,12 +263,40 @@ void main() {
       expect(BusinessSettings.defaults.receiptQrData, isNotEmpty);
     });
 
-    test('her address and socials are hers to type in, not invented', () async {
+    test('her address, socials and number are the ones she gave', () async {
+      // Taken from the receipt she marked up herself — not invented, and all
+      // of them editable in Settings → Receipt.
       const BusinessSettings d = BusinessSettings.defaults;
 
-      expect(d.receiptAddress, isEmpty);
-      expect(d.receiptFacebook, isEmpty);
-      expect(d.receiptInstagram, isEmpty);
+      expect(d.receiptAddress, contains('Mariveles'));
+      expect(d.receiptFacebook, 'Kubo Ca Phe');
+      expect(d.receiptInstagram, '@kubocaphe');
+      expect(d.receiptPhone, isNotEmpty);
+    });
+
+    test('a blank contact line is left off, not printed empty', () async {
+      final OrderRecord order = await sell();
+      final full = await ReceiptDocument(
+        order: order,
+        settings: shop.settings,
+      ).build();
+      final bare = await ReceiptDocument(
+        order: order,
+        settings: shop.settings.copyWith(
+          receiptAddress: '',
+          receiptFacebook: '',
+          receiptInstagram: '',
+          receiptPhone: '',
+        ),
+      ).build();
+
+      expect(bare.length, lessThan(full.length));
+    });
+
+    test('the thank-you carries no glyph the font cannot draw', () async {
+      // She drew a smiley beside it. The receipt font has no U+263A, and a
+      // character it cannot draw prints as an empty box.
+      expect(BusinessSettings.defaults.receiptThankYou, 'THANK YOU!');
     });
   });
 

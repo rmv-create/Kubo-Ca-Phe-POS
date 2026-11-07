@@ -49,6 +49,7 @@ class BusinessSettings {
     required this.receiptFacebook,
     required this.receiptInstagram,
     required this.receiptQrData,
+    required this.receiptPhone,
   });
 
   /// Values used before the owner has configured anything. The business name
@@ -80,12 +81,14 @@ class BusinessSettings {
     // She delivers, so the fee is offered from the start rather than hidden
     // behind a switch she would have to go looking for.
     deliveryFeeEnabled: true,
-    receiptThankYou: 'Salamat! Thank you for your order.',
-    // Blank on purpose. The shop's address and social handles are hers to
-    // type in — inventing either would put a wrong address on a real receipt.
-    receiptAddress: '',
-    receiptFacebook: '',
-    receiptInstagram: '',
+    // Hers. The smiley she drew beside it is not here: the receipt font
+    // carries no such glyph and would print an empty box in its place.
+    receiptThankYou: 'THANK YOU!',
+    // All four off the receipt she marked up herself.
+    receiptAddress: 'Sandatahan St. San Isidro Mariveles, Bataan.',
+    receiptFacebook: 'Kubo Ca Phe',
+    receiptInstagram: '@kubocaphe',
+    receiptPhone: '+63 947 186 6367',
     // The link behind the QR she already uses on her menu card. The code is
     // drawn from this text at print time, so changing the link changes the
     // code and there is no image to re-upload.
@@ -148,6 +151,10 @@ class BusinessSettings {
   final String receiptFacebook;
   final String receiptInstagram;
 
+  /// The shop's own number, for a customer who needs to reach her about an
+  /// order. Not the customer's — the receipt never carries that.
+  final String receiptPhone;
+
   /// What the QR code on the receipt points at — her page, or a review link.
   /// Empty prints no code.
   final String receiptQrData;
@@ -176,6 +183,7 @@ class BusinessSettings {
     String? receiptFacebook,
     String? receiptInstagram,
     String? receiptQrData,
+    String? receiptPhone,
   }) => BusinessSettings(
     businessName: businessName ?? this.businessName,
     currencyCode: currencyCode,
@@ -200,6 +208,7 @@ class BusinessSettings {
     receiptFacebook: receiptFacebook ?? this.receiptFacebook,
     receiptInstagram: receiptInstagram ?? this.receiptInstagram,
     receiptQrData: receiptQrData ?? this.receiptQrData,
+    receiptPhone: receiptPhone ?? this.receiptPhone,
   );
 }
 
@@ -234,4 +243,5 @@ abstract final class SettingKeys {
   static const String receiptFacebook = 'receipt.facebook';
   static const String receiptInstagram = 'receipt.instagram';
   static const String receiptQrData = 'receipt.qr_data';
+  static const String receiptPhone = 'receipt.phone';
 }

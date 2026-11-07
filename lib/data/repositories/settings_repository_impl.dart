@@ -70,6 +70,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       receiptInstagram:
           values[SettingKeys.receiptInstagram] ?? d.receiptInstagram,
       receiptQrData: values[SettingKeys.receiptQrData] ?? d.receiptQrData,
+      receiptPhone: values[SettingKeys.receiptPhone] ?? d.receiptPhone,
     );
   }
 
@@ -147,6 +148,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
       await _put(txn, SettingKeys.receiptFacebook, settings.receiptFacebook);
       await _put(txn, SettingKeys.receiptInstagram, settings.receiptInstagram);
       await _put(txn, SettingKeys.receiptQrData, settings.receiptQrData);
+      await _put(txn, SettingKeys.receiptPhone, settings.receiptPhone);
     });
   }
 

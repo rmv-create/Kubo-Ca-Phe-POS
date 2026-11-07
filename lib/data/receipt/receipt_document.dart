@@ -66,6 +66,7 @@ class ReceiptDocument {
             _logo(),
             pw.SizedBox(height: 6),
             ..._businessName(),
+            ..._contact(),
             pw.SizedBox(height: 10),
             _centred(order.orderNo, size: 12, bold: true),
             _centred(_formatDateTime(order.createdAt.toLocal()), size: 8),
@@ -81,16 +82,13 @@ class ReceiptDocument {
             ..._totals(),
             pw.SizedBox(height: 8),
             _payment(),
-            ..._note(),
             if (order.isVoided) ...<pw.Widget>[
               pw.SizedBox(height: 8),
               _centred('VOIDED', size: 12, bold: true),
               if (order.voidReason != null)
                 _centred(order.voidReason!, size: 8),
             ],
-            ..._thanks(),
-            ..._qr(),
-            ..._contact(),
+            ..._closing(),
             if (footerImage != null) ...<pw.Widget>[
               pw.SizedBox(height: 12),
               pw.Center(
@@ -165,6 +163,9 @@ class ReceiptDocument {
         children: <pw.Widget>[
           pw.SizedBox(width: 18, child: _text('${line.quantity}x', size: 9)),
           pw.Expanded(child: _text(line.title, size: 9, bold: true)),
+          // A long name — "Small Sea Salt Matcha Oat Latte" — runs the whole
+          // width, and without this the price is printed against it.
+          pw.SizedBox(width: 6),
           _text(line.baseTotal.format(), size: 9),
         ],
       ),
@@ -218,8 +219,10 @@ class ReceiptDocument {
                   '(${(order.discountRateBp / 100).toStringAsFixed(0)}%)',
         -order.discount,
       ),
-    if (order.deliveryFee.isPositive)
-      ReceiptLine('Delivery fee', order.deliveryFee),
+    // Always printed, even at zero: she asked for the line to be there, and
+    // a customer who was not charged for delivery can see that they were not.
+    // The discount is the opposite — no discount, no line.
+    ReceiptLine('Delivery fee', order.deliveryFee),
     ReceiptLine('Total', order.total, emphasised: true),
     if (order.vat.isPositive) ReceiptLine('VAT included (12%)', order.vat),
   ];
@@ -296,59 +299,88 @@ class ReceiptDocument {
     ],
   );
 
-  /// Her own note on this order — "leave at the gate", "no straw" — kept
-  /// verbatim and given its own label so it does not read as part of the
-  /// total.
-  List<pw.Widget> _note() {
-    final String note = order.note?.trim() ?? '';
-    if (note.isEmpty) return const <pw.Widget>[];
-    return <pw.Widget>[pw.SizedBox(height: 8), _text('Note: $note', size: 8)];
-  }
-
-  /// One line of thanks. Short on purpose: a receipt is 72mm wide and the
-  /// customer is reading it on a phone.
-  List<pw.Widget> _thanks() {
-    final String thanks = settings.receiptThankYou.trim();
-    if (thanks.isEmpty) return const <pw.Widget>[];
-    return <pw.Widget>[pw.SizedBox(height: 10), _centred(thanks, size: 9)];
-  }
-
-  /// The QR code, drawn from the link in settings rather than pasted in as a
-  /// picture — so changing where it points is typing, not image editing, and
-  /// the code stays sharp at any print size.
-  List<pw.Widget> _qr() {
+  /// The foot of the receipt: the code on the left, her words beside it.
+  ///
+  /// Laid out the way she drew it. The QR is *drawn* from the link in
+  /// settings rather than pasted in as a picture, so changing where it points
+  /// is typing, and the code stays sharp at any print size.
+  List<pw.Widget> _closing() {
     final String data = settings.receiptQrData.trim();
-    if (data.isEmpty) return const <pw.Widget>[];
+    final String note = order.note?.trim() ?? '';
+    final String thanks = settings.receiptThankYou.trim();
+    if (data.isEmpty && note.isEmpty && thanks.isEmpty) {
+      return const <pw.Widget>[];
+    }
+
+    // With no code there is nothing to sit beside, so the words take the full
+    // width and centre themselves instead of hugging a missing square.
+    if (data.isEmpty) {
+      return <pw.Widget>[
+        pw.SizedBox(height: 10),
+        if (note.isNotEmpty) _centred('Note: $note', size: 8),
+        if (note.isNotEmpty && thanks.isNotEmpty) pw.SizedBox(height: 6),
+        if (thanks.isNotEmpty) _centred(thanks, size: 11, bold: true),
+      ];
+    }
+
+    final List<pw.Widget> words = <pw.Widget>[
+      if (note.isNotEmpty) _text('Note: $note', size: 8),
+      if (note.isNotEmpty && thanks.isNotEmpty) pw.SizedBox(height: 6),
+      if (thanks.isNotEmpty) _text(thanks, size: 11, bold: true),
+    ];
+
     return <pw.Widget>[
-      pw.SizedBox(height: 8),
-      pw.Center(
-        child: pw.BarcodeWidget(
-          barcode: pw.Barcode.qrCode(),
-          data: data,
-          width: 24 * PdfPageFormat.mm,
-          height: 24 * PdfPageFormat.mm,
-          drawText: false,
-        ),
+      pw.SizedBox(height: 12),
+      pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: <pw.Widget>[
+          pw.BarcodeWidget(
+            barcode: pw.Barcode.qrCode(),
+            data: data,
+            width: 24 * PdfPageFormat.mm,
+            height: 24 * PdfPageFormat.mm,
+            drawText: false,
+          ),
+          if (words.isNotEmpty) ...<pw.Widget>[
+            pw.SizedBox(width: 8),
+            pw.Expanded(
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                mainAxisAlignment: pw.MainAxisAlignment.center,
+                children: words,
+              ),
+            ),
+          ],
+        ],
       ),
     ];
   }
 
-  /// Where to find her: the page, the handle, the address. Each printed only
-  /// if she has filled it in, because a receipt with an empty "Address:" on it
-  /// looks like a mistake.
+  /// Where to find her, directly under the shop's name — where she put it on
+  /// the receipt she marked up.
+  ///
+  /// Facebook and Instagram share a line, as she wrote them. Each line is
+  /// printed only if she has filled it in: a receipt with an empty "Address:"
+  /// on it looks like a mistake.
   List<pw.Widget> _contact() {
+    final String facebook = settings.receiptFacebook.trim();
+    final String instagram = settings.receiptInstagram.trim();
+    final String social = <String>[
+      if (facebook.isNotEmpty) 'Facebook: $facebook',
+      if (instagram.isNotEmpty) 'Instagram: $instagram',
+    ].join(' | ');
+
     final List<String> lines = <String>[
-      if (settings.receiptFacebook.trim().isNotEmpty)
-        'FB: ${settings.receiptFacebook.trim()}',
-      if (settings.receiptInstagram.trim().isNotEmpty)
-        'IG: ${settings.receiptInstagram.trim()}',
       if (settings.receiptAddress.trim().isNotEmpty)
         settings.receiptAddress.trim(),
+      if (social.isNotEmpty) social,
+      if (settings.receiptPhone.trim().isNotEmpty)
+        'Phone: ${settings.receiptPhone.trim()}',
     ];
     if (lines.isEmpty) return const <pw.Widget>[];
     return <pw.Widget>[
-      pw.SizedBox(height: 6),
-      for (final String line in lines) _centred(line, size: 8),
+      pw.SizedBox(height: 5),
+      for (final String line in lines) _centred(line, size: 7.5),
     ];
   }
 

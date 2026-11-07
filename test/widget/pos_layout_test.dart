@@ -70,14 +70,14 @@ void main() {
 
       expect(find.text('CLASSICS'), findsOneWidget);
       expect(find.text('SPECIALTY COFFEE'), findsOneWidget);
-      expect(find.text('BLACK'), findsOneWidget);
+      expect(find.text('ICED BLACK'), findsOneWidget);
       expect(find.text('SPANISH LATTE'), findsOneWidget);
       // The tile shows the default size and *that size's* price, so the
       // number always matches the size named beside it.
       expect(find.textContaining('Grande 16 oz'), findsWidgets);
       expect(find.text('₱139.00'), findsWidgets);
       expect(
-        find.text('₱129.00'),
+        find.text('₱119.00'),
         findsNothing,
         reason: 'the Small price must not appear under a Grande label',
       );
@@ -106,14 +106,14 @@ void main() {
       WidgetTester tester,
     ) async {
       await pumpPos(tester, iPhone16Plus);
-      expect(find.text('VIETNAMESE COFFEE'), findsNothing);
+      expect(find.text('CA PHE SUA DA'), findsNothing);
 
       await tester.tap(find.text('SPECIALTY COFFEE'));
       await settle(tester);
 
-      expect(find.text('VIETNAMESE COFFEE'), findsOneWidget);
-      expect(find.text('VIETNAMESE EGG COFFEE'), findsOneWidget);
-      expect(find.text('BLACK'), findsNothing);
+      expect(find.text('CA PHE SUA DA'), findsOneWidget);
+      expect(find.text('CA PHE TRUNG'), findsOneWidget);
+      expect(find.text('ICED BLACK'), findsNothing);
     });
 
     testWidgets('a drink can be added and paid for in a handful of taps', (
@@ -154,7 +154,7 @@ void main() {
     ) async {
       await pumpPos(tester, iPhone16Plus);
 
-      await tester.tap(find.text('BLACK'));
+      await tester.tap(find.text('ICED BLACK'));
       await settle(tester);
       await tester.tap(find.textContaining('ADD TO ORDER'));
       await settle(tester);
@@ -202,9 +202,11 @@ void main() {
       expect(find.text('Coconut'), findsNothing);
     });
 
-    testWidgets('Black offers no milk at all', (WidgetTester tester) async {
+    testWidgets('Iced Black offers no milk at all', (
+      WidgetTester tester,
+    ) async {
       await pumpPos(tester, iPhone16Plus);
-      await tester.tap(find.text('BLACK'));
+      await tester.tap(find.text('ICED BLACK'));
       await settle(tester);
 
       expect(find.text('SIZE'), findsOneWidget);

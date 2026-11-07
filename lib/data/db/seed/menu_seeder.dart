@@ -150,7 +150,7 @@ class MenuSeeder {
 
       int ruleOrder = 0;
       for (final SeedGroup group in MenuSeed.groups) {
-        // Black and Vietnamese Coffee take no milk choice at all.
+        // Iced Black and Ca Phe Sua Da take no milk choice at all.
         if (group.code == 'milk' && !product.showsMilk) continue;
 
         await txn.insert('product_customization_groups', <String, Object?>{

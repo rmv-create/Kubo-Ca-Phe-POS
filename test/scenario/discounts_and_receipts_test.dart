@@ -229,14 +229,17 @@ void main() {
       expect(line.lineTotal, order.subtotal);
     });
 
-    test('a plain sale prints no discount and no delivery line', () async {
+    test('a plain sale prints the delivery line but no discount', () async {
       final OrderRecord order = await sellWith();
 
+      // She asked for the delivery fee to be on every receipt, so a customer
+      // who was not charged for delivery can see that they were not. A
+      // discount nobody got is the opposite: no discount, no line.
       expect(
         ReceiptDocument.totalLines(order).map((ReceiptLine l) => l.label),
-        <String>['Subtotal', 'Total'],
-        reason: 'zero lines are noise, not information',
+        <String>['Subtotal', 'Delivery fee', 'Total'],
       );
+      expect(ReceiptDocument.totalLines(order)[1].amount, Money.zero);
       expect(
         ReceiptDocument.paymentLines(order).map((ReceiptLine l) => l.label),
         <String>['Cash payment'],
@@ -262,21 +265,21 @@ void main() {
       () async {
         final CompletedOrder cash = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
             paymentMethod: PaymentMethod.cash,
             tendered: Money.of(200),
           ),
         );
         final CompletedOrder gcashPlain = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
             paymentMethod: PaymentMethod.gcash,
             paymentConfirmed: true,
           ),
         );
         final CompletedOrder gcashRef = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
             paymentMethod: PaymentMethod.gcash,
             paymentConfirmed: true,
             paymentReference: 'ABC123',
