@@ -241,19 +241,27 @@ class _DiscountAndDeliveryBar extends ConsumerWidget {
 
     return Row(
       children: <Widget>[
-        Expanded(
-          child: OutlinedButton.icon(
-            onPressed: draft.isEmpty ? null : () => DiscountSheet.show(context),
-            icon: Icon(kind == null ? Icons.percent : Icons.check, size: 18),
-            label: Text(
-              kind == null ? 'Discount' : kind.label,
-              overflow: TextOverflow.ellipsis,
+        // She gives no Senior Citizen or PWD discount at the moment, so the
+        // button is not on the counter screen at all. The whole engine is
+        // still there behind Settings → Receipt when she needs it.
+        if (settings.discountsEnabled)
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: draft.isEmpty
+                  ? null
+                  : () => DiscountSheet.show(context),
+              icon: Icon(kind == null ? Icons.percent : Icons.check, size: 18),
+              label: Text(
+                kind == null ? 'Discount' : kind.label,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(KuboTouch.chip),
+              ),
             ),
-            style: OutlinedButton.styleFrom(
-              minimumSize: const Size.fromHeight(KuboTouch.chip),
-            ),
-          ),
-        ),
+          )
+        else
+          const Spacer(),
         const SizedBox(width: KuboSpacing.sm),
         SizedBox(
           width: KuboTouch.chip,

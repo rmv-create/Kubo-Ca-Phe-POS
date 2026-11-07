@@ -13,6 +13,7 @@ import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
 import '../data/db/migrations/migration_runner.dart';
 import '../data/db/seed/menu_seeder.dart';
+import '../data/db/seed/pantry_seeder.dart';
 import '../data/repositories/settings_repository_impl.dart';
 import '../domain/entities/backup_entry.dart';
 import '../domain/entities/business_settings.dart';
@@ -91,6 +92,9 @@ Future<AppBootstrap> bootstrapApp({Clock clock = const SystemClock()}) async {
   // Refuses to run if any product already exists, so her later edits are never
   // overwritten by a seed on a subsequent launch.
   await MenuSeeder(database, clock).seedIfEmpty();
+  // And her pantry: what she buys, what it costs, what was on the shelf, and
+  // what goes into each drink. Same rule — it never overwrites her own.
+  await PantrySeeder(database, clock).seedIfEmpty();
 
   final SettingsRepositoryImpl settingsRepository = SettingsRepositoryImpl(
     database,
@@ -153,6 +157,9 @@ Future<AppBootstrap> _bootstrapWeb(Clock clock) async {
   );
 
   await MenuSeeder(database, clock).seedIfEmpty();
+  // And her pantry: what she buys, what it costs, what was on the shelf, and
+  // what goes into each drink. Same rule — it never overwrites her own.
+  await PantrySeeder(database, clock).seedIfEmpty();
 
   final SettingsRepositoryImpl settingsRepository = SettingsRepositoryImpl(
     database,

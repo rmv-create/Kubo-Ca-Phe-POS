@@ -239,6 +239,24 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
 
           const Divider(),
           SwitchListTile(
+            value: settings.discountsEnabled,
+            title: const Text('Offer Senior Citizen and PWD discounts'),
+            subtitle: Text(
+              settings.discountsEnabled
+                  ? 'A discount button sits beside the delivery fee on the '
+                        'POS. The law requires the name and ID number of '
+                        'whoever claims it, and the receipt records them.'
+                  : 'Off. No discount button on the POS, and no discount line '
+                        'on any receipt. The 20% is worked out for you the '
+                        'moment you turn this on.',
+            ),
+            onChanged: (bool value) => ref
+                .read(settingsControllerProvider.notifier)
+                .update(settings.copyWith(discountsEnabled: value)),
+          ),
+
+          const Divider(),
+          SwitchListTile(
             value: settings.deliveryFeeEnabled,
             title: const Text('Offer a delivery fee'),
             subtitle: const Text(

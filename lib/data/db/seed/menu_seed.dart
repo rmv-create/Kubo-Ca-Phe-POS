@@ -161,6 +161,22 @@ abstract final class MenuSeed {
       ],
     ),
     SeedGroup(
+      code: 'strength',
+      name: 'Strength',
+      selection: SelectionType.single,
+      isRequired: false,
+      isProactive: false,
+      // The coffee or the matcha, not the drink: "less strong" is the one
+      // she was asked for, and the other two are its obvious neighbours.
+      // Free, and it does not change the recipe — a lighter cup still costs
+      // what the recipe says until she writes a recipe that says otherwise.
+      options: <SeedOption>[
+        SeedOption(name: 'Regular', price: 0),
+        SeedOption(name: 'Less Strong', price: 0),
+        SeedOption(name: 'Extra Strong', price: 0),
+      ],
+    ),
+    SeedGroup(
       code: 'sweetness',
       name: 'Sweetness',
       selection: SelectionType.single,
