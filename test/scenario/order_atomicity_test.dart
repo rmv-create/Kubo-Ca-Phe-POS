@@ -143,7 +143,7 @@ void main() {
             'Small',
             lineId: 'b',
             options: <DraftOption>[
-              await shop.draftOption('extras', 'Sea Salt Cream'),
+              await shop.draftOption('extras', 'Sea Salt Cold Foam'),
             ],
           ),
         ],

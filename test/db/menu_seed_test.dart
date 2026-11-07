@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kubo_pos/core/money/money.dart';
 import 'package:kubo_pos/data/db/app_database.dart';
+import 'package:kubo_pos/data/db/seed/menu_seed.dart';
 import 'package:kubo_pos/data/db/seed/menu_seeder.dart';
 import 'package:kubo_pos/data/repositories/menu_repository_impl.dart';
 import 'package:kubo_pos/domain/entities/business_settings.dart';
@@ -154,45 +155,67 @@ void main() {
       );
     });
 
-    test('every syrup is ₱30, as written on the sheet', () async {
-      final CustomizationGroup syrup = (await menu.customizationGroups())
-          .firstWhere((CustomizationGroup g) => g.code == 'syrup');
-      for (final String name in <String>['Vanilla', 'Caramel', 'Hazelnut']) {
-        expect(
-          syrup.options
-              .firstWhere((CustomizationOption o) => o.name == name)
-              .priceDelta,
-          Money.of(30),
-          reason: name,
-        );
-      }
+    test('syrup and sauce are not on the card, so they are not here', () {
+      // An early worksheet draft had them. Her menu card does not, and she
+      // said so plainly: "There's no syrup or sauces."
       expect(
-        syrup.options
-            .firstWhere((CustomizationOption o) => o.name == 'None')
+        MenuSeed.groups.map((SeedGroup g) => g.code),
+        isNot(contains('syrup')),
+      );
+      expect(
+        MenuSeed.groups.map((SeedGroup g) => g.code),
+        isNot(contains('sauce')),
+      );
+    });
+
+    test('the extras are the two the card prices, and no others', () async {
+      final CustomizationGroup extras = (await menu.customizationGroups())
+          .firstWhere((CustomizationGroup g) => g.code == 'extras');
+
+      expect(extras.options.map((CustomizationOption o) => o.name), <String>[
+        'Sea Salt Cold Foam',
+        '1g Matcha',
+      ]);
+      expect(
+        extras.options
+            .firstWhere(
+              (CustomizationOption o) => o.name == 'Sea Salt Cold Foam',
+            )
+            .priceDelta,
+        Money.of(20),
+      );
+      expect(
+        extras.options
+            .firstWhere((CustomizationOption o) => o.name == '1g Matcha')
+            .priceDelta,
+        Money.of(15),
+      );
+    });
+
+    test('Sub Oat is ₱20, and the sweetener is free', () async {
+      final List<CustomizationGroup> groups = await menu.customizationGroups();
+      final CustomizationGroup milk = groups.firstWhere(
+        (CustomizationGroup g) => g.code == 'milk',
+      );
+      final CustomizationGroup sweetness = groups.firstWhere(
+        (CustomizationGroup g) => g.code == 'sweetness',
+      );
+
+      expect(
+        milk.options
+            .firstWhere((CustomizationOption o) => o.name == 'Oat')
+            .priceDelta,
+        Money.of(20),
+      );
+      expect(
+        sweetness.options
+            .firstWhere(
+              (CustomizationOption o) => o.name == 'Additional Sweetener',
+            )
             .priceDelta,
         Money.zero,
       );
     });
-
-    test(
-      'Sea Salt Cream and Cold Foam are ₱20 — the card and the sheet',
-      () async {
-        final CustomizationGroup extras = (await menu.customizationGroups())
-            .firstWhere((CustomizationGroup g) => g.code == 'extras');
-        expect(
-          extras.options
-              .firstWhere((CustomizationOption o) => o.name == 'Sea Salt Cream')
-              .priceDelta,
-          Money.of(20),
-        );
-        expect(
-          extras.options
-              .firstWhere((CustomizationOption o) => o.name == 'Cold Foam')
-              .priceDelta,
-          Money.of(20),
-        );
-      },
-    );
 
     test('extras can be combined; milk cannot', () async {
       final List<CustomizationGroup> groups = await menu.customizationGroups();
@@ -224,28 +247,20 @@ void main() {
       },
     );
 
-    test(
-      'choices left blank on the sheet are flagged, not silently free',
-      () async {
-        final List<CustomizationGroup> groups = await menu
-            .customizationGroups();
-        final List<CustomizationOption> flagged = <CustomizationOption>[
-          for (final CustomizationGroup g in groups)
-            ...g.options.where(
-              (CustomizationOption o) => o.description == 'Price not set yet',
-            ),
-        ];
-        expect(flagged.map((CustomizationOption o) => o.name).toSet(), <String>{
-          'Extra Sweet',
-          'Chocolate',
-          'White Mocha',
-          'Caramel',
-          'Extra Shot',
-          'Extra Syrup',
-          'Extra Sauce',
-        });
-      },
-    );
+    test('nothing is left without a price any more', () async {
+      // Every choice she offers now has a number on her card, so there is
+      // nothing for the app to flag as "she has not told us yet".
+      final List<CustomizationGroup> groups = await menu.customizationGroups();
+      final List<CustomizationOption> flagged = <CustomizationOption>[
+        for (final CustomizationGroup g in groups)
+          ...g.options.where(
+            (CustomizationOption o) => o.description == 'Price not set yet',
+          ),
+      ];
+
+      expect(flagged, isEmpty);
+      expect(MenuSeed.unpricedOptions, isEmpty);
+    });
   });
 
   group('per-drink rules', () {

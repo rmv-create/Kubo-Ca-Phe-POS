@@ -115,17 +115,17 @@ void main() {
 
     test('the order options were chosen in does not matter', () async {
       final DraftOption oat = await shop.draftOption('milk', 'Oat');
-      final DraftOption vanilla = await shop.draftOption('syrup', 'Vanilla');
+      final DraftOption matcha = await shop.draftOption('extras', '1g Matcha');
 
       await order(
         'Spanish Latte',
         'Grande',
-        options: <DraftOption>[oat, vanilla],
+        options: <DraftOption>[oat, matcha],
       );
       await order(
         'Spanish Latte',
         'Grande',
-        options: <DraftOption>[vanilla, oat],
+        options: <DraftOption>[matcha, oat],
       );
 
       final List<CustomerOrderPattern> patterns = await shop.customers

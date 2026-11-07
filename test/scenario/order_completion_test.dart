@@ -37,11 +37,11 @@ void main() {
         'Grande',
         options: <DraftOption>[
           await shop.draftOption('milk', 'Oat'), // +20
-          await shop.draftOption('syrup', 'Vanilla'), // +30
+          await shop.draftOption('extras', '1g Matcha'), // +15
         ],
       );
-      expect(item.unitCustomization, Money.of(50));
-      expect(item.unitPrice, Money.of(189));
+      expect(item.unitCustomization, Money.of(35));
+      expect(item.unitPrice, Money.of(174));
     });
 
     test('a free option adds nothing', () async {
@@ -72,7 +72,7 @@ void main() {
             'Grande',
             lineId: 'c',
             options: <DraftOption>[
-              await shop.draftOption('extras', 'Sea Salt Cream'),
+              await shop.draftOption('extras', 'Sea Salt Cold Foam'),
             ],
           ),
         ],

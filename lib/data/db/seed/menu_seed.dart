@@ -186,33 +186,8 @@ abstract final class MenuSeed {
         SeedOption(name: 'Regular', price: 0),
         SeedOption(name: 'Less Sweet', price: 0),
         SeedOption(name: 'No Sugar', price: 0),
-        SeedOption(name: 'Extra Sweet', price: 0, needsPrice: true),
-      ],
-    ),
-    SeedGroup(
-      code: 'syrup',
-      name: 'Syrup',
-      selection: SelectionType.single,
-      isRequired: false,
-      isProactive: false,
-      options: <SeedOption>[
-        SeedOption(name: 'None', price: 0),
-        SeedOption(name: 'Vanilla', price: 3000),
-        SeedOption(name: 'Caramel', price: 3000),
-        SeedOption(name: 'Hazelnut', price: 3000),
-      ],
-    ),
-    SeedGroup(
-      code: 'sauce',
-      name: 'Sauce',
-      selection: SelectionType.single,
-      isRequired: false,
-      isProactive: false,
-      options: <SeedOption>[
-        SeedOption(name: 'None', price: 0),
-        SeedOption(name: 'Chocolate', price: 0, needsPrice: true),
-        SeedOption(name: 'White Mocha', price: 0, needsPrice: true),
-        SeedOption(name: 'Caramel', price: 0, needsPrice: true),
+        // "Additional Sweetener FREE" on the card.
+        SeedOption(name: 'Additional Sweetener', price: 0),
       ],
     ),
     SeedGroup(
@@ -221,13 +196,13 @@ abstract final class MenuSeed {
       selection: SelectionType.multi,
       isRequired: false,
       isProactive: false,
+      // The card's own list, and nothing else: "customize your drink! —
+      // Sea Salt Cold Foam ₱20, Sub Oat ₱20, 1g Matcha ₱15, Additional
+      // Sweetener FREE". Sub Oat is the milk group above; the sweetener is
+      // under Sweetness.
       options: <SeedOption>[
-        // The only add-on price printed on the menu card.
-        SeedOption(name: 'Sea Salt Cream', price: 2000),
-        SeedOption(name: 'Extra Shot', price: 0, needsPrice: true),
-        SeedOption(name: 'Extra Syrup', price: 0, needsPrice: true),
-        SeedOption(name: 'Extra Sauce', price: 0, needsPrice: true),
-        SeedOption(name: 'Cold Foam', price: 2000),
+        SeedOption(name: 'Sea Salt Cold Foam', price: 2000),
+        SeedOption(name: '1g Matcha', price: 1500),
       ],
     ),
   ];

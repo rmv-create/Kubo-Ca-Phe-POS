@@ -221,6 +221,121 @@ void main() {
     expect((await menuOf(db))['Cinnamon Oat Latte']![1], 14900);
   });
 
+  test('the choices her card does not have are retired, not deleted', () async {
+    final AppDatabase db = await openTestDatabaseAt(7);
+    addTearDown(db.close);
+    const String at = '2026-03-15T02:00:00Z';
+
+    final int classics = await db.db.insert(
+      'product_categories',
+      <String, Object?>{
+        'name': 'Classics',
+        'display_order': 0,
+        'created_at': at,
+        'updated_at': at,
+      },
+    );
+    final int product = await db.db.insert('products', <String, Object?>{
+      'category_id': classics,
+      'name': 'Spanish Latte',
+      'display_order': 0,
+      'created_at': at,
+      'updated_at': at,
+    });
+    final int syrup = await db.db
+        .insert('customization_groups', <String, Object?>{
+          'code': 'syrup',
+          'name': 'Syrup',
+          'selection_type': 'single',
+          'is_required': 0,
+          'is_proactive': 0,
+          'display_order': 3,
+          'is_active': 1,
+          'created_at': at,
+          'updated_at': at,
+        });
+    final int vanilla = await db.db
+        .insert('customization_options', <String, Object?>{
+          'group_id': syrup,
+          'name': 'Vanilla',
+          'price_delta_centavos': 3000,
+          'display_order': 1,
+          'is_active': 1,
+          'created_at': at,
+          'updated_at': at,
+        });
+    await db.db.insert('product_customization_groups', <String, Object?>{
+      'product_id': product,
+      'group_id': syrup,
+      'is_visible': 1,
+      'display_order': 3,
+      'created_at': at,
+      'updated_at': at,
+    });
+    final int extras = await db.db
+        .insert('customization_groups', <String, Object?>{
+          'code': 'extras',
+          'name': 'Extras',
+          'selection_type': 'multi',
+          'is_required': 0,
+          'is_proactive': 0,
+          'display_order': 5,
+          'is_active': 1,
+          'created_at': at,
+          'updated_at': at,
+        });
+    await db.db.insert('customization_options', <String, Object?>{
+      'group_id': extras,
+      'name': 'Sea Salt Cream',
+      'price_delta_centavos': 2000,
+      'display_order': 0,
+      'is_active': 1,
+      'created_at': at,
+      'updated_at': at,
+    });
+
+    await const MigrationRunner().run(db.db);
+
+    // Switched off and unhooked from every drink, but still on the record —
+    // an order that carried a Vanilla syrup must still print as it was sold.
+    final Map<String, Object?> group = (await db.db.query(
+      'customization_groups',
+      where: 'code = ?',
+      whereArgs: <Object?>['syrup'],
+    )).single;
+    expect(group['is_active'], 0);
+    expect(
+      await db.db.query(
+        'product_customization_groups',
+        where: 'group_id = ?',
+        whereArgs: <Object?>[syrup],
+      ),
+      isEmpty,
+    );
+    expect(
+      await db.db.query(
+        'customization_options',
+        where: 'id = ?',
+        whereArgs: <Object?>[vanilla],
+      ),
+      hasLength(1),
+    );
+
+    // The extras become the two the card prices, the first renamed in place
+    // so orders already carrying it still point at it.
+    final List<Map<String, Object?>> offered = await db.db.query(
+      'customization_options',
+      where: 'group_id = ? AND is_active = 1',
+      whereArgs: <Object?>[extras],
+      orderBy: 'display_order',
+    );
+    expect(offered.map((Map<String, Object?> o) => o['name']), <String>[
+      'Sea Salt Cold Foam',
+      '1g Matcha',
+    ]);
+    expect(offered.last['price_delta_centavos'], 1500);
+  });
+
   test('an upgraded shop and a new one end up with the same menu', () async {
     // The migration carries its own frozen copy of the card so that it does
     // the same thing in a year as it does today. This is what stops that copy
