@@ -9,7 +9,11 @@ enum BackupReason {
   preMigration('pre_migration', 'Before database upgrade'),
   preRestore('pre_restore', 'Before restoring a backup'),
   preRiskyOperation('pre_risky', 'Before a risky operation'),
-  dailyClosing('daily_closing', 'Daily closing');
+  dailyClosing('daily_closing', 'Daily closing'),
+
+  /// A file copied into the backups folder from somewhere else — the old
+  /// phone, iCloud Drive, a chat. Never pruned: she put it there on purpose.
+  imported('imported', 'Brought in from another device');
 
   const BackupReason(this.code, this.label);
 
@@ -18,7 +22,9 @@ enum BackupReason {
 
   /// Backups that must never be pruned away automatically.
   bool get isProtected =>
-      this == BackupReason.preMigration || this == BackupReason.preRestore;
+      this == BackupReason.preMigration ||
+      this == BackupReason.preRestore ||
+      this == BackupReason.imported;
 
   static BackupReason fromCode(String code) => BackupReason.values.firstWhere(
     (BackupReason r) => r.code == code,

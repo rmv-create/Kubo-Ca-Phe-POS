@@ -87,6 +87,72 @@ void main() {
     await expectLater(backups.restore(entry), throwsA(isA<BackupException>()));
   });
 
+  group('moving to another phone', () {
+    test('a file copied into the folder is picked up and listed', () async {
+      // The new phone's side of a device move: she saves the file from the
+      // old phone into Kubo's folder, and it appears here ready to restore.
+      final BackupEntry made = await backups.create();
+      final File copied = File(
+        p.join(backups.backupDirectory.path, 'from_the_old_phone.db'),
+      );
+      await File(backups.pathOf(made)).copy(copied.path);
+      // It is not in the manifest, so nothing knows about it yet.
+      expect(
+        (await backups.listBackups()).map((BackupEntry e) => e.fileName),
+        isNot(contains('from_the_old_phone.db')),
+      );
+
+      final List<BackupEntry> adopted = await backups.adopt();
+
+      expect(adopted, hasLength(1));
+      expect(adopted.single.reason, BackupReason.imported);
+      expect(adopted.single.schemaVersion, greaterThan(0));
+      expect(
+        (await backups.listBackups()).map((BackupEntry e) => e.fileName),
+        contains('from_the_old_phone.db'),
+      );
+    });
+
+    test('it is taken in once, not again on every look', () async {
+      await backups.create();
+      await File(
+        backups.pathOf((await backups.listBackups()).first),
+      ).copy(p.join(backups.backupDirectory.path, 'copy.db'));
+
+      expect(await backups.adopt(), hasLength(1));
+      expect(await backups.adopt(), isEmpty);
+    });
+
+    test('something that is not a database is left where it is', () async {
+      await backups.create();
+      await File(
+        p.join(backups.backupDirectory.path, 'holiday_photo.db'),
+      ).writeAsString('not a database, whatever it is called');
+
+      expect(await backups.adopt(), isEmpty);
+      expect(
+        (await backups.listBackups()).map((BackupEntry e) => e.fileName),
+        isNot(contains('holiday_photo.db')),
+      );
+    });
+
+    test('a brought-in backup is never pruned away', () async {
+      await backups.create();
+      await File(
+        backups.pathOf((await backups.listBackups()).first),
+      ).copy(p.join(backups.backupDirectory.path, 'from_the_old_phone.db'));
+      await backups.adopt();
+
+      await backups.prune(keep: 1);
+
+      expect(
+        (await backups.listBackups()).map((BackupEntry e) => e.fileName),
+        contains('from_the_old_phone.db'),
+        reason: 'she put it there on purpose',
+      );
+    });
+  });
+
   test('pruning keeps the newest and never empties the folder', () async {
     for (int i = 0; i < 5; i++) {
       clock.advance(const Duration(minutes: 1));

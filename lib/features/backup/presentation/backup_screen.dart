@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
@@ -17,9 +18,13 @@ final StateProvider<bool> restartRequiredProvider = StateProvider<bool>(
 );
 
 final FutureProvider<List<BackupEntry>> backupListProvider =
-    FutureProvider<List<BackupEntry>>(
-      (Ref ref) => ref.watch(backupServiceProvider).listBackups(),
-    );
+    FutureProvider<List<BackupEntry>>((Ref ref) async {
+      final BackupService service = ref.watch(backupServiceProvider);
+      // Anything copied into the folder from another phone is picked up
+      // before the list is drawn, so moving devices needs no import button.
+      await service.adopt();
+      return service.listBackups();
+    });
 
 class BackupScreen extends ConsumerWidget {
   const BackupScreen({super.key});
@@ -41,10 +46,13 @@ class BackupScreen extends ConsumerWidget {
               0,
             ),
             child: Text(
-              'The whole business lives in one file on this device. A backup is '
-              'taken automatically once a day and before every app upgrade. '
-              'Backups are saved in the app’s Documents folder, so they can '
-              'be copied off the device with the Files app.',
+              'The whole business lives in one file on this device. A backup '
+              'is taken automatically once a day and before every app '
+              'upgrade, and kept in the app’s folder in Files.\n\n'
+              'Moving to a new phone: send a copy of the newest backup to '
+              'yourself, save it into Kubo’s folder in Files on the new '
+              'phone, open this screen, and restore it. Everything comes '
+              'across — orders, customers, recipes, stock and settings.',
               style: theme.textTheme.bodySmall,
             ),
           ),
@@ -143,16 +151,38 @@ class _BackupTile extends ConsumerWidget {
       ),
       trailing: PopupMenuButton<String>(
         onSelected: (String action) => switch (action) {
+          'send' => _send(context, ref),
           'verify' => _verify(context, ref),
           'restore' => _restore(context, ref),
           _ => null,
         },
         itemBuilder: (BuildContext context) => const <PopupMenuEntry<String>>[
+          PopupMenuItem<String>(value: 'send', child: Text('Send a copy…')),
           PopupMenuItem<String>(value: 'verify', child: Text('Verify')),
           PopupMenuItem<String>(value: 'restore', child: Text('Restore…')),
         ],
       ),
     );
+  }
+
+  /// Sends the backup file itself — to iCloud Drive, a chat, an email.
+  ///
+  /// This is the half of a device move that the phone cannot do for her: one
+  /// copy of the file, off this device, that she can open on the next one.
+  Future<void> _send(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final BackupService service = ref.read(backupServiceProvider);
+    try {
+      await Share.shareXFiles(<XFile>[
+        XFile(service.pathOf(entry), name: entry.fileName),
+      ], subject: 'Kubo Cà Phê backup — ${entry.fileName}');
+    } on Object catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text('The copy could not be sent. $error')),
+        );
+    }
   }
 
   Future<void> _verify(BuildContext context, WidgetRef ref) async {

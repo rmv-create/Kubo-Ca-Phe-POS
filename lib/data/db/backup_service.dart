@@ -44,6 +44,10 @@ class BackupService {
   File get _manifestFile =>
       File(p.join(backupDirectory.path, manifestFileName));
 
+  /// Where a backup's file sits on disk.
+  String pathOf(BackupEntry entry) =>
+      p.join(backupDirectory.path, entry.fileName);
+
   Future<BackupEntry> create({
     BackupReason reason = BackupReason.manual,
   }) async {
@@ -106,6 +110,69 @@ class BackupService {
       // a fresh backup.
       return <BackupEntry>[];
     }
+  }
+
+  /// Takes in backup files that were copied into the folder from elsewhere.
+  ///
+  /// This is how a shop moves to a new phone: copy the `.db` file out of the
+  /// old phone's Files app, into the new one's, and it appears in the list
+  /// here ready to restore. A file nobody put there on purpose cannot do any
+  /// harm — it is only listed, never opened, until she chooses to restore it,
+  /// and a restore takes its own backup first.
+  ///
+  /// Returns the files newly taken in.
+  Future<List<BackupEntry>> adopt() async {
+    if (!await backupDirectory.exists()) return <BackupEntry>[];
+
+    final List<BackupEntry> known = await listBackups();
+    final Set<String> seen = <String>{
+      for (final BackupEntry entry in known) entry.fileName,
+    };
+
+    final List<BackupEntry> found = <BackupEntry>[];
+    await for (final FileSystemEntity item in backupDirectory.list()) {
+      if (item is! File) continue;
+      final String name = p.basename(item.path);
+      if (!name.endsWith('.db') || seen.contains(name)) continue;
+
+      final List<int> bytes = await item.readAsBytes();
+      // Every SQLite file starts with this. Anything else is not a backup,
+      // and listing it would only invite her to restore rubbish.
+      if (!_looksLikeSqlite(bytes)) continue;
+
+      found.add(
+        BackupEntry(
+          fileName: name,
+          // The file's own timestamp: it was made on the other phone, and
+          // dating it "now" would make it look like today's backup.
+          createdAt: (await item.lastModified()).toUtc(),
+          reason: BackupReason.imported,
+          sizeBytes: bytes.length,
+          schemaVersion: _schemaVersionOf(bytes),
+          sha256: sha256.convert(bytes).toString(),
+        ),
+      );
+    }
+    if (found.isEmpty) return found;
+
+    await _writeManifest(<BackupEntry>[...found, ...known]);
+    return found;
+  }
+
+  static const String _sqliteMagic = 'SQLite format 3';
+
+  static bool _looksLikeSqlite(List<int> bytes) {
+    if (bytes.length < 100) return false;
+    return String.fromCharCodes(bytes.take(_sqliteMagic.length)) ==
+        _sqliteMagic;
+  }
+
+  /// SQLite keeps the `user_version` at byte 60 of the header, big-endian.
+  /// Read from the bytes rather than by opening the file, so a corrupt or
+  /// foreign database cannot take the app down on the way past.
+  static int _schemaVersionOf(List<int> bytes) {
+    if (bytes.length < 64) return 0;
+    return (bytes[60] << 24) | (bytes[61] << 16) | (bytes[62] << 8) | bytes[63];
   }
 
   /// Deletes the oldest unprotected backups beyond [keep].
