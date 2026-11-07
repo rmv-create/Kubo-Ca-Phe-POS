@@ -36,7 +36,7 @@ void main() {
     await shop.sell(
       OrderDraft(
         customer: maria,
-        items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+        items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
         paymentMethod: PaymentMethod.cash,
       ),
     );
@@ -62,7 +62,7 @@ void main() {
         OrderDraft(
           customer: refreshed,
           items: <DraftItem>[
-            await shop.item('Iced Black', 'Grande', lineId: 'good'),
+            await shop.item('Iced Black', 'Large', lineId: 'good'),
             DraftItem(
               lineId: 'bad',
               product: ghost,
@@ -97,7 +97,7 @@ void main() {
     await expectLater(
       shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.gcash,
           // Not confirmed.
         ),
@@ -113,7 +113,7 @@ void main() {
       for (int i = 0; i < 2; i++) {
         await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -137,7 +137,7 @@ void main() {
     final CompletedOrder order = await shop.sell(
       OrderDraft(
         items: <DraftItem>[
-          await shop.item('Spanish Latte', 'Grande', lineId: 'a'),
+          await shop.item('Spanish Latte', 'Large', lineId: 'a'),
           await shop.item(
             'Matcha Oat Latte',
             'Small',
@@ -165,7 +165,7 @@ void main() {
     final CompletedOrder order = await shop.sell(
       OrderDraft(
         items: <DraftItem>[
-          await shop.item('Spanish Latte', 'Grande', quantity: 2, lineId: 'a'),
+          await shop.item('Spanish Latte', 'Large', quantity: 2, lineId: 'a'),
           await shop.item('Iced Black', 'Small', lineId: 'b'),
         ],
         paymentMethod: PaymentMethod.cash,
@@ -189,7 +189,7 @@ void main() {
   test('every completed order leaves an audit entry', () async {
     final CompletedOrder order = await shop.sell(
       OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
         paymentMethod: PaymentMethod.cash,
       ),
     );

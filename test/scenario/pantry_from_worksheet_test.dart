@@ -84,7 +84,7 @@ void main() {
         'Ca Phe Muoi',
         'Ca Phe Trung',
       ]) {
-        for (final String size in <String>['Grande', 'Small']) {
+        for (final String size in <String>['Large', 'Small']) {
           final CompletedOrder done = await shop.sell(
             OrderDraft(
               items: <DraftItem>[await shop.item(drink, size)],
@@ -112,7 +112,7 @@ void main() {
     test('a Grande Spanish Latte costs what her sheet says', () async {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -133,7 +133,7 @@ void main() {
 
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -148,8 +148,7 @@ void main() {
       // Her Caramel Macchiato lists fresh milk twice — 85 g in the drink and
       // 15 g in the cold foam. The recipe must hold 100 g, not 15.
       final PantryRecipe macchiato = PantrySeed.recipes.firstWhere(
-        (PantryRecipe r) =>
-            r.drink == 'Caramel Macchiato' && r.size == 'Grande',
+        (PantryRecipe r) => r.drink == 'Caramel Macchiato' && r.size == 'Large',
       );
 
       expect(macchiato.lines['Alaska Fresh Milk'], 100);

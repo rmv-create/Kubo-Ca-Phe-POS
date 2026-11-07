@@ -35,7 +35,7 @@ void main() {
       price: Money.of(1200),
       openingStock: 5000,
     );
-    await shop.setRecipe('Iced Black', 'Grande', <Ingredient, double>{
+    await shop.setRecipe('Iced Black', 'Large', <Ingredient, double>{
       beans: 20,
     });
 
@@ -46,9 +46,7 @@ void main() {
     await shop.sell(
       OrderDraft(
         customer: (await shop.customers.byId(mariaId))!,
-        items: <DraftItem>[
-          await shop.item('Iced Black', 'Grande', quantity: 2),
-        ],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large', quantity: 2)],
         paymentMethod: PaymentMethod.cash,
       ),
     );

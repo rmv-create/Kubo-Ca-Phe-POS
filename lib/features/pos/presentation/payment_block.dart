@@ -14,6 +14,13 @@ import '../state/cart_controller.dart';
 import 'discount_sheet.dart';
 import 'order_pane.dart';
 
+/// How long a note on an order may be.
+///
+/// An 80mm receipt is about 40 characters wide, so this is five full lines —
+/// more than anything she has needed, and still a receipt rather than a
+/// letter.
+const int noteLimit = 200;
+
 /// Total, payment method, and the button that commits the sale.
 ///
 /// This block never scrolls away: on iPhone it is pinned to the bottom inside
@@ -325,8 +332,12 @@ class _DiscountAndDeliveryBar extends ConsumerWidget {
         content: TextField(
           controller: controller,
           autofocus: true,
-          maxLines: 3,
+          maxLines: 4,
           minLines: 1,
+          // Long enough for anything a customer actually asks for, short
+          // enough that the receipt stays a receipt. The counter shows how
+          // much is left rather than silently cutting her off.
+          maxLength: noteLimit,
           textCapitalization: TextCapitalization.sentences,
           decoration: const InputDecoration(
             hintText: 'Leave at the gate · no straw · for pick-up at 3pm',

@@ -48,7 +48,7 @@ const List<ManagementEntry> managementEntries = <ManagementEntry>[
   ),
   ManagementEntry(
     label: 'Recipes',
-    description: 'Independent Small and Grande recipes, with versions',
+    description: 'Independent Small and Large recipes, with versions',
     icon: Icons.science_outlined,
     route: Routes.recipes,
   ),

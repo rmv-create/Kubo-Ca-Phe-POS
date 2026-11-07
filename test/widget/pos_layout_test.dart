@@ -74,7 +74,7 @@ void main() {
       expect(find.text('SPANISH LATTE'), findsOneWidget);
       // The tile shows the default size and *that size's* price, so the
       // number always matches the size named beside it.
-      expect(find.textContaining('Grande 16 oz'), findsWidgets);
+      expect(find.textContaining('Large 16 oz'), findsWidgets);
       expect(find.text('₱139.00'), findsWidgets);
       expect(
         find.text('₱119.00'),

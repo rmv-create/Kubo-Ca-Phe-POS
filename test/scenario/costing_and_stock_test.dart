@@ -47,7 +47,7 @@ void main() {
 
   group('costing a drink', () {
     test('adds every ingredient at its own price', () async {
-      await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
         beans: 18, // 18 g x ₱1.20 = ₱21.60
         milk: 240, // 240 ml x ₱0.09 = ₱21.60
         cup: 1, //   1 pc x ₱5.00 = ₱5.00
@@ -55,7 +55,7 @@ void main() {
 
       final CompletedOrder order = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -85,7 +85,7 @@ void main() {
         'Pinch C',
         price: Money.of(4),
       );
-      await shop.setRecipe('Iced Black', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Iced Black', 'Large', <Ingredient, double>{
         a: 1,
         b: 1,
         c: 1,
@@ -93,7 +93,7 @@ void main() {
 
       final CompletedOrder order = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -109,14 +109,14 @@ void main() {
       'an ingredient with no price makes the whole drink uncosted',
       () async {
         final Ingredient mystery = await shop.addIngredient('Unpriced syrup');
-        await shop.setRecipe('Matcha Oat Latte', 'Grande', <Ingredient, double>{
+        await shop.setRecipe('Matcha Oat Latte', 'Large', <Ingredient, double>{
           milk: 240,
           mystery: 10,
         });
 
         final CompletedOrder order = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -146,7 +146,7 @@ void main() {
     test('a drink with no recipe is not claimed as pure profit', () async {
       final CompletedOrder order = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Ca Phe Trung', 'Grande')],
+          items: <DraftItem>[await shop.item('Ca Phe Trung', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -160,7 +160,7 @@ void main() {
     });
 
     test('Small and Grande use their own recipes, not a multiplier', () async {
-      await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
         beans: 18,
         milk: 240,
       });
@@ -172,7 +172,7 @@ void main() {
 
       final Recipe grande = (await shop.recipeBook.recipeFor(
         productId: (await shop.product('Spanish Latte')).id,
-        sizeId: (await shop.size('Spanish Latte', 'Grande')).size.id,
+        sizeId: (await shop.size('Spanish Latte', 'Large')).size.id,
       ))!;
       final Recipe small = (await shop.recipeBook.recipeFor(
         productId: (await shop.product('Spanish Latte')).id,
@@ -193,13 +193,13 @@ void main() {
     test(
       'editing a recipe leaves earlier orders costed as they were sold',
       () async {
-        await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+        await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
           beans: 18,
           milk: 240,
         });
         final CompletedOrder march = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -215,14 +215,14 @@ void main() {
 
         // Months later, the recipe changes.
         shop.clock.advance(const Duration(days: 90));
-        await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+        await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
           beans: 22,
           milk: 300,
         });
 
         final CompletedOrder june = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -252,12 +252,12 @@ void main() {
     );
 
     test('a price rise does not rewrite what past orders cost', () async {
-      await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
         beans: 18,
       });
       final CompletedOrder before = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -286,7 +286,7 @@ void main() {
 
       final CompletedOrder after = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -319,7 +319,7 @@ void main() {
 
   group('stock comes out when a drink is sold', () {
     setUp(() async {
-      await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
         beans: 18,
         milk: 240,
         cup: 1,
@@ -329,7 +329,7 @@ void main() {
     test('every ingredient is deducted, in the right amount', () async {
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -352,7 +352,7 @@ void main() {
       await shop.sell(
         OrderDraft(
           items: <DraftItem>[
-            await shop.item('Spanish Latte', 'Grande', quantity: 2),
+            await shop.item('Spanish Latte', 'Large', quantity: 2),
           ],
           paymentMethod: PaymentMethod.cash,
         ),
@@ -370,7 +370,7 @@ void main() {
     test('every deduction is a ledger entry with before and after', () async {
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -396,14 +396,14 @@ void main() {
           openingStock: 0,
           tracked: false,
         );
-        await shop.setRecipe('Matcha Oat Latte', 'Grande', <Ingredient, double>{
+        await shop.setRecipe('Matcha Oat Latte', 'Large', <Ingredient, double>{
           milk: 200,
           ice: 150,
         });
 
         final CompletedOrder order = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -432,7 +432,7 @@ void main() {
     test('the cached balance can always be rebuilt from the ledger', () async {
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );

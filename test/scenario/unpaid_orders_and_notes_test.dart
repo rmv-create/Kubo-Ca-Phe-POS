@@ -24,7 +24,7 @@ void main() {
   }) async {
     final CompletedOrder done = await shop.sell(
       OrderDraft(
-        items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+        items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
         unpaid: unpaid,
         paymentMethod: unpaid ? null : (method ?? PaymentMethod.cash),
         note: note,
@@ -77,7 +77,7 @@ void main() {
       );
       await shop.setRecipe(
         'Spanish Latte',
-        'Grande',
+        'Large',
         <dynamic, double>{coffee: 18}.cast(),
       );
 
@@ -293,10 +293,46 @@ void main() {
       expect(bare.length, lessThan(full.length));
     });
 
-    test('the thank-you carries no glyph the font cannot draw', () async {
-      // She drew a smiley beside it. The receipt font has no U+263A, and a
-      // character it cannot draw prints as an empty box.
-      expect(BusinessSettings.defaults.receiptThankYou, 'THANK YOU!');
+    test('the smiley she drew is on the receipt, and is drawn', () async {
+      // The receipt font has no ☺ — typeset, it would be an empty box — so
+      // the face is drawn on the page. The text keeps the character, and the
+      // document has to build with it.
+      expect(BusinessSettings.defaults.receiptThankYou, contains('☺'));
+
+      final OrderRecord order = await sell();
+      final bytes = await ReceiptDocument(
+        order: order,
+        settings: shop.settings,
+      ).build();
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+
+      // Drawn, not typeset: the glyph itself is never asked of the font.
+      final plain = await ReceiptDocument(
+        order: order,
+        settings: shop.settings.copyWith(receiptThankYou: 'THANK YOU!'),
+      ).build();
+      expect(bytes.length, greaterThan(plain.length));
+    });
+
+    test('a typed :) gets the same face', () async {
+      final OrderRecord order = await sell();
+      final smiley = await ReceiptDocument(
+        order: order,
+        settings: shop.settings.copyWith(receiptThankYou: 'Salamat :)'),
+      ).build();
+      final plain = await ReceiptDocument(
+        order: order,
+        settings: shop.settings.copyWith(receiptThankYou: 'Salamat'),
+      ).build();
+
+      expect(smiley.length, greaterThan(plain.length));
+    });
+
+    test('the address reads as she wrote it', () async {
+      expect(
+        BusinessSettings.defaults.receiptAddress,
+        'Sandatahan St. San Isidro Mariveles, Bataan',
+      );
     });
   });
 

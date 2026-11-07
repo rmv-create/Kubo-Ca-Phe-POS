@@ -81,11 +81,11 @@ class BusinessSettings {
     // She delivers, so the fee is offered from the start rather than hidden
     // behind a switch she would have to go looking for.
     deliveryFeeEnabled: true,
-    // Hers. The smiley she drew beside it is not here: the receipt font
-    // carries no such glyph and would print an empty box in its place.
-    receiptThankYou: 'THANK YOU!',
+    // Hers, smiley and all. The receipt font has no ☺, so the face is drawn
+    // on the page instead of typeset — see ReceiptDocument.
+    receiptThankYou: 'THANK YOU! ☺',
     // All four off the receipt she marked up herself.
-    receiptAddress: 'Sandatahan St. San Isidro Mariveles, Bataan.',
+    receiptAddress: 'Sandatahan St. San Isidro Mariveles, Bataan',
     receiptFacebook: 'Kubo Ca Phe',
     receiptInstagram: '@kubocaphe',
     receiptPhone: '+63 947 186 6367',

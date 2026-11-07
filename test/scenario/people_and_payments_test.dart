@@ -28,7 +28,13 @@ void main() {
     test('the two the app ships with are there and offered', () async {
       final List<PaymentMethod> all = await methods.all();
 
-      expect(all.map((PaymentMethod m) => m.code), <String>['cash', 'gcash']);
+      expect(all.map((PaymentMethod m) => m.code), <String>[
+        'cash',
+        'gcash',
+        'maya',
+        'maribank',
+        'bpi',
+      ], reason: 'the five ways she takes money');
       expect(all.first.takesTendered, isTrue, reason: 'cash counts change');
       expect(
         all.last.needsConfirmation,
@@ -39,14 +45,18 @@ void main() {
 
     test('the owner can add one, and the POS then offers it', () async {
       await methods.add(
-        const PaymentMethod(code: '', label: 'Maya', needsConfirmation: true),
+        const PaymentMethod(
+          code: '',
+          label: 'Bank transfer',
+          needsConfirmation: true,
+        ),
       );
 
       final List<PaymentMethod> all = await methods.all();
-      expect(all.map((PaymentMethod m) => m.label), contains('Maya'));
+      expect(all.map((PaymentMethod m) => m.label), contains('Bank transfer'));
       expect(
-        all.firstWhere((PaymentMethod m) => m.label == 'Maya').code,
-        'maya',
+        all.firstWhere((PaymentMethod m) => m.label == 'Bank transfer').code,
+        'bank_transfer',
       );
     });
 
@@ -55,7 +65,7 @@ void main() {
       () async {
         await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.gcash,
             paymentConfirmed: true,
           ),
@@ -63,12 +73,15 @@ void main() {
 
         await methods.update(PaymentMethod.gcash.copyWith(isActive: false));
 
-        expect((await methods.all()).map((PaymentMethod m) => m.code), <String>[
-          'cash',
-        ]);
         expect(
-          (await methods.all(includeInactive: true)).length,
-          2,
+          (await methods.all()).map((PaymentMethod m) => m.code),
+          isNot(contains('gcash')),
+        );
+        expect(
+          (await methods.all(
+            includeInactive: true,
+          )).map((PaymentMethod m) => m.code),
+          contains('gcash'),
           reason: 'still there, just not offered',
         );
       },
@@ -77,7 +90,7 @@ void main() {
     test('a method that has taken money cannot be deleted', () async {
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -96,7 +109,7 @@ void main() {
         (await methods.all(
           includeInactive: true,
         )).map((PaymentMethod m) => m.code),
-        <String>['cash', 'gcash'],
+        isNot(contains('bank_transfer')),
       );
     });
 
@@ -113,7 +126,7 @@ void main() {
     test('a receipt keeps the name the button had on the day', () async {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.gcash,
           paymentConfirmed: true,
         ),
@@ -251,7 +264,7 @@ void main() {
           items: <DraftItem>[
             await shop.item(
               'Spanish Latte',
-              'Grande',
+              'Large',
               options: <DraftOption>[await shop.draftOption('milk', 'Oat')],
             ),
           ],
@@ -284,7 +297,7 @@ void main() {
             items: <DraftItem>[
               await shop.item(
                 'Spanish Latte',
-                'Grande',
+                'Large',
                 options: <DraftOption>[await shop.draftOption('milk', 'Oat')],
               ),
             ],
@@ -308,7 +321,7 @@ void main() {
       () async {
         final CompletedOrder done = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -333,7 +346,7 @@ void main() {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
           customer: (await shop.customers.byId(first))!,
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -347,7 +360,7 @@ void main() {
     test('the order itself now carries the name, for the receipt', () async {
       final CompletedOrder done = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );

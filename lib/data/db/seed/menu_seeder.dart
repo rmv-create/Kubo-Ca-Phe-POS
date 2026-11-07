@@ -137,7 +137,7 @@ class MenuSeeder {
       for (final SeedSize size in MenuSeed.sizes) {
         final int price = size.code == 'small'
             ? product.smallPrice
-            : product.grandePrice;
+            : product.largePrice;
         await txn.insert('product_sizes', <String, Object?>{
           'product_id': productId,
           'size_id': sizeIds[size.code],

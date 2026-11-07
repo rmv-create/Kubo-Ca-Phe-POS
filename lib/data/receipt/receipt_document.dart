@@ -319,14 +319,15 @@ class ReceiptDocument {
         pw.SizedBox(height: 10),
         if (note.isNotEmpty) _centred('Note: $note', size: 8),
         if (note.isNotEmpty && thanks.isNotEmpty) pw.SizedBox(height: 6),
-        if (thanks.isNotEmpty) _centred(thanks, size: 11, bold: true),
+        if (thanks.isNotEmpty)
+          pw.Center(child: _thanksLine(thanks, pw.MainAxisAlignment.center)),
       ];
     }
 
     final List<pw.Widget> words = <pw.Widget>[
       if (note.isNotEmpty) _text('Note: $note', size: 8),
       if (note.isNotEmpty && thanks.isNotEmpty) pw.SizedBox(height: 6),
-      if (thanks.isNotEmpty) _text(thanks, size: 11, bold: true),
+      if (thanks.isNotEmpty) _thanksLine(thanks, pw.MainAxisAlignment.start),
     ];
 
     return <pw.Widget>[
@@ -383,6 +384,71 @@ class ReceiptDocument {
       for (final String line in lines) _centred(line, size: 7.5),
     ];
   }
+
+  /// The characters she can type to get a drawn smiley.
+  ///
+  /// The receipt font has no ☺ of its own — it would print as an empty box —
+  /// so the face is drawn instead, in whatever size the text around it is.
+  static final RegExp _smileyMark = RegExp(r'☺|☻|:\)|:-\)');
+
+  /// Her thank-you, with any smiley in it drawn rather than typeset.
+  pw.Widget _thanksLine(String thanks, pw.MainAxisAlignment alignment) {
+    const double size = 11;
+    final List<pw.Widget> parts = <pw.Widget>[];
+    int at = 0;
+    for (final RegExpMatch match in _smileyMark.allMatches(thanks)) {
+      final String before = thanks.substring(at, match.start).trimRight();
+      if (before.isNotEmpty) {
+        parts.add(_text(before, size: size, bold: true));
+      }
+      parts
+        ..add(pw.SizedBox(width: 4))
+        ..add(_smiley(size + 1));
+      at = match.end;
+    }
+    final String rest = thanks.substring(at).trimLeft();
+    if (rest.isNotEmpty) {
+      if (parts.isNotEmpty) parts.add(pw.SizedBox(width: 4));
+      parts.add(_text(rest, size: size, bold: true));
+    }
+    if (parts.isEmpty) return _text(thanks, size: size, bold: true);
+
+    return pw.Row(
+      mainAxisSize: pw.MainAxisSize.min,
+      mainAxisAlignment: alignment,
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: parts,
+    );
+  }
+
+  /// A smiling face, drawn with a circle, two dots and a curve.
+  pw.Widget _smiley(double diameter) => pw.SizedBox(
+    width: diameter,
+    height: diameter,
+    child: pw.CustomPaint(
+      painter: (PdfGraphics canvas, PdfPoint box) {
+        final double r = box.x / 2;
+        canvas
+          ..saveContext()
+          ..setStrokeColor(PdfColors.black)
+          ..setFillColor(PdfColors.black)
+          ..setLineWidth(r * 0.14)
+          ..drawEllipse(r, r, r * 0.92, r * 0.92)
+          ..strokePath()
+          // Eyes.
+          ..drawEllipse(r * 0.64, r * 1.28, r * 0.13, r * 0.17)
+          ..drawEllipse(r * 1.36, r * 1.28, r * 0.13, r * 0.17)
+          ..fillPath()
+          // Mouth: a shallow curve, drawn rather than filled so it reads at
+          // receipt size.
+          ..moveTo(r * 0.52, r * 0.82)
+          ..curveTo(r * 0.8, r * 0.3, r * 1.2, r * 0.3, r * 1.48, r * 0.82)
+          ..setLineWidth(r * 0.14)
+          ..strokePath()
+          ..restoreContext();
+      },
+    ),
+  );
 
   pw.Widget _amountRow(
     String label,

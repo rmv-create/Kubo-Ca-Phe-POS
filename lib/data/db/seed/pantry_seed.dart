@@ -244,12 +244,12 @@ abstract final class PantrySeed {
   ];
 
   /// What goes into each drink, off sheet 5. Her "Large" is the app's
-  /// Grande. Where she listed an ingredient twice in one drink — the
+  /// Large. Where she listed an ingredient twice in one drink — the
   /// milk in a cold foam, say — the two lines are added together.
   static const List<PantryRecipe> recipes = <PantryRecipe>[
     PantryRecipe(
       drink: 'Iced Black',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Sang Tao 1': 33,
         'Water': 235,
@@ -275,7 +275,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Spanish Latte',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Sang Tao 1': 22,
         'Water': 130,
@@ -307,7 +307,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Cinnamon Oat Latte',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Sang Tao 1': 20,
         'Water': 115,
@@ -339,7 +339,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Caramel Macchiato',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Sang Tao 1': 22,
         'Water': 130,
@@ -379,7 +379,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Matcha Oat Latte',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Matcha': 4.4,
         'Water': 60,
@@ -409,7 +409,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Sea Salt Matcha Oat Latte',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Matcha': 4.4,
         'Water': 60,
@@ -445,7 +445,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Ca Phe Sua Da',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Sang Tao 1': 55,
         'Water': 405,
@@ -479,7 +479,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Ca Phe Muoi',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Electricity & Gas': 1,
         'Large cup 16oz': 1,
@@ -499,7 +499,7 @@ abstract final class PantrySeed {
     ),
     PantryRecipe(
       drink: 'Ca Phe Trung',
-      size: 'Grande',
+      size: 'Large',
       lines: <String, double>{
         'Sang Tao 1': 22,
         'Water': 170,

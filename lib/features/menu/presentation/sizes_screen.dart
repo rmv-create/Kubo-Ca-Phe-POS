@@ -42,7 +42,7 @@ class SizesScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(KuboSpacing.lg),
               child: Text(
                 'Every drink can be priced separately at each size, and each '
-                'size gets its own recipe — a Grande is never a Small times '
+                'size gets its own recipe — a Large is never a Small times '
                 'two.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
@@ -81,7 +81,7 @@ class SizesScreen extends ConsumerWidget {
       context,
       title: 'New size',
       label: 'Size name',
-      helper: 'What the customer calls it, e.g. Grande',
+      helper: 'What the customer calls it, e.g. Large',
     );
     if (name == null || name.trim().isEmpty || !context.mounted) return;
 

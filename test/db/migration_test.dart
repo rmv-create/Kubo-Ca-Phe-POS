@@ -190,7 +190,7 @@ void main() {
   group('constraints', () {
     test('a product cannot have the same size twice', () async {
       final int categoryId = await _insertCategory(database.db, 'Classics');
-      final int sizeId = await _insertSize(database.db, 'grande', 'Grande', 16);
+      final int sizeId = await _insertSize(database.db, 'grande', 'Large', 16);
       final int productId = await database.db
           .insert('products', <String, Object?>{
             'category_id': categoryId,

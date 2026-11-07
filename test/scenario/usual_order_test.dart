@@ -40,17 +40,17 @@ void main() {
 
   group('learning the usual', () {
     test('one order is not a usual', () async {
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
       expect(await shop.customers.usualFor(mariaId), isNull);
     });
 
     test('the same drink twice becomes the usual', () async {
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
 
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
       expect(usual.productName, 'Spanish Latte');
-      expect(usual.sizeName, 'Grande');
+      expect(usual.sizeName, 'Large');
       expect(usual.pattern.occurrenceCount, 2);
       expect(usual.isSaved, isFalse);
       expect(usual.price, Money.of(139));
@@ -58,10 +58,10 @@ void main() {
 
     test('the usual is what repeats, not what was ordered last', () async {
       // Three Spanish Lattes over three visits, then one Matcha today.
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
-      await order('Matcha Oat Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
+      await order('Matcha Oat Latte', 'Large');
 
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
       expect(
@@ -80,12 +80,12 @@ void main() {
 
         await order(
           'Spanish Latte',
-          'Grande',
+          'Large',
           options: <DraftOption>[oat, lessIce],
         );
         await order(
           'Spanish Latte',
-          'Grande',
+          'Large',
           options: <DraftOption>[oat, lessIce],
         );
 
@@ -100,8 +100,8 @@ void main() {
       final DraftOption oat = await shop.draftOption('milk', 'Oat');
       final DraftOption full = await shop.draftOption('milk', 'Full Cream');
 
-      await order('Spanish Latte', 'Grande', options: <DraftOption>[oat]);
-      await order('Spanish Latte', 'Grande', options: <DraftOption>[full]);
+      await order('Spanish Latte', 'Large', options: <DraftOption>[oat]);
+      await order('Spanish Latte', 'Large', options: <DraftOption>[full]);
 
       final List<CustomerOrderPattern> patterns = await shop.customers
           .patternsFor(mariaId);
@@ -119,12 +119,12 @@ void main() {
 
       await order(
         'Spanish Latte',
-        'Grande',
+        'Large',
         options: <DraftOption>[oat, matcha],
       );
       await order(
         'Spanish Latte',
-        'Grande',
+        'Large',
         options: <DraftOption>[matcha, oat],
       );
 
@@ -139,13 +139,13 @@ void main() {
     });
 
     test('two of the same drink in one order count as two', () async {
-      await order('Spanish Latte', 'Grande', quantity: 2);
+      await order('Spanish Latte', 'Large', quantity: 2);
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
       expect(usual.pattern.occurrenceCount, 2);
     });
 
     test('Small and Grande are different usuals', () async {
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
       await order('Spanish Latte', 'Small');
       final List<CustomerOrderPattern> patterns = await shop.customers
           .patternsFor(mariaId);
@@ -155,11 +155,11 @@ void main() {
 
   group('a saved usual', () {
     test('beats the calculated one', () async {
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
-      await order('Matcha Oat Latte', 'Grande');
-      await order('Matcha Oat Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
+      await order('Matcha Oat Latte', 'Large');
+      await order('Matcha Oat Latte', 'Large');
 
       // Spanish Latte repeats more, so it is the calculated usual.
       expect(
@@ -178,18 +178,18 @@ void main() {
     });
 
     test('is never overwritten by ordering something else', () async {
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
       final CustomerOrderPattern latte = (await shop.customers.patternsFor(
         mariaId,
       )).single;
       await shop.customers.saveUsual(customerId: mariaId, patternId: latte.id);
 
       // She orders something different, several times.
-      await order('Ca Phe Trung', 'Grande');
-      await order('Ca Phe Trung', 'Grande');
-      await order('Ca Phe Trung', 'Grande');
-      await order('Ca Phe Trung', 'Grande');
+      await order('Ca Phe Trung', 'Large');
+      await order('Ca Phe Trung', 'Large');
+      await order('Ca Phe Trung', 'Large');
+      await order('Ca Phe Trung', 'Large');
 
       final UsualOrder usual = (await shop.customers.usualFor(mariaId))!;
       expect(
@@ -200,11 +200,11 @@ void main() {
     });
 
     test('can be cleared, falling back to what repeats', () async {
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
-      await order('Matcha Oat Latte', 'Grande');
-      await order('Matcha Oat Latte', 'Grande');
-      await order('Matcha Oat Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
+      await order('Matcha Oat Latte', 'Large');
+      await order('Matcha Oat Latte', 'Large');
+      await order('Matcha Oat Latte', 'Large');
 
       final CustomerOrderPattern latte = (await shop.customers.patternsFor(
         mariaId,
@@ -224,7 +224,7 @@ void main() {
 
     test('cannot be set to another customer\'s order', () async {
       final int otherId = await shop.customers.create(name: 'Mark Reyes');
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
       final CustomerOrderPattern mariasPattern =
           (await shop.customers.patternsFor(mariaId)).single;
 
@@ -240,14 +240,14 @@ void main() {
 
   group('the usual is priced at today\'s prices', () {
     test('a price change is reflected next time it is offered', () async {
-      await order('Spanish Latte', 'Grande');
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
+      await order('Spanish Latte', 'Large');
       expect((await shop.customers.usualFor(mariaId))!.price, Money.of(139));
 
       final Product latte = await shop.product('Spanish Latte');
       await shop.menu.setProductSize(
         productId: latte.id,
-        sizeId: (await shop.size('Spanish Latte', 'Grande')).size.id,
+        sizeId: (await shop.size('Spanish Latte', 'Large')).size.id,
         priceCentavos: 14900,
         isAvailable: true,
         isDefaultSize: true,
@@ -281,7 +281,7 @@ void main() {
     });
 
     test('an empty search shows recent visitors', () async {
-      await order('Spanish Latte', 'Grande');
+      await order('Spanish Latte', 'Large');
       final List<Customer> recent = await shop.customers.search('');
       expect(recent.first.name, 'Maria Santos');
     });

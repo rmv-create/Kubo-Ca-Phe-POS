@@ -26,7 +26,7 @@ void main() {
   }) async {
     final CompletedOrder done = await shop.sell(
       OrderDraft(
-        items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+        items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
         paymentMethod: PaymentMethod.cash,
         discountKind: discount,
         discountBeneficiaryName: beneficiary,
@@ -79,7 +79,7 @@ void main() {
         price: Money.of(900),
         openingStock: 1000,
       );
-      await shop.setRecipe('Spanish Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
         coffee: 18,
       });
 
@@ -151,7 +151,7 @@ void main() {
           items: <DraftItem>[
             await shop.item(
               'Spanish Latte',
-              'Grande',
+              'Large',
               options: <DraftOption>[
                 await shop.draftOption('sweetness', 'Less Sweet'),
               ],
@@ -189,7 +189,7 @@ void main() {
           items: <DraftItem>[
             await shop.item(
               'Spanish Latte',
-              'Grande',
+              'Large',
               quantity: 2,
               options: <DraftOption>[
                 await shop.draftOption('milk', 'Oat'),
@@ -265,21 +265,21 @@ void main() {
       () async {
         final CompletedOrder cash = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.cash,
             tendered: Money.of(200),
           ),
         );
         final CompletedOrder gcashPlain = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.gcash,
             paymentConfirmed: true,
           ),
         );
         final CompletedOrder gcashRef = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.gcash,
             paymentConfirmed: true,
             paymentReference: 'ABC123',

@@ -64,7 +64,7 @@ class ProductEditorScreen extends ConsumerWidget {
 ///
 /// The recipe is the drink's cost, so this is where she will look for it —
 /// rather than remembering that recipes live under Stock. Each size has its
-/// own recipe, because a Grande is not a Small doubled.
+/// own recipe, because a Large is not a Small doubled.
 class _RecipeTiles extends StatelessWidget {
   const _RecipeTiles({required this.product});
 

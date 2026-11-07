@@ -7,12 +7,13 @@ import '../../../core/money/money.dart';
 import '../../../core/money/unit_cost.dart';
 import '../../../core/quantity/quantity.dart';
 import '../../../domain/entities/ingredient.dart';
+import '../../../domain/entities/menu.dart';
 import '../../../domain/entities/recipe.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../state/stock_actions.dart';
 
-/// One recipe per drink per size. Small and Grande are always separate.
+/// One recipe per drink per size. Small and Large are always separate.
 class RecipesScreen extends ConsumerWidget {
   const RecipesScreen({super.key});
 
@@ -43,7 +44,7 @@ class RecipesScreen extends ConsumerWidget {
               Padding(
                 padding: const EdgeInsets.all(KuboSpacing.lg),
                 child: Text(
-                  'Each size gets its own recipe — a Grande is never a Small '
+                  'Each size gets its own recipe — a Large is never a Small '
                   'times two. Editing a recipe starts a new version, so orders '
                   'already sold keep the cost they were sold at.',
                   style: Theme.of(context).textTheme.bodySmall,
@@ -180,6 +181,12 @@ class _RecipeEditorScreenState extends ConsumerState<RecipeEditorScreen> {
                 padding: const EdgeInsets.only(bottom: 140),
                 children: <Widget>[
                   _CostBanner(recipe: recipe, draft: draft, byId: byId),
+                  _WhereTheMoneyGoes(
+                    recipe: recipe,
+                    draft: draft,
+                    byId: byId,
+                    cost: cost,
+                  ),
                   const SectionHeader('Goes into one drink'),
                   if (draft.isEmpty)
                     Padding(
@@ -358,6 +365,124 @@ class _LineTile extends StatelessWidget {
       ),
       onTap: onEdit,
     );
+  }
+}
+
+/// What the drink costs, what it sells for, and which lines account for it.
+///
+/// A cost that looks wrong is almost always one ingredient's price or one
+/// quantity, and the fastest way to find it is to see the biggest lines
+/// first. Tapping a line below opens the quantity; the price itself lives in
+/// Management → Ingredients.
+class _WhereTheMoneyGoes extends ConsumerWidget {
+  const _WhereTheMoneyGoes({
+    required this.recipe,
+    required this.draft,
+    required this.byId,
+    required this.cost,
+  });
+
+  final Recipe recipe;
+  final Map<int, Quantity> draft;
+  final Map<int, Ingredient> byId;
+  final Money? cost;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final Money? made = cost;
+    if (made == null || draft.isEmpty) return const SizedBox.shrink();
+
+    final ThemeData theme = Theme.of(context);
+    final MenuSnapshot? menu = ref.watch(fullMenuProvider).valueOrNull;
+    final Money? price = menu == null
+        ? null
+        : _priceOf(menu, recipe.productId, recipe.sizeId);
+
+    // Biggest first: the line that is wrong is usually the biggest one.
+    final List<MapEntry<String, Money>> lines =
+        <MapEntry<String, Money>>[
+          for (final MapEntry<int, Quantity> line in draft.entries)
+            if (byId[line.key]?.currentCost != null)
+              MapEntry<String, Money>(
+                byId[line.key]!.name,
+                moneyFromMicroCentavos(
+                  byId[line.key]!.currentCost!.costMicroCentavos(line.value),
+                ),
+              ),
+        ]..sort(
+          (MapEntry<String, Money> a, MapEntry<String, Money> b) =>
+              b.value.centavos.compareTo(a.value.centavos),
+        );
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        KuboSpacing.lg,
+        KuboSpacing.lg,
+        0,
+      ),
+      padding: const EdgeInsets.all(KuboSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(KuboRadius.md),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            price == null
+                ? 'Costs ${made.format()} to make'
+                : 'Costs ${made.format()} · sells for ${price.format()}',
+            style: theme.textTheme.titleSmall,
+          ),
+          if (price != null && price.isPositive) ...<Widget>[
+            const SizedBox(height: 2),
+            Text(
+              '${(price - made).format()} gross profit · '
+              '${((price - made).centavos * 100 / price.centavos).round()}%',
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+          if (lines.isNotEmpty) ...<Widget>[
+            const SizedBox(height: KuboSpacing.sm),
+            for (final MapEntry<String, Money> line in lines.take(3))
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: Text(line.key, style: theme.textTheme.bodySmall),
+                    ),
+                    Text(line.value.format(), style: theme.textTheme.bodySmall),
+                  ],
+                ),
+              ),
+            if (lines.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '…and ${lines.length - 3} more below',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  static Money? _priceOf(MenuSnapshot menu, int productId, int sizeId) {
+    for (final List<Product> products in menu.productsByCategory.values) {
+      for (final Product product in products) {
+        if (product.id != productId) continue;
+        for (final ProductSize size in product.sizes) {
+          if (size.size.id == sizeId) return size.price;
+        }
+      }
+    }
+    return null;
   }
 }
 

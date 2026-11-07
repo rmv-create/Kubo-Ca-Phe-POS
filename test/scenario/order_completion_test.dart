@@ -18,7 +18,7 @@ void main() {
 
   group('pricing', () {
     test('a plain drink costs its size price', () async {
-      final DraftItem item = await shop.item('Spanish Latte', 'Grande');
+      final DraftItem item = await shop.item('Spanish Latte', 'Large');
       expect(item.unitPrice, Money.of(139));
       expect(item.lineTotal, Money.of(139));
     });
@@ -34,7 +34,7 @@ void main() {
     test('options add their own charges', () async {
       final DraftItem item = await shop.item(
         'Spanish Latte',
-        'Grande',
+        'Large',
         options: <DraftOption>[
           await shop.draftOption('milk', 'Oat'), // +20
           await shop.draftOption('extras', '1g Matcha'), // +15
@@ -47,7 +47,7 @@ void main() {
     test('a free option adds nothing', () async {
       final DraftItem item = await shop.item(
         'Spanish Latte',
-        'Grande',
+        'Large',
         options: <DraftOption>[await shop.draftOption('milk', 'Full Cream')],
       );
       expect(item.unitPrice, Money.of(139));
@@ -56,7 +56,7 @@ void main() {
     test('quantity multiplies exactly', () async {
       final DraftItem item = await shop.item(
         'Ca Phe Muoi',
-        'Grande',
+        'Large',
         quantity: 3,
       );
       expect(item.lineTotal, Money.of(447));
@@ -65,11 +65,11 @@ void main() {
     test('the order total is the sum of its lines', () async {
       final OrderDraft draft = OrderDraft(
         items: <DraftItem>[
-          await shop.item('Spanish Latte', 'Grande', lineId: 'a'),
-          await shop.item('Ca Phe Muoi', 'Grande', quantity: 2, lineId: 'b'),
+          await shop.item('Spanish Latte', 'Large', lineId: 'a'),
+          await shop.item('Ca Phe Muoi', 'Large', quantity: 2, lineId: 'b'),
           await shop.item(
             'Matcha Oat Latte',
-            'Grande',
+            'Large',
             lineId: 'c',
             options: <DraftOption>[
               await shop.draftOption('extras', 'Sea Salt Cold Foam'),
@@ -96,7 +96,7 @@ void main() {
 
     test('an order with no payment method cannot be completed', () async {
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
       );
       // The methods are the owner's to configure now, so the prompt no
       // longer names two of them.
@@ -109,7 +109,7 @@ void main() {
 
     test('GCash cannot be completed until the money is confirmed', () async {
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
         paymentMethod: PaymentMethod.gcash,
       );
       expect(draft.canComplete, isFalse);
@@ -130,7 +130,7 @@ void main() {
 
     test('GCash completes once confirmed', () async {
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
         paymentMethod: PaymentMethod.gcash,
         paymentConfirmed: true,
         paymentReference: 'REF123',
@@ -148,7 +148,7 @@ void main() {
 
     test('cash is settled the moment it is taken', () async {
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
         paymentMethod: PaymentMethod.cash,
         tendered: Money.of(200),
       );
@@ -168,7 +168,7 @@ void main() {
         items: <DraftItem>[
           await shop.item(
             'Spanish Latte',
-            'Grande',
+            'Large',
             lineId: 'a',
             options: <DraftOption>[
               await shop.draftOption('milk', 'Oat'),
@@ -189,7 +189,7 @@ void main() {
 
     test('snapshots survive the drink being renamed afterwards', () async {
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Spanish Latte', 'Grande')],
+        items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
         paymentMethod: PaymentMethod.cash,
       );
       await shop.sell(draft);
@@ -201,7 +201,7 @@ void main() {
         'order_items',
       )).single;
       expect(item['product_name_snapshot'], 'Spanish Latte');
-      expect(item['size_name_snapshot'], 'Grande');
+      expect(item['size_name_snapshot'], 'Large');
       expect(item['size_volume_oz_snapshot'], 16.0);
       expect(item['unit_price_centavos'], 13900);
     });
@@ -211,7 +211,7 @@ void main() {
       // and a null recipe_version_id is what marks it as such — the app must
       // not report the full price as profit in the meantime.
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
         paymentMethod: PaymentMethod.cash,
       );
       final CompletedOrder order = await shop.sell(draft);
@@ -231,7 +231,7 @@ void main() {
 
     test('an order without a customer is a perfectly good order', () async {
       final OrderDraft draft = OrderDraft(
-        items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+        items: <DraftItem>[await shop.item('Iced Black', 'Large')],
         paymentMethod: PaymentMethod.cash,
       );
       final CompletedOrder order = await shop.sell(draft);
@@ -245,7 +245,7 @@ void main() {
       for (int i = 1; i <= 3; i++) {
         final CompletedOrder order = await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -256,14 +256,14 @@ void main() {
     test('do not restart the next day, as the owner asked', () async {
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
       shop.clock.advance(const Duration(days: 1));
       final CompletedOrder next = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -278,7 +278,7 @@ void main() {
       );
       final CompletedOrder first = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
         using: daily,
@@ -288,7 +288,7 @@ void main() {
       shop.clock.advance(const Duration(days: 1));
       final CompletedOrder next = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
         using: daily,
@@ -301,7 +301,7 @@ void main() {
       shop.clock.set(DateTime(2026, 3, 16, 0, 30));
       final CompletedOrder order = await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -328,7 +328,7 @@ void main() {
         OrderDraft(
           customer: before,
           items: <DraftItem>[
-            await shop.item('Spanish Latte', 'Grande', quantity: 2),
+            await shop.item('Spanish Latte', 'Large', quantity: 2),
           ],
           paymentMethod: PaymentMethod.cash,
         ),
@@ -349,7 +349,7 @@ void main() {
         await shop.sell(
           OrderDraft(
             customer: current,
-            items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+            items: <DraftItem>[await shop.item('Iced Black', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );
@@ -368,7 +368,7 @@ void main() {
           await shop.sell(
             OrderDraft(
               customer: current,
-              items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+              items: <DraftItem>[await shop.item('Iced Black', 'Large')],
               paymentMethod: PaymentMethod.cash,
             ),
           );
@@ -386,7 +386,7 @@ void main() {
     );
 
     test('average order value is the total divided by the orders', () async {
-      for (final String size in <String>['Grande', 'Small']) {
+      for (final String size in <String>['Large', 'Small']) {
         final Customer current = (await shop.customers.byId(mariaId))!;
         await shop.sell(
           OrderDraft(

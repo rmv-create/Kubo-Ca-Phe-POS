@@ -33,7 +33,7 @@ void main() {
       price: Money.of(250),
       openingStock: 200,
     );
-    await shop.setRecipe('Iced Black', 'Grande', <Ingredient, double>{
+    await shop.setRecipe('Iced Black', 'Large', <Ingredient, double>{
       beans: 20, // ₱24.00
       cup: 1, //  ₱5.00
     });
@@ -48,7 +48,7 @@ void main() {
     OrderDraft(
       customer: customer,
       items: <DraftItem>[
-        await shop.item('Iced Black', 'Grande', quantity: quantity),
+        await shop.item('Iced Black', 'Large', quantity: quantity),
       ],
       paymentMethod: PaymentMethod.cash,
     ),
@@ -281,7 +281,7 @@ void main() {
       await sellBlack(quantity: 2);
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Iced Black', 'Grande')],
+          items: <DraftItem>[await shop.item('Iced Black', 'Large')],
           paymentMethod: PaymentMethod.gcash,
           paymentConfirmed: true,
         ),
@@ -339,7 +339,7 @@ void main() {
       // Ca Phe Trung has no recipe.
       await shop.sell(
         OrderDraft(
-          items: <DraftItem>[await shop.item('Ca Phe Trung', 'Grande')],
+          items: <DraftItem>[await shop.item('Ca Phe Trung', 'Large')],
           paymentMethod: PaymentMethod.cash,
         ),
       );
@@ -360,7 +360,7 @@ void main() {
         price: Money.of(9000),
         openingStock: 1000,
       );
-      await shop.setRecipe('Matcha Oat Latte', 'Grande', <Ingredient, double>{
+      await shop.setRecipe('Matcha Oat Latte', 'Large', <Ingredient, double>{
         gold: 12, // ₱108.00 to make, sold at ₱139
         cup: 1,
       });
@@ -368,7 +368,7 @@ void main() {
       for (int i = 0; i < 5; i++) {
         await shop.sell(
           OrderDraft(
-            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Grande')],
+            items: <DraftItem>[await shop.item('Matcha Oat Latte', 'Large')],
             paymentMethod: PaymentMethod.cash,
           ),
         );

@@ -70,9 +70,9 @@ void main() {
     test(
       'store the customer name and the physical volume separately',
       () async {
-        await menu.createSize(code: 'grande', name: 'Grande', volumeOz: 16);
+        await menu.createSize(code: 'grande', name: 'Large', volumeOz: 16);
         final DrinkSize size = (await menu.sizes()).single;
-        expect(size.name, 'Grande');
+        expect(size.name, 'Large');
         expect(size.volumeOz, 16);
         expect(size.volumeLabel, '16 oz');
       },
@@ -80,7 +80,7 @@ void main() {
 
     test('a third size can be added without touching code', () async {
       await menu.createSize(code: 'small', name: 'Small', volumeOz: 12);
-      await menu.createSize(code: 'grande', name: 'Grande', volumeOz: 16);
+      await menu.createSize(code: 'grande', name: 'Large', volumeOz: 16);
       await menu.createSize(code: 'venti', name: 'Venti', volumeOz: 20);
       expect((await menu.sizes()).length, 3);
     });
@@ -107,7 +107,7 @@ void main() {
       );
       grandeId = await menu.createSize(
         code: 'grande',
-        name: 'Grande',
+        name: 'Large',
         volumeOz: 16,
       );
     });
@@ -252,7 +252,7 @@ void main() {
         'product_id': id,
         'product_name_snapshot': 'Spanish Latte',
         'size_id': grandeId,
-        'size_name_snapshot': 'Grande',
+        'size_name_snapshot': 'Large',
         'size_volume_oz_snapshot': 16.0,
         'quantity': 1,
         'unit_base_price_centavos': 13900,

@@ -34,9 +34,9 @@ void main() {
       ]);
     });
 
-    test('two sizes, Small 12 oz and Grande 16 oz', () async {
+    test('two sizes, Small 12 oz and Large 16 oz', () async {
       final List<DrinkSize> sizes = await menu.sizes();
-      expect(sizes.map((DrinkSize s) => s.name), <String>['Small', 'Grande']);
+      expect(sizes.map((DrinkSize s) => s.name), <String>['Small', 'Large']);
       expect(sizes.map((DrinkSize s) => s.volumeOz), <double>[12, 16]);
     });
 
@@ -81,7 +81,7 @@ void main() {
           (ProductSize s) => s.size.name == 'Small',
         );
         final ProductSize grande = product.sizes.firstWhere(
-          (ProductSize s) => s.size.name == 'Grande',
+          (ProductSize s) => s.size.name == 'Large',
         );
         expect(
           small.price,
@@ -110,7 +110,7 @@ void main() {
       final List<Product> products = await menu.products();
       for (final Product p in products) {
         if (p.name == 'Ca Phe Sua Da') continue;
-        expect(p.defaultSize!.size.name, 'Grande', reason: p.name);
+        expect(p.defaultSize!.size.name, 'Large', reason: p.name);
       }
     });
   });

@@ -57,6 +57,8 @@ void main() {
       'volume_oz': 12,
       'display_order': 0,
     });
+    // Still called Grande here: this is the database as it stood before the
+    // rename, which is the whole point of the fixture.
     final int grande = await insert('sizes', <String, Object?>{
       'code': 'grande',
       'name': 'Grande',
@@ -334,6 +336,59 @@ void main() {
       '1g Matcha',
     ]);
     expect(offered.last['price_delta_centavos'], 1500);
+  });
+
+  test('Grande becomes Large without moving anything', () async {
+    final AppDatabase db = await tradingShopOnVersion5();
+
+    await const MigrationRunner().run(db.db);
+
+    final Map<String, Object?> size = (await db.db.query(
+      'sizes',
+      where: 'code = ?',
+      whereArgs: <Object?>['large'],
+    )).single;
+    expect(size['name'], 'Large');
+    expect(size['volume_oz'], 16);
+    expect(
+      await db.db.query(
+        'sizes',
+        where: 'name = ?',
+        whereArgs: <Object?>['Grande'],
+      ),
+      isEmpty,
+    );
+
+    // The same row, so prices and recipes still point at it — and the order
+    // already sold keeps the name it was sold under.
+    expect((await menuOf(db))['Iced Black'], <int>[10900, 12900]);
+    expect(
+      (await db.db.query('order_items')).single['size_name_snapshot'],
+      'Grande',
+    );
+  });
+
+  test('the ways she takes money are all there', () async {
+    final AppDatabase db = await tradingShopOnVersion5();
+
+    await const MigrationRunner().run(db.db);
+
+    final List<Map<String, Object?>> methods = await db.db.query(
+      'payment_methods',
+      where: 'is_active = 1',
+      orderBy: 'display_order',
+    );
+    expect(methods.map((Map<String, Object?> m) => m['name']), <String>[
+      'Cash',
+      'GCash',
+      'Maya',
+      'MariBank',
+      'BPI',
+    ]);
+    // Only cash can work out change; everything else lands where the POS
+    // cannot see it and has to be confirmed.
+    expect(methods.first['takes_tendered'], 1);
+    expect(methods.last['needs_confirmation'], 1);
   });
 
   test('an upgraded shop and a new one end up with the same menu', () async {

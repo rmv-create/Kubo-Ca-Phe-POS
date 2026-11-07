@@ -86,7 +86,7 @@ class IngredientsScreen extends ConsumerWidget {
       context,
       title: 'New ingredient',
       label: 'Name',
-      helper: 'Coffee beans, Oat milk, Grande cup…',
+      helper: 'Coffee beans, Oat milk, Large cup…',
     );
     if (name == null || name.trim().isEmpty || !context.mounted) return;
 

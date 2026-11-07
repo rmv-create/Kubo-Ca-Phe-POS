@@ -18,7 +18,7 @@ abstract final class MenuSeed {
 
   static const List<SeedSize> sizes = <SeedSize>[
     SeedSize(code: 'small', name: 'Small', volumeOz: 12),
-    SeedSize(code: 'grande', name: 'Grande', volumeOz: 16),
+    SeedSize(code: 'large', name: 'Large', volumeOz: 16),
   ];
 
   /// Q1 of the worksheet was answered **B — two sizes on everything**.
@@ -35,8 +35,8 @@ abstract final class MenuSeed {
       name: 'Iced Black',
       description: 'Phin-brewed coffee served black. Bold, smooth and clean.',
       smallPrice: 10900,
-      grandePrice: 12900,
-      defaultSizeCode: 'grande',
+      largePrice: 12900,
+      defaultSizeCode: 'large',
       showsMilk: false,
     ),
     SeedProduct(
@@ -45,8 +45,8 @@ abstract final class MenuSeed {
       description:
           'Bold phin coffee with creamy milk and a touch of sweetness.',
       smallPrice: 11900,
-      grandePrice: 13900,
-      defaultSizeCode: 'grande',
+      largePrice: 13900,
+      defaultSizeCode: 'large',
     ),
     SeedProduct(
       category: classics,
@@ -54,8 +54,8 @@ abstract final class MenuSeed {
       description:
           'Bold phin coffee with creamy milk and a touch of sweetness.',
       smallPrice: 12900,
-      grandePrice: 14900,
-      defaultSizeCode: 'grande',
+      largePrice: 14900,
+      defaultSizeCode: 'large',
       defaultMilk: 'Oat',
     ),
     SeedProduct(
@@ -65,8 +65,8 @@ abstract final class MenuSeed {
           'Smooth milk, bold coffee, and caramel with our signature cold '
           'foam.',
       smallPrice: 14900,
-      grandePrice: 16900,
-      defaultSizeCode: 'grande',
+      largePrice: 16900,
+      defaultSizeCode: 'large',
     ),
     SeedProduct(
       category: classics,
@@ -76,8 +76,8 @@ abstract final class MenuSeed {
       description:
           'Vibrant matcha with creamy milk. Smooth, earthy and lightly sweet.',
       smallPrice: 14900,
-      grandePrice: 16900,
-      defaultSizeCode: 'grande',
+      largePrice: 16900,
+      defaultSizeCode: 'large',
       defaultMilk: 'Oat',
     ),
     SeedProduct(
@@ -86,8 +86,8 @@ abstract final class MenuSeed {
       description:
           'Vibrant matcha with creamy milk. Smooth, earthy and lightly sweet.',
       smallPrice: 16900,
-      grandePrice: 18900,
-      defaultSizeCode: 'grande',
+      largePrice: 18900,
+      defaultSizeCode: 'large',
       defaultMilk: 'Oat',
     ),
     SeedProduct(
@@ -97,7 +97,7 @@ abstract final class MenuSeed {
           'Traditional phin coffee with sweetened condensed milk. '
           'Strong, bold and comforting.',
       smallPrice: 12400,
-      grandePrice: 14400,
+      largePrice: 14400,
       // The card prints this one at 12 oz, unlike every other drink.
       defaultSizeCode: 'small',
       showsMilk: false,
@@ -109,8 +109,8 @@ abstract final class MenuSeed {
           'Strong phin coffee with smooth sea salt cream. '
           'Rich, creamy and perfectly balanced.',
       smallPrice: 12900,
-      grandePrice: 14900,
-      defaultSizeCode: 'grande',
+      largePrice: 14900,
+      defaultSizeCode: 'large',
     ),
     SeedProduct(
       category: specialty,
@@ -119,8 +119,8 @@ abstract final class MenuSeed {
           'Classic Hanoi-style egg coffee. '
           'Creamy, velvety and deliciously indulgent.',
       smallPrice: 14900,
-      grandePrice: 16900,
-      defaultSizeCode: 'grande',
+      largePrice: 16900,
+      defaultSizeCode: 'large',
     ),
   ];
 
@@ -259,7 +259,7 @@ class SeedProduct {
     required this.name,
     required this.description,
     required this.smallPrice,
-    required this.grandePrice,
+    required this.largePrice,
     required this.defaultSizeCode,
     this.showsMilk = true,
     this.defaultMilk,
@@ -271,7 +271,7 @@ class SeedProduct {
 
   /// Provisional, in centavos.
   final int smallPrice;
-  final int grandePrice;
+  final int largePrice;
 
   final String defaultSizeCode;
 
@@ -283,7 +283,7 @@ class SeedProduct {
   final String? defaultMilk;
 
   Money get small => Money(smallPrice);
-  Money get grande => Money(grandePrice);
+  Money get large => Money(largePrice);
 }
 
 class SeedGroup {

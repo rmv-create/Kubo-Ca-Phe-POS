@@ -8,6 +8,7 @@ import 'm005_unpaid_orders.dart';
 import 'm006_menu_card_prices.dart';
 import 'm007_strength_choice.dart';
 import 'm008_card_customisations.dart';
+import 'm009_sizes_and_payment_methods.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -23,6 +24,7 @@ const List<Migration> appMigrations = <Migration>[
   M006MenuCardPrices(),
   M007StrengthChoice(),
   M008CardCustomisations(),
+  M009SizesAndPaymentMethods(),
 ];
 
 /// The schema version a freshly built app expects.
