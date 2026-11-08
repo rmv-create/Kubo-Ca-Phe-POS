@@ -22,6 +22,21 @@ Future<AppDatabase> openTestDatabase() async {
   );
 }
 
+/// Opens an empty database of its own, in a real file.
+///
+/// The ffi factory hands back the *same* connection for every in-memory
+/// open, so two shops that both asked for `:memory:` would be one shop —
+/// which is no way to test two tills.
+Future<AppDatabase> openSeparateTestDatabase() async {
+  sqfliteFfiInit();
+  final Directory dir = await Directory.systemTemp.createTemp('kubo_till');
+  addTearDown(() => dir.delete(recursive: true));
+  return AppDatabase.open(
+    factory: databaseFactoryFfi,
+    path: p.join(dir.path, 'kubo.db'),
+  );
+}
+
 /// Opens a database migrated only as far as [version].
 ///
 /// Lets a test stand where a real installed app stands before an update, so
@@ -98,8 +113,13 @@ const Set<String> expectedTables = <String>{
 
 /// Opens a test database and writes the owner's menu into it, exactly as the
 /// app does on first launch.
-Future<AppDatabase> openSeededDatabase({FixedClock? clock}) async {
-  final AppDatabase db = await openTestDatabase();
+Future<AppDatabase> openSeededDatabase({
+  FixedClock? clock,
+  bool separate = false,
+}) async {
+  final AppDatabase db = separate
+      ? await openSeparateTestDatabase()
+      : await openTestDatabase();
   await MenuSeeder(db, clock ?? testClock()).seedIfEmpty();
   return db;
 }

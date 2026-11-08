@@ -118,9 +118,17 @@ class PosFixture {
   Future<Quantity?> stockOf(int ingredientId) async =>
       (await stock.ingredientById(ingredientId))?.onHand;
 
-  static Future<PosFixture> open({FixedClock? clock}) async {
+  /// [separate] gives this shop a database of its own rather than the
+  /// shared in-memory one — what two tills in the same test need.
+  static Future<PosFixture> open({
+    FixedClock? clock,
+    bool separate = false,
+  }) async {
     final FixedClock c = clock ?? testClock();
-    final AppDatabase db = await openSeededDatabase(clock: c);
+    final AppDatabase db = await openSeededDatabase(
+      clock: c,
+      separate: separate,
+    );
     return PosFixture._(db, c);
   }
 
