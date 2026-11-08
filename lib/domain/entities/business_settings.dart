@@ -267,6 +267,11 @@ abstract final class SettingKeys {
   /// device: it is a statement about what this phone has managed to send.
   static const String cloudLastBackupDay = 'cloud.last_backup_day';
 
+  /// The last business day she saved a copy out of Kubo altogether — to
+  /// Google Drive, to Files, to a message. The shop's own cloud is one
+  /// basket; this is the day she last put an egg in another.
+  static const String cloudLastOffSiteDay = 'cloud.last_off_site_day';
+
   /// Which shop's log this till belongs to, where it had got to reading it,
   /// and how the last round went.
   static const String syncShopId = 'sync.shop_id';

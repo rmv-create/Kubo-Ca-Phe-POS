@@ -9,6 +9,7 @@ import '../../../data/cloud/cloud_backup_service.dart';
 import '../../../data/db/archive_file.dart';
 import '../../../data/db/database_archive.dart';
 import '../../../domain/entities/backup_entry.dart';
+import '../../../domain/entities/business_settings.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../domain/services/nightly_backup_service.dart';
 import '../../../shared/widgets/async_view.dart';
@@ -178,12 +179,21 @@ class DailyClosingScreen extends ConsumerWidget {
         ),
       );
 
-    // Only when the automatic copy did not go. She should not be asked to
-    // do by hand what has just been done for her; she should be asked when
-    // it has not.
-    if (!round.sent && context.mounted) {
-      await _offerToSaveAFile(context, ref, day, because: round.message);
-      return;
+    // And then a second copy, out of Kubo altogether.
+    //
+    // The nightly copy lives in the shop's own Firebase, which is the same
+    // basket as the shop. If that project is deleted, suspended, or the
+    // Google account behind it is lost, both go together — so it is not
+    // really a backup, it is a second drawer in the same desk. This is the
+    // copy that survives that, and the only hands that can take it are
+    // hers.
+    if (context.mounted) {
+      await _offerToSaveAFile(
+        context,
+        ref,
+        day,
+        because: round.sent ? null : round.message,
+      );
     }
     if (kIsWeb) return;
 
@@ -210,6 +220,8 @@ class DailyClosingScreen extends ConsumerWidget {
     await _offerToSend(context, ref, backup, day, because: outcome);
   }
 
+  static const String _offSiteNote = '';
+
   /// In a browser, the day's copy is a file she keeps herself.
   ///
   /// Asked here rather than left to her to remember, because closing is the
@@ -224,18 +236,26 @@ class DailyClosingScreen extends ConsumerWidget {
     final bool? save = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('Save today\u2019s copy by hand?'),
+        title: Text(
+          because == null
+              ? 'Keep a second copy?'
+              : 'Save today\u2019s copy by hand?',
+        ),
         content: Text(
-          '${because ?? 'The automatic backup did not go up.'}\n\n'
-          'The whole shop lives inside this browser, and a browser can '
-          'clear its own storage. A file saved now is the only copy that '
-          'survives a lost phone \u2014 put it in Google Drive, iCloud, or '
-          'even message it to yourself.',
+          because == null
+              ? 'Tonight\u2019s copy is already in the shop\u2019s own '
+                    'cloud. This saves a second one somewhere else '
+                    '\u2014 Google Drive, Files, or a message to yourself '
+                    '\u2014 so that losing the shop\u2019s cloud does not '
+                    'lose the shop.$_offSiteNote'
+              : '$because\n\nThe whole shop lives inside this browser, and '
+                    'a browser can clear its own storage. A file saved now '
+                    'is the only copy that survives a lost phone.',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Not now'),
+            child: const Text('Not tonight'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
@@ -256,6 +276,9 @@ class DailyClosingScreen extends ConsumerWidget {
         'kubo-${day.replaceAll('-', '')}.sql',
         into: ref.read(backupServiceProvider).backupDirectory,
       );
+      await ref
+          .read(settingsRepositoryProvider)
+          .writeRaw(SettingKeys.cloudLastOffSiteDay, day);
       messenger
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text('$day is safe off the phone')));

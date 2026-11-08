@@ -646,3 +646,20 @@ final FutureProvider<List<CloudBackup>> cloudBackupsProvider =
     FutureProvider<List<CloudBackup>>(
       (Ref ref) => ref.watch(nightlyBackupProvider).list(),
     );
+
+
+/// How many days since she last saved a copy out of Kubo altogether.
+///
+/// Null when she never has. The shop's own cloud is one basket; this counts
+/// the days since she put an egg in another.
+final FutureProvider<int?> daysSinceOffSiteCopyProvider =
+    FutureProvider<int?>((Ref ref) async {
+      final String? day = await ref
+          .watch(settingsRepositoryProvider)
+          .readRaw(SettingKeys.cloudLastOffSiteDay);
+      if (day == null || day.isEmpty) return null;
+      final DateTime? then = DateTime.tryParse(day);
+      if (then == null) return null;
+      final DateTime now = ref.watch(clockProvider).now();
+      return DateTime(now.year, now.month, now.day).difference(then).inDays;
+    });

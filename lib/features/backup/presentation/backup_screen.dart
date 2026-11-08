@@ -710,13 +710,19 @@ class _NightlySectionState extends ConsumerState<_NightlySection> {
                 ),
         ),
         Padding(
-          padding: const EdgeInsets.all(KuboSpacing.lg),
+          padding: const EdgeInsets.fromLTRB(
+            KuboSpacing.lg,
+            KuboSpacing.lg,
+            KuboSpacing.lg,
+            KuboSpacing.sm,
+          ),
           child: OutlinedButton.icon(
             onPressed: _busy ? null : _sendNow,
             icon: const Icon(Icons.cloud_upload_outlined),
             label: const Text('Send tonight\u2019s copy now'),
           ),
         ),
+        const _SecondBasket(),
       ],
     );
   }
@@ -795,5 +801,83 @@ class _NightlySectionState extends ConsumerState<_NightlySection> {
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text('$error')));
     }
+  }
+}
+
+
+/// How long since a copy left Kubo altogether.
+///
+/// The nightly copy lives in the shop's own Firebase, which is the same
+/// basket as the shop: lose that project or that Google account and both go
+/// together. A file in Google Drive, in Files, or in a message to herself is
+/// the copy that survives it — and the only person who can put one there is
+/// her, so the app's job is to keep saying so.
+class _SecondBasket extends ConsumerWidget {
+  const _SecondBasket();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    final int? days = ref.watch(daysSinceOffSiteCopyProvider).valueOrNull;
+    final bool overdue = days == null || days >= 7;
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        0,
+        KuboSpacing.lg,
+        KuboSpacing.lg,
+      ),
+      padding: const EdgeInsets.all(KuboSpacing.md),
+      decoration: BoxDecoration(
+        color: overdue
+            ? theme.colorScheme.errorContainer
+            : theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(KuboRadius.md),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Icon(
+            overdue ? Icons.error_outline : Icons.check_circle_outline,
+            size: 20,
+            color: overdue ? theme.colorScheme.onErrorContainer : null,
+          ),
+          const SizedBox(width: KuboSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  switch (days) {
+                    null => 'No copy has ever left Kubo',
+                    0 => 'A copy left Kubo today',
+                    1 => 'A copy last left Kubo yesterday',
+                    _ => 'A copy last left Kubo $days days ago',
+                  },
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    color: overdue
+                        ? theme.colorScheme.onErrorContainer
+                        : null,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'The nightly copy lives in the shop\u2019s own cloud. If '
+                  'that account is ever lost, so is it. Save a file to '
+                  'Google Drive now and then \u2014 closing the day offers '
+                  'it every night.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: overdue
+                        ? theme.colorScheme.onErrorContainer
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

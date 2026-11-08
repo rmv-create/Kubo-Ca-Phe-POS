@@ -4,11 +4,17 @@ import 'dart:js_interop';
 
 import 'package:web/web.dart' as web;
 
-/// Hands the browser a file to download.
+/// Hands the file to whatever the phone can send it to.
 ///
-/// This is the browser's whole answer to "save this somewhere": the file
-/// lands wherever downloads go, and on an iPhone that is the Files app, from
-/// where it can go to iCloud Drive, Google Drive or a message.
+/// On an iPhone this is the share sheet, which is the only route that puts
+/// the file straight into Google Drive — one tap on "Drive" rather than a
+/// download, then Files, then move it. If the phone has no share sheet, or
+/// she dismisses it, the file is downloaded instead, which on iOS lands in
+/// Files and on a computer lands wherever downloads go.
+///
+/// Both paths end with the file off Kubo and in her hands, which is the
+/// whole point: a copy that does not depend on the shop's own cloud still
+/// being there.
 Future<bool> saveArchive(
   String sql,
   String filename, {
@@ -18,6 +24,9 @@ Future<bool> saveArchive(
     <JSAny>[sql.toJS].toJS,
     web.BlobPropertyBag(type: 'application/sql;charset=utf-8'),
   );
+
+  if (await _shareFile(blob, filename)) return true;
+
   final String url = web.URL.createObjectURL(blob);
   final web.HTMLAnchorElement anchor =
       web.document.createElement('a') as web.HTMLAnchorElement
@@ -30,6 +39,34 @@ Future<bool> saveArchive(
   // blob left dangling holds the whole database in memory.
   web.URL.revokeObjectURL(url);
   return true;
+}
+
+/// Offers the file to the phone's own share sheet.
+///
+/// Returns false when this browser cannot share files at all, so the caller
+/// can fall back to a download. A share the owner cancels also comes back
+/// false — she is then handed the download, which is not what she asked for
+/// but is better than nothing happening.
+Future<bool> _shareFile(web.Blob blob, String filename) async {
+  try {
+    final web.Navigator navigator = web.window.navigator;
+    final web.File file = web.File(
+      <JSAny>[blob].toJS,
+      filename,
+      web.FilePropertyBag(type: 'application/sql'),
+    );
+    final web.ShareData data = web.ShareData(
+      files: <web.File>[file].toJS,
+      title: filename,
+      text: 'Kubo C\u00e0 Ph\u00ea backup',
+    );
+    if (!navigator.canShare(data)) return false;
+    await navigator.share(data).toDart;
+    return true;
+  } on Object {
+    // No share sheet, or she closed it. Either way, fall back.
+    return false;
+  }
 }
 
 bool get canPickArchive => true;
