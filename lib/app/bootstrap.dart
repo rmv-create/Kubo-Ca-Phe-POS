@@ -13,6 +13,7 @@ import '../core/time/clock.dart';
 import '../data/cloud/cloud_backup_service.dart';
 import '../data/cloud/google_drive_target.dart';
 import '../data/db/app_database.dart';
+import '../data/db/archive_file.dart';
 import '../data/db/backup_service.dart';
 import '../data/db/migrations/migration_runner.dart';
 import '../data/db/seed/menu_seeder.dart';
@@ -167,6 +168,13 @@ Future<void> _runDailyBackup({
 /// same seed, same engines. Only the file-backed backup service is stood down,
 /// because a browser has no folder to write into.
 Future<AppBootstrap> _bootstrapWeb(Clock clock) async {
+  // Browser storage is "best effort" by default: Safari and Chrome may clear
+  // it when the device is short of space or the site is left alone. Asking
+  // for persistence promotes it to storage the browser keeps until the owner
+  // clears it herself. It is a request, not a guarantee — which is why the
+  // Backup screen still presses her for a file she holds.
+  await requestPersistentStorage();
+
   final DatabaseFactory factory = databaseFactoryFfiWeb;
   final AppDatabase database = await AppDatabase.open(
     factory: factory,

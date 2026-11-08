@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -7,7 +8,9 @@ import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../data/cloud/cloud_backup_service.dart';
 import '../../../data/cloud/cloud_backup_target.dart';
+import '../../../data/db/archive_file.dart';
 import '../../../data/db/backup_service.dart';
+import '../../../data/db/database_archive.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../shared/widgets/section_header.dart';
 import 'send_backup.dart';
@@ -48,67 +51,83 @@ class BackupScreen extends ConsumerWidget {
               0,
             ),
             child: Text(
-              'The whole business lives in one file on this device. A backup '
-              'is taken automatically once a day and before every app '
-              'upgrade, and kept in the app’s folder in Files.\n\n'
-              'Moving to a new phone: send a copy of the newest backup to '
-              'yourself, save it into Kubo’s folder in Files on the new '
-              'phone, open this screen, and restore it. Everything comes '
-              'across — orders, customers, recipes, stock and settings.',
+              kIsWeb
+                  ? 'The whole business lives in this browser, and a browser '
+                        'can clear its own storage. Save a file at the end of '
+                        'each day and keep it somewhere you would keep a '
+                        'receipt book — then nothing can be lost for good, '
+                        'and any phone or computer can pick the shop back up '
+                        'by loading it.'
+                  : 'The whole business lives in one file on this device. A '
+                        'backup is taken automatically once a day and before '
+                        'every app upgrade, and kept in the app’s folder in '
+                        'Files.\n\n'
+                        'Moving to a new phone: send a copy of the newest '
+                        'backup to yourself, save it into Kubo’s folder in '
+                        'Files on the new phone, open this screen, and '
+                        'restore it. Everything comes across — orders, '
+                        'customers, recipes, stock and settings.',
               style: theme.textTheme.bodySmall,
             ),
           ),
+          const _EverythingAsAFile(),
           const _CloudSection(),
-          if (ref.watch(backupNeedsSendingProvider).valueOrNull ?? false)
+          if (!kIsWeb &&
+              (ref.watch(backupNeedsSendingProvider).valueOrNull ?? false))
             const _StillOnThisPhone(),
-          Padding(
-            padding: const EdgeInsets.all(KuboSpacing.lg),
-            child: FilledButton.icon(
-              onPressed: () => _createBackup(context, ref),
-              icon: const Icon(Icons.save_outlined),
-              label: const Text('Back up now'),
+          // Copying the database file is a thing only a phone can do. In a
+          // browser the file above *is* the backup, so the rest of this
+          // screen would be a list of nothing and a button that fails.
+          if (!kIsWeb) ...<Widget>[
+            Padding(
+              padding: const EdgeInsets.all(KuboSpacing.lg),
+              child: FilledButton.icon(
+                onPressed: () => _createBackup(context, ref),
+                icon: const Icon(Icons.save_outlined),
+                label: const Text('Back up now'),
+              ),
             ),
-          ),
-          const SectionHeader(
-            'Backups',
-            padding: EdgeInsets.fromLTRB(
-              KuboSpacing.lg,
-              0,
-              KuboSpacing.lg,
-              KuboSpacing.sm,
+            const SectionHeader(
+              'Backups',
+              padding: EdgeInsets.fromLTRB(
+                KuboSpacing.lg,
+                0,
+                KuboSpacing.lg,
+                KuboSpacing.sm,
+              ),
             ),
-          ),
-          Expanded(
-            child: backups.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator.adaptive()),
-              error: (Object error, StackTrace stack) => Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(KuboSpacing.xl),
-                  child: Text(
-                    'The backup list could not be read.\n$error',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodyMedium,
+            Expanded(
+              child: backups.when(
+                loading: () =>
+                    const Center(child: CircularProgressIndicator.adaptive()),
+                error: (Object error, StackTrace stack) => Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(KuboSpacing.xl),
+                    child: Text(
+                      'The backup list could not be read.\n$error',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium,
+                    ),
                   ),
                 ),
-              ),
-              data: (List<BackupEntry> entries) => entries.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No backups yet',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                data: (List<BackupEntry> entries) => entries.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No backups yet',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
+                      )
+                    : ListView.separated(
+                        itemCount: entries.length,
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (BuildContext context, int index) =>
+                            _BackupTile(entry: entries[index]),
                       ),
-                    )
-                  : ListView.separated(
-                      itemCount: entries.length,
-                      separatorBuilder: (_, __) => const Divider(height: 1),
-                      itemBuilder: (BuildContext context, int index) =>
-                          _BackupTile(entry: entries[index]),
-                    ),
+              ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -132,6 +151,166 @@ class BackupScreen extends ConsumerWidget {
       messenger
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+}
+
+/// The shop as one file she can download, keep, and load back.
+///
+/// The copies above are of the database file itself, which only exists on a
+/// phone. This is the whole shop written out as text: it works in a browser,
+/// it can be read with the naked eye, and it moves between the web version
+/// and the phone version, because it carries the rows rather than the file.
+class _EverythingAsAFile extends ConsumerStatefulWidget {
+  const _EverythingAsAFile();
+
+  @override
+  ConsumerState<_EverythingAsAFile> createState() => _EverythingAsAFileState();
+}
+
+class _EverythingAsAFileState extends ConsumerState<_EverythingAsAFile> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SectionHeader('Everything, as a file'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            KuboSpacing.lg,
+            0,
+            KuboSpacing.lg,
+            KuboSpacing.sm,
+          ),
+          child: Text(
+            'Every drink, order, customer, recipe and price in one file you '
+            'can save anywhere — Files, Drive, a message to yourself. Keep '
+            'one at the end of each day and nothing can be lost for good.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            KuboSpacing.lg,
+            0,
+            KuboSpacing.lg,
+            KuboSpacing.md,
+          ),
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _busy ? null : _download,
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('SAVE A FILE'),
+                ),
+              ),
+              if (canPickArchive) ...<Widget>[
+                const SizedBox(width: KuboSpacing.sm),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _busy ? null : _restore,
+                    icon: const Icon(Icons.upload_outlined),
+                    label: const Text('LOAD A FILE'),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _download() async {
+    setState(() => _busy = true);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      final DateTime now = ref.read(clockProvider).now();
+      final String stamp = now
+          .toIso8601String()
+          .substring(0, 16)
+          .replaceAll(RegExp('[-:]'), '')
+          .replaceAll('T', '-');
+      await saveArchive(
+        await DatabaseArchive(
+          ref.read(databaseProvider).db,
+          ref.read(clockProvider),
+        ).export(),
+        'kubo-$stamp.sql',
+        into: ref.read(backupServiceProvider).backupDirectory,
+      );
+    } on Object catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$error')));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _restore() async {
+    final String? sql = await pickArchive();
+    if (sql == null || !mounted) return;
+
+    final ArchiveHeader? header = DatabaseArchive.describe(sql);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    if (header == null) {
+      messenger.showSnackBar(
+        const SnackBar(content: Text('That file is not a Kubo backup.')),
+      );
+      return;
+    }
+
+    final DateTime? taken = header.takenAt;
+    final String when = taken == null
+        ? ''
+        : ', saved ${DateFormat('d MMM yyyy · HH:mm').format(taken.toLocal())}';
+    final bool? ok = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Load this file?'),
+        content: Text(
+          'It holds ${header.rowCount} records$when.\n\n'
+          'Everything in the app now — every order, customer and recipe '
+          'recorded since — is replaced by what is in the file.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Load it'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      await DatabaseArchive(
+        ref.read(databaseProvider).db,
+        ref.read(clockProvider),
+      ).restore(sql);
+      ref.read(salesRevisionProvider.notifier).bump();
+      ref.read(menuRevisionProvider.notifier).bump();
+      ref.read(stockRevisionProvider.notifier).bump();
+      await ref.read(settingsControllerProvider.notifier).reload();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(const SnackBar(content: Text('Loaded.')));
+    } on AppException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 }
