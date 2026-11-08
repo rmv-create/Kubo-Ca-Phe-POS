@@ -12,6 +12,7 @@ import 'm009_sizes_and_payment_methods.dart';
 import 'm010_order_numbers.dart';
 import 'm011_option_effects_per_drink.dart';
 import 'm012_sync_foundations.dart';
+import 'm013_local_only_settings.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -31,6 +32,7 @@ const List<Migration> appMigrations = <Migration>[
   M010OrderNumbers(),
   M011OptionEffectsPerDrink(),
   M012SyncFoundations(),
+  M013LocalOnlySettings(),
 ];
 
 /// The schema version a freshly built app expects.

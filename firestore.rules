@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// Who may read and write the shop's records.
+//
+// The app signs in anonymously, so "who you are" is a number the phone was
+// given, not an email. That alone proves nothing — anyone can get one. What
+// these rules actually check is whether that phone is a till the owner has
+// let in: a document under the shop with the phone's own id as its name.
+//
+// A till is let in by typing a six-digit code that the first till is showing
+// at that moment, and which expires in ten minutes. Having the shop's id is
+// not enough on its own.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isTill(shopId) {
+      return signedIn() && exists(
+        /databases/$(database)/documents/shops/$(shopId)/tills/$(request.auth.uid)
+      );
+    }
+
+    function shopData(shopId) {
+      return get(/databases/$(database)/documents/shops/$(shopId)).data;
+    }
+
+    function shopExists(shopId) {
+      return exists(/databases/$(database)/documents/shops/$(shopId));
+    }
+
+    match /shops/{shopId} {
+      // The first till makes the shop. Ids are 32 random hex characters, so
+      // there is nothing to guess at and nothing of hers to land on.
+      allow create: if signedIn();
+      allow get, update: if isTill(shopId);
+      allow delete: if false;
+
+      // One document per till, named after the phone's own sign-in id.
+      match /tills/{uid} {
+        allow read: if isTill(shopId);
+
+        // You may only ever add yourself, and only either as the very first
+        // till — before the shop document exists — or by presenting the code
+        // the owner's till is showing right now.
+        allow create: if signedIn()
+          && uid == request.auth.uid
+          && (
+            !shopExists(shopId)
+            || (
+              shopData(shopId).join_code is string
+              && shopData(shopId).join_code == request.resource.data.code
+              && request.time < shopData(shopId).join_expires_at
+            )
+          );
+
+        allow update: if isTill(shopId) && uid == request.auth.uid;
+        allow delete: if isTill(shopId);
+      }
+
+      // The log the tills leave for each other. Append only: a change is
+      // written once, by the till it happened on, and nobody — including
+      // that till — may edit or remove it afterwards. A shop's books should
+      // not be rewritable from a phone.
+      match /changes/{changeId} {
+        allow read: if isTill(shopId);
+        allow create: if isTill(shopId)
+          && request.resource.data.device_id is string
+          && request.resource.data.table is string;
+        allow update, delete: if false;
+      }
+    }
+  }
+}

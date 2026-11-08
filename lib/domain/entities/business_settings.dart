@@ -245,6 +245,13 @@ abstract final class SettingKeys {
   /// When a backup last reached the cloud, and what stopped the last try.
   static const String cloudLastUploadAt = 'cloud.last_upload_at';
   static const String cloudLastError = 'cloud.last_error';
+
+  /// Which shop's log this till belongs to, where it had got to reading it,
+  /// and how the last round went.
+  static const String syncShopId = 'sync.shop_id';
+  static const String syncCursor = 'sync.cursor';
+  static const String syncLastAt = 'sync.last_at';
+  static const String syncLastError = 'sync.last_error';
   static const String vatRegistered = 'tax.vat_registered';
   static const String vatRateBp = 'tax.vat_rate_bp';
   static const String statutoryDiscountRateBp =
