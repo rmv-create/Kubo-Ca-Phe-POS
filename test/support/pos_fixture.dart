@@ -164,6 +164,33 @@ class PosFixture {
     );
   }
 
+  /// A chosen option **as that drink prices it**.
+  ///
+  /// Oat costs ₱20 on a Spanish Latte and nothing on a Matcha Oat Latte, and
+  /// the difference lives on the product. [draftOption] reads the group's own
+  /// price and is fine where no drink overrides it; this is what the POS
+  /// actually does.
+  Future<DraftOption> optionOn(
+    String productName,
+    String sizeName,
+    String groupCode,
+    String optionName,
+  ) async {
+    final Product p = await product(productName);
+    final ProductSize s = await size(productName, sizeName);
+    final List<ResolvedCustomizationGroup> groups = await menu
+        .resolvedGroupsFor(p.id, sizeId: s.size.id);
+    final CustomizationGroup group = groups
+        .firstWhere((ResolvedCustomizationGroup g) => g.group.code == groupCode)
+        .group;
+    return DraftOption(
+      group: group,
+      option: group.options.firstWhere(
+        (CustomizationOption o) => o.name == optionName,
+      ),
+    );
+  }
+
   /// One drink, ready to drop into a draft.
   Future<DraftItem> item(
     String productName,

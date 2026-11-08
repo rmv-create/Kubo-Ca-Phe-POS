@@ -2,12 +2,14 @@ import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../../core/money/money.dart';
 import '../../../core/money/unit_cost.dart';
+import '../../../core/quantity/measurement_unit.dart';
 import '../../../core/quantity/quantity.dart';
 import '../../../core/time/clock.dart';
 import '../../../domain/entities/business_settings.dart';
 import '../../../domain/entities/ingredient.dart';
 import '../../../domain/services/inventory_engine.dart';
 import '../app_database.dart';
+import 'option_effects_seed.dart';
 import 'pantry_seed.dart';
 
 /// Writes [PantrySeed] — her ingredients, their costs, what she had on the
@@ -37,7 +39,9 @@ class PantrySeeder {
   /// 1 — the first setup workbook.
   /// 2 — the corrected recipe sheet of 7 November, which moved the sea salt
   ///     cream from Ca Phe Sua Da to Ca Phe Muoi, where it belongs.
-  static const int seedVersion = 2;
+  /// 3 — what each customisation takes out of stock, so a customised drink
+  ///     is costed as the drink she actually made.
+  static const int seedVersion = 3;
 
   /// The note every recipe written from the worksheet carries. A recipe
   /// without it is one she wrote, and is never touched.
@@ -55,7 +59,10 @@ class PantrySeeder {
     }
 
     if (await _storedVersion() >= seedVersion) return false;
-    await _db.transaction(_refreshRecipes);
+    await _db.transaction((Transaction txn) async {
+      await _refreshRecipes(txn);
+      await _writeOptionEffects(txn);
+    });
     await _stampVersion();
     return true;
   }
@@ -205,6 +212,100 @@ class PantrySeeder {
     for (final PantryRecipe recipe in PantrySeed.recipes) {
       await _writeRecipe(txn, recipe, ingredientIds, now);
     }
+
+    await _writeOptionEffects(txn);
+  }
+
+  /// What each customisation adds to, or takes out of, the drink.
+  ///
+  /// Written straight over whatever is there: these are transcriptions of her
+  /// sheet, not decisions anyone has made in the app. An effect naming a
+  /// drink or an option the shop does not have is skipped rather than
+  /// guessed at.
+  Future<void> _writeOptionEffects(Transaction txn) async {
+    final String now = _clock.nowIso();
+
+    for (final OptionEffect effect in OptionEffectsSeed.effects) {
+      final int? optionId = await _optionId(txn, effect.option);
+      final int? ingredientId = await _ingredientId(txn, effect.ingredient);
+      if (optionId == null || ingredientId == null) continue;
+
+      int? productId;
+      int? sizeId;
+      if (effect.drink != null) {
+        productId = await _productId(txn, effect.drink!);
+        sizeId = await _sizeId(txn, effect.size!);
+        if (productId == null || sizeId == null) continue;
+      }
+
+      final BaseUnit unit = await _unitOf(txn, ingredientId);
+      await txn.insert('option_ingredient_effects', <String, Object?>{
+        'option_id': optionId,
+        'ingredient_id': ingredientId,
+        'product_id': productId,
+        'size_id': sizeId,
+        'qty_milli_delta':
+            Quantity.fromBase(effect.amount.abs(), unit).milli *
+            (effect.amount.isNegative ? -1 : 1),
+        'created_at': now,
+        'updated_at': now,
+      }, conflictAlgorithm: ConflictAlgorithm.replace);
+    }
+  }
+
+  Future<int?> _optionId(Transaction txn, String name) async {
+    final List<Map<String, Object?>> rows = await txn.query(
+      'customization_options',
+      columns: <String>['id'],
+      where: 'name = ? COLLATE NOCASE AND is_active = 1',
+      whereArgs: <Object?>[name],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['id']! as int;
+  }
+
+  Future<int?> _ingredientId(Transaction txn, String name) async {
+    final List<Map<String, Object?>> rows = await txn.query(
+      'ingredients',
+      columns: <String>['id'],
+      where: 'name = ? COLLATE NOCASE',
+      whereArgs: <Object?>[name],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['id']! as int;
+  }
+
+  Future<int?> _productId(Transaction txn, String name) async {
+    final List<Map<String, Object?>> rows = await txn.query(
+      'products',
+      columns: <String>['id'],
+      where: 'name = ? COLLATE NOCASE',
+      whereArgs: <Object?>[name],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['id']! as int;
+  }
+
+  Future<int?> _sizeId(Transaction txn, String name) async {
+    final List<Map<String, Object?>> rows = await txn.query(
+      'sizes',
+      columns: <String>['id'],
+      where: 'name = ? COLLATE NOCASE',
+      whereArgs: <Object?>[name],
+      limit: 1,
+    );
+    return rows.isEmpty ? null : rows.first['id']! as int;
+  }
+
+  Future<BaseUnit> _unitOf(Transaction txn, int ingredientId) async {
+    final List<Map<String, Object?>> rows = await txn.query(
+      'ingredients',
+      columns: <String>['base_unit'],
+      where: 'id = ?',
+      whereArgs: <Object?>[ingredientId],
+      limit: 1,
+    );
+    return BaseUnit.fromCode(rows.first['base_unit']! as String);
   }
 
   Future<void> _writeRecipe(

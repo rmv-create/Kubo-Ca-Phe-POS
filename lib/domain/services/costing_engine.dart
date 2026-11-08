@@ -55,6 +55,8 @@ class CostingEngine {
     final Map<int, Quantity> consumption = await consumptionFor(
       recipeVersionId: versionId,
       optionIds: optionIds,
+      productId: productId,
+      sizeId: sizeId,
     );
     if (consumption.isEmpty) {
       return DrinkCost.noRecipe(price: price, recipeVersionId: versionId);
@@ -129,6 +131,8 @@ class CostingEngine {
   Future<Map<int, Quantity>> consumptionFor({
     required int recipeVersionId,
     required List<int> optionIds,
+    int? productId,
+    int? sizeId,
   }) async {
     final Map<int, Quantity> totals = <int, Quantity>{};
 
@@ -153,13 +157,18 @@ class CostingEngine {
         optionIds.length,
         '?',
       ).join(',');
+      // An effect with no product is a rule for every drink; one that names
+      // a product and a size applies only there. A rule for another drink is
+      // simply not this drink's business.
       final List<Map<String, Object?>> effects = await _db.rawQuery(
         'SELECT e.ingredient_id AS id, e.qty_milli_delta AS delta, '
         'i.base_unit AS unit '
         'FROM option_ingredient_effects e '
         'JOIN ingredients i ON i.id = e.ingredient_id '
-        'WHERE e.option_id IN ($placeholders)',
-        optionIds,
+        'WHERE e.option_id IN ($placeholders) '
+        'AND (e.product_id IS NULL OR e.product_id = ?) '
+        'AND (e.size_id IS NULL OR e.size_id = ?)',
+        <Object?>[...optionIds, productId, sizeId],
       );
       for (final Map<String, Object?> row in effects) {
         final int id = row['id']! as int;
