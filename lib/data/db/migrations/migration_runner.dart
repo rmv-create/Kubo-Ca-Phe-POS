@@ -11,6 +11,7 @@ import 'm008_card_customisations.dart';
 import 'm009_sizes_and_payment_methods.dart';
 import 'm010_order_numbers.dart';
 import 'm011_option_effects_per_drink.dart';
+import 'm012_sync_foundations.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -29,6 +30,7 @@ const List<Migration> appMigrations = <Migration>[
   M009SizesAndPaymentMethods(),
   M010OrderNumbers(),
   M011OptionEffectsPerDrink(),
+  M012SyncFoundations(),
 ];
 
 /// The schema version a freshly built app expects.

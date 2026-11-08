@@ -90,6 +90,10 @@ const Set<String> expectedTables = <String>{
   'app_users',
   'order_discounts',
   'product_option_prices',
+  // What two tills need to agree with each other.
+  'sync_outbox',
+  'sync_inbox',
+  'sync_devices',
 };
 
 /// Opens a test database and writes the owner's menu into it, exactly as the

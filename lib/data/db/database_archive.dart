@@ -25,8 +25,14 @@ class DatabaseArchive {
   static const String _magic = 'Kubo Cà Phê backup';
   static const int formatVersion = 1;
 
-  /// Tables SQLite keeps for itself, which are rebuilt rather than restored.
-  static const Set<String> _internal = <String>{'android_metadata'};
+  /// Tables that belong to this device rather than to the shop: SQLite's
+  /// own, and the sync queues, which mean nothing anywhere else.
+  static const Set<String> _internal = <String>{
+    'android_metadata',
+    'sync_outbox',
+    'sync_inbox',
+    'sync_devices',
+  };
 
   /// Every row in the database, as SQL.
   Future<String> export() async {
