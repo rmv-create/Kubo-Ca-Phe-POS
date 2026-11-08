@@ -1,5 +1,3 @@
-import 'dart:math';
-
 import '../../../core/time/clock.dart';
 import '../../../domain/entities/business_settings.dart';
 import '../../../domain/repositories/settings_repository.dart';
@@ -45,98 +43,9 @@ class CloudSyncService {
 
   Future<int> waitingToGoUp() => _engine.pendingCount();
 
-  /// Makes this till the first one of a new shop.
-  ///
-  /// The id is long and random because it is also the only thing standing
-  /// between a stranger and the front door of the shop's log — the rules
-  /// then ask for a code on top of it.
-  Future<String> startShop() async {
-    final String existing =
-        await _settings.readRaw(SettingKeys.syncShopId) ?? '';
-    if (existing.isNotEmpty) return existing;
-
-    final Random random = Random.secure();
-    final String id = List<String>.generate(
-      32,
-      (_) => '0123456789abcdef'[random.nextInt(16)],
-    ).join();
-    await _settings.writeRaw(SettingKeys.syncShopId, id);
-    return id;
-  }
-
-  /// A six-digit code for the other till, good for ten minutes.
-  ///
-  /// Short because it is read aloud across a counter, and short-lived
-  /// because a code that never expires is a password that was shouted once.
-  String newJoinCode() {
-    final Random random = Random.secure();
-    return (random.nextInt(900000) + 100000).toString();
-  }
-
-  /// Makes this till the first one of a new shop, and opens it in the
-  /// cloud so another can be let in later.
-  Future<bool> openShop({String label = 'Till'}) async {
-    final SyncTransport? transport = _transport;
-    if (transport == null) return false;
-    try {
-      await startShop();
-      if (!await transport.isReady()) return false;
-      await transport.openShop(label: label);
-      await _settings.writeRaw(SettingKeys.syncLastError, '');
-      return true;
-    } on Object catch (error) {
-      await _fail(_readable(error));
-      return false;
-    }
-  }
-
-  /// Shows a code for ten minutes so the other till can be let in.
-  Future<String?> showJoinCode() async {
-    final SyncTransport? transport = _transport;
-    if (transport == null || !await isPaired()) return null;
-    try {
-      if (!await transport.isReady()) return null;
-      final String code = newJoinCode();
-      await transport.offerCode(
-        code,
-        _clock.now().toUtc().add(const Duration(minutes: 10)),
-      );
-      return code;
-    } on Object catch (error) {
-      await _fail(_readable(error));
-      return null;
-    }
-  }
-
-  /// Joins the shop this till was set up from, with the code the other one
-  /// is showing.
-  Future<bool> joinWithCode(String code, {String label = 'Till'}) async {
-    final SyncTransport? transport = _transport;
-    if (transport == null || !await isPaired()) return false;
-    try {
-      if (!await transport.isReady()) return false;
-      final bool welcomed = await transport.joinWithCode(code, label: label);
-      if (!welcomed) {
-        await _fail('That code is wrong or has run out. Ask for a new one.');
-      }
-      return welcomed;
-    } on Object catch (error) {
-      await _fail(_readable(error));
-      return false;
-    }
-  }
-
-  /// The tills in this shop, as the cloud last heard of them.
-  Future<List<TillPresence>> tills() async {
-    final SyncTransport? transport = _transport;
-    if (transport == null || !await isPaired()) return <TillPresence>[];
-    try {
-      if (!await transport.isReady()) return <TillPresence>[];
-      return await transport.tills();
-    } on Object {
-      return <TillPresence>[];
-    }
-  }
+  /// Remembers which shop this till belongs to, once it has been let in.
+  Future<void> rememberShop(String id) async =>
+      _settings.writeRaw(SettingKeys.syncShopId, id);
 
   /// Tells and is told, once.
   ///

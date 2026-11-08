@@ -55,6 +55,48 @@ class SyncEngine {
     return rows.first['n']! as int;
   }
 
+  /// Queues every row of every synced table, as if the shop had just been
+  /// written from scratch.
+  ///
+  /// A till that joins later is given the shop through the log, so the log
+  /// has to contain the whole shop. Rows written before this device started
+  /// syncing — the seeded menu on an install that predates it, anything the
+  /// owner set up before she had an account — were never queued, because
+  /// the triggers only hear about changes made while they exist.
+  ///
+  /// Rows already waiting are left alone rather than queued twice. Sending
+  /// one twice would be harmless, since the far end recognises a change it
+  /// has already taken, but it is a day's worth of someone's data.
+  Future<int> enqueueEverything() async {
+    int queued = 0;
+    await _db.db.transaction((Transaction txn) async {
+      for (final SyncedTable table in syncedTables) {
+        // Derived rows are recomputed at the far end, never carried.
+        if (table.kind == SyncKind.derived) continue;
+        final List<Map<String, Object?>> rows = await txn.rawQuery('''
+          SELECT t.rowid AS rid, t.uid AS uid FROM ${table.name} t
+          WHERE t.uid IS NOT NULL
+            AND NOT EXISTS (
+              SELECT 1 FROM sync_outbox o
+              WHERE o.table_name = ? AND o.sent_at IS NULL
+                AND (o.row_id = t.rowid OR o.row_uid = t.uid)
+            )
+        ''', <Object?>[table.name]);
+        for (final Map<String, Object?> row in rows) {
+          await txn.insert('sync_outbox', <String, Object?>{
+            'table_name': table.name,
+            'row_id': row['rid'],
+            'row_uid': row['uid'],
+            'op': 'upsert',
+            'at': _clock.nowIso(),
+          });
+          queued++;
+        }
+      }
+    });
+    return queued;
+  }
+
   // ─────────────────────────── going out ───────────────────────────
 
   /// What this till has done and not yet told anyone about.

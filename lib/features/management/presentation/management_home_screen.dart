@@ -113,6 +113,12 @@ const List<ManagementEntry> managementEntries = <ManagementEntry>[
     route: Routes.staff,
   ),
   ManagementEntry(
+    label: 'Phones in this shop',
+    description: 'Invite your barista’s phone, or shut one out',
+    icon: Icons.smartphone_outlined,
+    route: Routes.tills,
+  ),
+  ManagementEntry(
     label: 'Settings',
     description: 'Business name, trading day, costing method',
     icon: Icons.settings_outlined,

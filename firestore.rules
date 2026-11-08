@@ -1,20 +1,38 @@
 rules_version = '2';
 
-// Who may read and write the shop's records.
+// Who may read and write a shop's records.
 //
-// The app signs in anonymously, so "who you are" is a number the phone was
-// given, not an email. That alone proves nothing — anyone can get one. What
-// these rules actually check is whether that phone is a till the owner has
-// let in: a document under the shop with the phone's own id as its name.
+// Three facts decide everything below.
 //
-// A till is let in by typing a six-digit code that the first till is showing
-// at that moment, and which expires in ten minutes. Having the shop's id is
-// not enough on its own.
+//  * The **owner** is an account — an email and a password she chose. Her
+//    uid is written on the shop when she opens it and is never changed, so
+//    she can sign in on any phone and still be the owner.
+//  * A **till** is a phone she has let in: a document under the shop named
+//    after that phone's own sign-in id. A barista's phone signs in
+//    anonymously, which proves nothing on its own; what lets it in is the
+//    invite.
+//  * An **invite** is a document of its own under `invites`, good for ten
+//    minutes. It is what a phone holding nothing but a code uses to find
+//    the shop. Knowing a shop's id is not a way in.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() {
       return request.auth != null;
+    }
+
+    function shopPath(shopId) {
+      return /databases/$(database)/documents/shops/$(shopId);
+    }
+
+    function shopExists(shopId) {
+      return exists(shopPath(shopId));
+    }
+
+    function isOwner(shopId) {
+      return signedIn()
+        && shopExists(shopId)
+        && get(shopPath(shopId)).data.owner_uid == request.auth.uid;
     }
 
     function isTill(shopId) {
@@ -23,47 +41,85 @@ service cloud.firestore {
       );
     }
 
-    function shopData(shopId) {
-      return get(/databases/$(database)/documents/shops/$(shopId)).data;
+    function invitePath(code) {
+      return /databases/$(database)/documents/invites/$(code);
     }
 
-    function shopExists(shopId) {
-      return exists(/databases/$(database)/documents/shops/$(shopId));
+    // A live invite for this shop, and nothing else, is what admits a phone.
+    function inviteAdmits(shopId, code) {
+      return code is string
+        && exists(invitePath(code))
+        && get(invitePath(code)).data.shop_id == shopId
+        && request.time < get(invitePath(code)).data.expires_at;
+    }
+
+    // An invite says which shop it opens and when it dies. Anybody signed in
+    // may read one *if they already know the code* — a get, never a list, so
+    // the collection cannot be browsed for live invites. Only the shop's
+    // owner may write one, and only pointing at her own shop.
+    match /invites/{code} {
+      allow get: if signedIn();
+      allow list: if false;
+      allow create, update: if isOwner(request.resource.data.shop_id)
+        && request.resource.data.created_by == request.auth.uid
+        && request.resource.data.expires_at is timestamp
+        // Ten minutes, with a minute of slack for a slow clock. An invite
+        // that lives for a week is a password that was shouted once.
+        && request.resource.data.expires_at
+             < request.time + duration.value(11, 'm');
+      allow delete: if isOwner(resource.data.shop_id);
+    }
+
+    // Which shop an account owns. Hers to read, written once when she
+    // opens it, and never pointed anywhere else afterwards.
+    match /owners/{uid} {
+      allow get: if signedIn() && uid == request.auth.uid;
+      allow list: if false;
+      allow create: if signedIn() && uid == request.auth.uid;
+      allow update, delete: if false;
     }
 
     match /shops/{shopId} {
-      // The first till makes the shop. Ids are 32 random hex characters, so
-      // there is nothing to guess at and nothing of hers to land on.
-      allow create: if signedIn();
-      allow get, update: if isTill(shopId);
+      // Opening a shop names its owner, and it must be the account doing
+      // the opening. Ids are 32 random hex characters, so there is nothing
+      // to guess at and nothing of hers to land on.
+      allow create: if signedIn()
+        && request.resource.data.owner_uid == request.auth.uid;
+
+      allow get: if isTill(shopId);
+      // The owner alone, and she may never hand the shop to somebody else.
+      allow update: if isOwner(shopId)
+        && request.resource.data.owner_uid == resource.data.owner_uid;
       allow delete: if false;
 
-      // One document per till, named after the phone's own sign-in id.
+      // One document per phone, named after that phone's own sign-in id.
       match /tills/{uid} {
         allow read: if isTill(shopId);
 
-        // You may only ever add yourself, and only either as the very first
-        // till — before the shop document exists — or by presenting the code
-        // the owner's till is showing right now.
+        // You may only ever add yourself, and only as the very first till —
+        // the owner, before the shop document exists — or by presenting an
+        // invite that is live right now.
         allow create: if signedIn()
           && uid == request.auth.uid
           && (
             !shopExists(shopId)
-            || (
-              shopData(shopId).join_code is string
-              && shopData(shopId).join_code == request.resource.data.code
-              && request.time < shopData(shopId).join_expires_at
-            )
+            || inviteAdmits(shopId, request.resource.data.code)
           );
 
-        allow update: if isTill(shopId) && uid == request.auth.uid;
-        allow delete: if isTill(shopId);
+        // A phone may say hello as itself. It may not promote itself: the
+        // role it joined with is the role it keeps.
+        allow update: if isTill(shopId)
+          && uid == request.auth.uid
+          && request.resource.data.role == resource.data.role;
+
+        // The owner can shut any phone out. A phone can also let itself go.
+        allow delete: if isOwner(shopId) || uid == request.auth.uid;
       }
 
       // The log the tills leave for each other. Append only: a change is
       // written once, by the till it happened on, and nobody — including
-      // that till — may edit or remove it afterwards. A shop's books should
-      // not be rewritable from a phone.
+      // that till, including the owner — may edit or remove it afterwards.
+      // A shop's books should not be rewritable from a phone.
       match /changes/{changeId} {
         allow read: if isTill(shopId);
         allow create: if isTill(shopId)

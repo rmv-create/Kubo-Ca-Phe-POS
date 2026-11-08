@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../domain/services/shop_access_service.dart';
+import '../features/access/presentation/welcome_screen.dart';
 import '../features/backup/presentation/backup_screen.dart';
 import 'providers.dart';
 import 'router.dart';
@@ -35,6 +37,26 @@ class _KuboAppState extends ConsumerState<KuboApp> {
       );
     }
 
+    // Nothing of the shop is built until this phone is known to be in one.
+    // The welcome screen is not a page inside the app; it stands in front of
+    // it, because a phone that has not been let in has no POS to show.
+    final AsyncValue<ShopStanding> standing = ref.watch(shopStandingProvider);
+    final Widget? gate = standing.when(
+      loading: () => const _Opening(),
+      error: (Object error, StackTrace _) => const WelcomeScreen(),
+      data: (ShopStanding value) =>
+          value == ShopStanding.inside ? null : const WelcomeScreen(),
+    );
+    if (gate != null) {
+      return MaterialApp(
+        title: businessName,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        debugShowCheckedModeBanner: false,
+        home: gate,
+      );
+    }
+
     return MaterialApp.router(
       title: businessName,
       theme: AppTheme.light,
@@ -43,6 +65,17 @@ class _KuboAppState extends ConsumerState<KuboApp> {
       routerConfig: _router,
     );
   }
+}
+
+/// A blank moment while the app works out whether this phone is in a shop.
+/// Deliberately almost empty: showing a POS and then snatching it away would
+/// be worse than showing nothing for half a second.
+class _Opening extends StatelessWidget {
+  const _Opening();
+
+  @override
+  Widget build(BuildContext context) =>
+      const Scaffold(body: Center(child: CircularProgressIndicator()));
 }
 
 /// Shown after a restore. The open database connection no longer matches the

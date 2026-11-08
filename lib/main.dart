@@ -6,6 +6,7 @@ import 'app/app.dart';
 import 'app/bootstrap.dart';
 import 'app/theme/app_theme.dart';
 import 'app/theme/kubo_tokens.dart';
+import 'data/cloud/cloud_start.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +18,9 @@ Future<void> main() async {
     DeviceOrientation.landscapeLeft,
     DeviceOrientation.landscapeRight,
   ]);
+
+  // Started, not waited for: see CloudStart.
+  CloudStart.begin();
 
   try {
     final AppBootstrap bootstrap = await bootstrapApp();

@@ -4,10 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/time/clock.dart';
+import '../data/cloud/account_service.dart';
 import '../data/cloud/cloud_backup_service.dart';
 import '../data/cloud/google_drive_target.dart';
+import '../data/cloud/shop_directory.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
+import '../data/db/sync/sync_engine.dart';
 import '../data/export/excel_export_service.dart';
 import '../data/repositories/customer_repository_impl.dart';
 import '../data/repositories/inventory_repository_impl.dart';
@@ -35,6 +38,7 @@ import '../domain/repositories/settings_repository.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/reporting_service.dart';
 import '../domain/services/sales_service.dart';
+import '../domain/services/shop_access_service.dart';
 import '../domain/services/sign_in_service.dart';
 
 /// Infrastructure providers.
@@ -569,3 +573,46 @@ final Provider<ExcelExportService> excelExportProvider =
         customers: ref.watch(customerRepositoryProvider),
       ),
     );
+
+
+// ─────────────────────────── getting in ───────────────────────────
+
+/// The owner's account. One per app, because signing in is a fact about
+/// the whole phone rather than about a screen.
+final Provider<AccountService> accountServiceProvider =
+    Provider<AccountService>((Ref ref) => AccountService());
+
+final Provider<ShopDirectory> shopDirectoryProvider = Provider<ShopDirectory>(
+  (Ref ref) => ShopDirectory(),
+);
+
+final Provider<SyncEngine> syncEngineProvider = Provider<SyncEngine>(
+  (Ref ref) => SyncEngine(
+    database: ref.watch(databaseProvider),
+    clock: ref.watch(clockProvider),
+  ),
+);
+
+final Provider<ShopAccessService> shopAccessServiceProvider =
+    Provider<ShopAccessService>(
+      (Ref ref) => ShopAccessService(
+        database: ref.watch(databaseProvider),
+        settings: ref.watch(settingsRepositoryProvider),
+        clock: ref.watch(clockProvider),
+        account: ref.watch(accountServiceProvider),
+        directory: ref.watch(shopDirectoryProvider),
+        engine: ref.watch(syncEngineProvider),
+      ),
+    );
+
+/// Whether this phone holds a shop at all. Everything above the welcome
+/// screen is behind this.
+final FutureProvider<ShopStanding> shopStandingProvider =
+    FutureProvider<ShopStanding>(
+      (Ref ref) => ref.watch(shopAccessServiceProvider).standing(),
+    );
+
+/// True when this till was let in as the owner rather than as a barista.
+final FutureProvider<bool> isOwnerTillProvider = FutureProvider<bool>(
+  (Ref ref) => ref.watch(shopAccessServiceProvider).isOwner,
+);

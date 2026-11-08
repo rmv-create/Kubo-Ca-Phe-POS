@@ -92,13 +92,7 @@ Future<AppBootstrap> bootstrapApp({Clock clock = const SystemClock()}) async {
     },
   );
 
-  // First launch only: writes the owner's menu from her setup worksheet.
-  // Refuses to run if any product already exists, so her later edits are never
-  // overwritten by a seed on a subsequent launch.
-  await MenuSeeder(database, clock).seedIfEmpty();
-  // And her pantry: what she buys, what it costs, what was on the shelf, and
-  // what goes into each drink. Same rule — it never overwrites her own.
-  await PantrySeeder(database, clock).seedIfEmpty();
+  await _seedIfThisPhoneHasAShop(database, clock);
 
   final SettingsRepositoryImpl settingsRepository = SettingsRepositoryImpl(
     database,
@@ -120,6 +114,30 @@ Future<AppBootstrap> bootstrapApp({Clock clock = const SystemClock()}) async {
     clock: clock,
     exportDirectory: exportDir,
   );
+}
+
+/// Writes the menu, but only onto a phone that is already running a shop.
+///
+/// This used to happen on every first launch, which is how a stranger with
+/// the link ended up with a complete working copy of Kubo, and how a barista
+/// opening the same link got a blank shop of her own rather than her
+/// employer's. A phone now gets the menu when its owner opens a shop on it,
+/// and at no other time: see [ShopAccessService].
+///
+/// Phones that were already trading before any of this existed keep working
+/// untouched. That is what the check is for — the seeders themselves refuse
+/// to overwrite, so this only decides whether a *blank* phone is filled.
+Future<void> _seedIfThisPhoneHasAShop(AppDatabase db, Clock clock) async {
+  final List<Map<String, Object?>> products = await db.db.rawQuery(
+    'SELECT 1 FROM products LIMIT 1',
+  );
+  final List<Map<String, Object?>> users = await db.db.rawQuery(
+    'SELECT 1 FROM app_users LIMIT 1',
+  );
+  if (products.isEmpty && users.isEmpty) return;
+
+  await MenuSeeder(db, clock).seedIfEmpty();
+  await PantrySeeder(db, clock).seedIfEmpty();
 }
 
 /// Takes at most one automatic backup per business day, then prunes.
@@ -181,10 +199,7 @@ Future<AppBootstrap> _bootstrapWeb(Clock clock) async {
     path: 'kubo_pos.db',
   );
 
-  await MenuSeeder(database, clock).seedIfEmpty();
-  // And her pantry: what she buys, what it costs, what was on the shelf, and
-  // what goes into each drink. Same rule — it never overwrites her own.
-  await PantrySeeder(database, clock).seedIfEmpty();
+  await _seedIfThisPhoneHasAShop(database, clock);
 
   final SettingsRepositoryImpl settingsRepository = SettingsRepositoryImpl(
     database,

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kubo_pos/data/cloud/shop_directory.dart';
 import 'package:kubo_pos/data/db/sync/cloud_sync_service.dart';
 import 'package:kubo_pos/data/db/sync/sync_change.dart';
 import 'package:kubo_pos/data/db/sync/sync_engine.dart';
@@ -29,7 +30,7 @@ void main() {
       clock: shop.clock,
       transport: postbox,
     );
-    await sync.startShop();
+    await sync.rememberShop(ShopDirectory.newShopId());
   });
   tearDown(() async => shop.close());
 
@@ -141,26 +142,39 @@ void main() {
     });
   });
 
-  group('the shop and the code', () {
+  group('the shop and the invite', () {
     test('the shop is named once and keeps its name', () async {
-      final String first = await sync.startShop();
-      final String again = await sync.startShop();
+      await sync.rememberShop(ShopDirectory.newShopId());
+      final String? first = await sync.shopId();
+      await sync.rememberShop(first!);
 
-      expect(first, again);
+      expect(await sync.shopId(), first);
       expect(first.length, 32, reason: 'long enough not to be guessed at');
     });
 
-    test('a join code is six digits', () {
-      for (int i = 0; i < 50; i++) {
-        expect(sync.newJoinCode(), matches(RegExp(r'^[1-9][0-9]{5}$')));
+    test('an invite avoids the letters people mishear', () {
+      for (int i = 0; i < 100; i++) {
+        final String invite = ShopDirectory.newInvite();
+        expect(invite, matches(RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}$')));
+        expect(
+          invite,
+          isNot(matches(RegExp('[OI015S]'))),
+          reason: 'read aloud across a counter',
+        );
       }
     });
 
-    test('two codes in a row are not the same', () {
+    test('two invites in a row are not the same', () {
       final Set<String> codes = <String>{
-        for (int i = 0; i < 20; i++) sync.newJoinCode(),
+        for (int i = 0; i < 20; i++) ShopDirectory.newInvite(),
       };
-      expect(codes.length, greaterThan(15));
+      expect(codes.length, 20);
+    });
+
+    test('an invite is read back however she types it', () {
+      expect(ShopDirectory.tidy('k7pq-m39x'), 'K7PQM39X');
+      expect(ShopDirectory.tidy('K7PQ M39X'), 'K7PQM39X');
+      expect(ShopDirectory.tidy('  K7PQ-M39X  '), 'K7PQM39X');
     });
   });
 }
@@ -199,32 +213,4 @@ class _Postbox implements SyncTransport {
   @override
   Future<void> heartbeat({required String label}) async => _check();
 
-  // Pairing is the cloud's business, not the engine's. A postbox on the
-  // table has no shop to open and nobody to let in.
-  bool opened = false;
-  String? offeredCode;
-
-  @override
-  Future<void> openShop({required String label}) async {
-    _check();
-    opened = true;
-  }
-
-  @override
-  Future<void> offerCode(String code, DateTime until) async {
-    _check();
-    offeredCode = code;
-  }
-
-  @override
-  Future<bool> joinWithCode(String code, {required String label}) async {
-    _check();
-    return code == offeredCode;
-  }
-
-  @override
-  Future<List<TillPresence>> tills() async {
-    _check();
-    return const <TillPresence>[];
-  }
 }

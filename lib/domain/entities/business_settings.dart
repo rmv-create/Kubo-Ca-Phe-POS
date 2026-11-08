@@ -266,6 +266,19 @@ abstract final class SettingKeys {
   /// Which shop's log this till belongs to, where it had got to reading it,
   /// and how the last round went.
   static const String syncShopId = 'sync.shop_id';
+
+  /// Who this device is admitted as: `owner` or `barista`. Local to the
+  /// device, like everything else under `sync.`, because it is a statement
+  /// about this phone and not about the shop.
+  static const String syncRole = 'sync.role';
+
+  /// Set once the device has been let into a shop. Until then the app shows
+  /// the way in and nothing else.
+  static const String syncAdmittedAt = 'sync.admitted_at';
+
+  /// This device's name in the owner's list of tills.
+  static const String syncDeviceLabel = 'sync.device_label';
+
   static const String syncCursor = 'sync.cursor';
   static const String syncLastAt = 'sync.last_at';
   static const String syncLastError = 'sync.last_error';
