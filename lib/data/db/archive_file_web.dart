@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io' show Directory;
 import 'dart:js_interop';
+import 'dart:typed_data';
 
 import 'package:web/web.dart' as web;
 
@@ -53,7 +54,7 @@ Future<bool> _shareFile(web.Blob blob, String filename) async {
     final web.File file = web.File(
       <JSAny>[blob].toJS,
       filename,
-      web.FilePropertyBag(type: 'application/sql'),
+      web.FilePropertyBag(type: blob.type),
     );
     final web.ShareData data = web.ShareData(
       files: <web.File>[file].toJS,
@@ -109,4 +110,34 @@ Future<bool> requestPersistentStorage() async {
   } on Object {
     return false;
   }
+}
+
+/// Hands a workbook to the share sheet, or to the downloads folder.
+///
+/// The same two routes as [saveArchive], and for the same reason: on an
+/// iPhone the share sheet is the only way a file reaches Google Drive or
+/// Sheets in one tap rather than four.
+Future<bool> saveBinary(
+  List<int> bytes,
+  String filename, {
+  required Directory into,
+  String mimeType = 'application/octet-stream',
+}) async {
+  final web.Blob blob = web.Blob(
+    <JSAny>[Uint8List.fromList(bytes).toJS].toJS,
+    web.BlobPropertyBag(type: mimeType),
+  );
+
+  if (await _shareFile(blob, filename)) return true;
+
+  final String url = web.URL.createObjectURL(blob);
+  final web.HTMLAnchorElement anchor =
+      web.document.createElement('a') as web.HTMLAnchorElement
+        ..href = url
+        ..download = filename;
+  web.document.body!.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  web.URL.revokeObjectURL(url);
+  return true;
 }

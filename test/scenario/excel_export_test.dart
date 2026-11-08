@@ -62,22 +62,40 @@ void main() {
     if (outDir.existsSync()) await outDir.delete(recursive: true);
   });
 
-  test('writes every report as a real .xlsx file', () async {
-    final List<File> files = await export.exportAll();
+  test('writes one workbook holding every sheet', () async {
+    final File file = await export.exportAll();
 
-    expect(files.length, 8);
-    for (final File file in files) {
-      expect(file.existsSync(), isTrue, reason: file.path);
-      expect(file.path, endsWith('.xlsx'));
-      expect(
-        await file.length(),
-        greaterThan(1000),
-        reason: '${file.path} looks empty',
-      );
-      // It has to actually open as a workbook, not merely exist.
-      final Excel reopened = Excel.decodeBytes(await file.readAsBytes());
-      expect(reopened.sheets, isNotEmpty);
-    }
+    expect(file.existsSync(), isTrue, reason: file.path);
+    expect(file.path, endsWith('.xlsx'));
+    expect(await file.length(), greaterThan(1000));
+
+    // It has to open as a workbook, not merely exist, and every report has
+    // to be in there — one file is only an improvement if nothing was lost
+    // on the way to it.
+    final Excel reopened = Excel.decodeBytes(await file.readAsBytes());
+    expect(
+      reopened.sheets.keys,
+      containsAll(<String>[
+        'Daily Sales',
+        'Monthly Sales',
+        'Best Sellers',
+        'Inventory',
+        'Waste',
+        'Customers',
+        'Purchases',
+        'Suppliers',
+      ]),
+    );
+  });
+
+  test('the same workbook comes back as bytes, for a browser', () async {
+    // A browser has no folder to write into, so the export has to be able
+    // to hand over the bytes and let the page deal with them.
+    final ExcelBook book = await export.everything();
+
+    expect(book.name, endsWith('.xlsx'));
+    expect(book.bytes.length, greaterThan(1000));
+    expect(Excel.decodeBytes(book.bytes).sheets, isNotEmpty);
   });
 
   test('the daily sales sheet carries the real figures', () async {

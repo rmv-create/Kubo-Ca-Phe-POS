@@ -27,3 +27,20 @@ Future<String?> pickArchive() async => null;
 
 /// Nothing to ask for: a file on a phone stays until it is deleted.
 Future<bool> requestPersistentStorage() async => true;
+
+/// Writes a workbook into [into] and offers it to the share sheet.
+Future<bool> saveBinary(
+  List<int> bytes,
+  String filename, {
+  required Directory into,
+  String mimeType = 'application/octet-stream',
+}) async {
+  await into.create(recursive: true);
+  final File file = File(p.join(into.path, filename));
+  await file.writeAsBytes(bytes, flush: true);
+
+  final ShareResult result = await Share.shareXFiles(<XFile>[
+    XFile(file.path, name: filename, mimeType: mimeType),
+  ], subject: 'Kubo Cà Phê — $filename');
+  return result.status == ShareResultStatus.success;
+}

@@ -1,12 +1,11 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/money/money.dart';
+import '../../../data/db/archive_file.dart';
+import '../../../data/export/excel_export_service.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
@@ -108,24 +107,29 @@ class ReportsScreen extends ConsumerWidget {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     messenger
       ..clearSnackBars()
-      ..showSnackBar(const SnackBar(content: Text('Building the reports…')));
+      ..showSnackBar(
+        const SnackBar(content: Text('Building the reports\u2026')),
+      );
     try {
-      final List<File> files = await ref.read(excelExportProvider).exportAll();
+      // One workbook with every sheet in it, handed to the share sheet.
+      // This used to write eight files into a folder, and a browser has no
+      // folder — so in the only build she actually runs, the export simply
+      // failed. One file is also kinder: she taps Share once, not eight
+      // times, and tabs between sheets in Google Sheets rather than
+      // between downloads.
+      final ExcelBook book = await ref.read(excelExportProvider).everything();
+      final bool shared = await saveBinary(
+        book.bytes,
+        book.name,
+        into: ref.read(backupServiceProvider).backupDirectory,
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
+      if (!shared) return;
       messenger
         ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(
-            content: Text('${files.length} spreadsheets saved to Documents'),
-            action: SnackBarAction(
-              label: 'Share',
-              onPressed: () => Share.shareXFiles(
-                files.map((File f) => XFile(f.path)).toList(),
-                text: 'Kubo Cà Phê reports',
-              ),
-            ),
-          ),
-        );
-    } catch (error) {
+        ..showSnackBar(SnackBar(content: Text('${book.name} is ready')));
+    } on Object catch (error) {
       messenger
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text('The export failed: $error')));

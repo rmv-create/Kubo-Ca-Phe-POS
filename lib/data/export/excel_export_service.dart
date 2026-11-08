@@ -36,27 +36,108 @@ class ExcelExportService {
   final CustomerRepository _customers;
 
   /// Everything, as one workbook per report.
-  Future<List<File>> exportAll({String? businessDate, String? month}) async {
+  /// Everything, in one workbook.
+  ///
+  /// One file rather than eight: a browser can only hand over one file at a
+  /// time without asking eight times, and a person opening this in Google
+  /// Sheets would rather tab between sheets than between downloads.
+  ///
+  /// Returns the bytes, not a file. Where those bytes end up — a folder on
+  /// a phone, the share sheet in a browser — is the caller's business, and
+  /// in a browser there is no folder at all.
+  Future<ExcelBook> everything({String? businessDate, String? month}) async {
     final String day = businessDate ?? _reporting.today;
     final String period = month ?? _reporting.thisMonth;
-    return <File>[
-      await exportDailySales(day),
-      await exportMonthlySales(period),
-      await exportProductProfitability(month: period),
-      await exportInventory(),
-      await exportWaste(),
-      await exportCustomers(),
-      await exportPurchases(),
-      await exportSuppliers(),
-    ];
+
+    final Excel book = Excel.createExcel();
+    await _fillDailySales(book, day);
+    await _fillMonthlySales(book, period);
+    await _fillProductProfitability(book, month: period);
+    await _fillInventory(book);
+    await _fillWaste(book);
+    await _fillCustomers(book);
+    await _fillPurchases(book);
+    await _fillSuppliers(book);
+
+    final List<int>? bytes = book.encode();
+    if (bytes == null) {
+      throw StateError('The spreadsheet could not be written.');
+    }
+    return ExcelBook(name: 'Kubo $period.xlsx', bytes: bytes);
   }
 
+  /// The same workbook, written into a folder. Phones only.
+  Future<File> exportAll({String? businessDate, String? month}) async {
+    final ExcelBook made = await everything(
+      businessDate: businessDate,
+      month: month,
+    );
+    await directory.create(recursive: true);
+    final File file = File(p.join(directory.path, made.name));
+    await file.writeAsBytes(made.bytes, flush: true);
+    return file;
+  }
+
+
+  // ── one sheet at a time, each in its own workbook ──
+  //
+  // Kept because each is separately useful and separately tested: a test
+  // that opens one workbook and reads one sheet is worth more than one
+  // that opens a workbook of eight.
+
   Future<File> exportDailySales(String businessDate) async {
+    final Excel book = Excel.createExcel();
+    await _fillDailySales(book, businessDate);
+    return _save(book, 'Daily Sales $businessDate');
+  }
+
+  Future<File> exportMonthlySales(String month) async {
+    final Excel book = Excel.createExcel();
+    await _fillMonthlySales(book, month);
+    return _save(book, 'Monthly Sales $month');
+  }
+
+  Future<File> exportProductProfitability({required String month}) async {
+    final Excel book = Excel.createExcel();
+    await _fillProductProfitability(book, month: month);
+    return _save(book, 'Product Profitability $month');
+  }
+
+  Future<File> exportInventory() async {
+    final Excel book = Excel.createExcel();
+    await _fillInventory(book);
+    return _save(book, 'Inventory ${_reporting.today}');
+  }
+
+  Future<File> exportWaste() async {
+    final Excel book = Excel.createExcel();
+    await _fillWaste(book);
+    return _save(book, 'Waste ${_reporting.today}');
+  }
+
+  Future<File> exportCustomers() async {
+    final Excel book = Excel.createExcel();
+    await _fillCustomers(book);
+    return _save(book, 'Customers ${_reporting.today}');
+  }
+
+  Future<File> exportPurchases() async {
+    final Excel book = Excel.createExcel();
+    await _fillPurchases(book);
+    return _save(book, 'Purchases ${_reporting.today}');
+  }
+
+  Future<File> exportSuppliers() async {
+    final Excel book = Excel.createExcel();
+    await _fillSuppliers(book);
+    return _save(book, 'Suppliers ${_reporting.today}');
+  }
+
+  Future<void> _fillDailySales(Excel book, String businessDate) async {
     final SalesSummary summary = await _reporting.forDay(businessDate);
     final List<ProductPerformance> products = await _reporting
         .productPerformance(businessDate: businessDate);
 
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Daily Sales');
     _title(sheet, 'DAILY SALES', businessDate);
     _summaryBlock(sheet, summary, startRow: 3);
@@ -84,15 +165,13 @@ class ExcelExportService {
     }
     _totalsRow(sheet, row, products);
 
-    return _save(book, 'Daily Sales $businessDate');
   }
 
-  Future<File> exportMonthlySales(String month) async {
+  Future<void> _fillMonthlySales(Excel book, String month) async {
     final SalesSummary summary = await _reporting.forMonth(month);
     final List<ProductPerformance> products = await _reporting
         .productPerformance(month: month);
 
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Monthly Sales');
     _title(sheet, 'MONTHLY SALES', month);
     _summaryBlock(sheet, summary, startRow: 3);
@@ -124,16 +203,14 @@ class ExcelExportService {
     }
     _totalsRow(sheet, row, products);
 
-    return _save(book, 'Monthly Sales $month');
   }
 
-  Future<File> exportProductProfitability({required String month}) async {
+  Future<void> _fillProductProfitability(Excel book, {required String month}) async {
     final List<ProductPerformance> bestSellers = await _reporting
         .productPerformance(month: month);
     final List<ProductPerformance> mostProfitable = await _reporting
         .mostProfitable(month: month);
 
-    final Excel book = Excel.createExcel();
 
     // Two sheets, because the drink that sells most and the drink that earns
     // most are usually not the same one.
@@ -145,12 +222,10 @@ class ExcelExportService {
     _title(profit, 'MOST PROFITABLE', month);
     _performanceTable(profit, mostProfitable, startRow: 3);
 
-    return _save(book, 'Product Profitability $month');
   }
 
-  Future<File> exportInventory() async {
+  Future<void> _fillInventory(Excel book) async {
     final List<Ingredient> ingredients = await _inventory.ingredients();
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Inventory');
     _title(sheet, 'INVENTORY', _reporting.today);
 
@@ -208,12 +283,10 @@ class ExcelExportService {
       ]);
     }
 
-    return _save(book, 'Inventory ${_reporting.today}');
   }
 
-  Future<File> exportWaste() async {
+  Future<void> _fillWaste(Excel book) async {
     final List<WasteEntry> entries = await _inventory.waste(limit: 500);
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Waste');
     _title(sheet, 'WASTE', 'Most recent first');
 
@@ -247,12 +320,10 @@ class ExcelExportService {
       Money(total),
     );
 
-    return _save(book, 'Waste ${_reporting.today}');
   }
 
-  Future<File> exportCustomers() async {
+  Future<void> _fillCustomers(Excel book) async {
     final List<Customer> customers = await _customers.recent(limit: 1000);
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Customers');
     _title(sheet, 'CUSTOMERS', _reporting.today);
 
@@ -282,12 +353,10 @@ class ExcelExportService {
       ]);
     }
 
-    return _save(book, 'Customers ${_reporting.today}');
   }
 
-  Future<File> exportPurchases() async {
+  Future<void> _fillPurchases(Excel book) async {
     final List<Purchase> purchases = await _purchasing.purchases(limit: 500);
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Purchases');
     _title(sheet, 'PURCHASES', 'Most recent first');
 
@@ -313,12 +382,10 @@ class ExcelExportService {
       }
     }
 
-    return _save(book, 'Purchases ${_reporting.today}');
   }
 
-  Future<File> exportSuppliers() async {
+  Future<void> _fillSuppliers(Excel book) async {
     final List<Supplier> suppliers = await _purchasing.suppliers();
-    final Excel book = Excel.createExcel();
     final Sheet sheet = _sheet(book, 'Suppliers');
     _title(sheet, 'SUPPLIERS', _reporting.today);
 
@@ -340,7 +407,6 @@ class ExcelExportService {
       ]);
     }
 
-    return _save(book, 'Suppliers ${_reporting.today}');
   }
 
   Future<File> exportDailyClosing(DailyClosing closing) async {
@@ -357,10 +423,17 @@ class ExcelExportService {
   // ─────────────────────────────── helpers ───────────────────────────────
 
   Sheet _sheet(Excel book, String name) {
-    // A new workbook comes with a default sheet; rename it rather than leaving
-    // an empty "Sheet1" beside the real one.
+    if (book.sheets.containsKey(name)) return book[name];
+
+    // A new workbook comes with one empty default sheet. The first report
+    // takes it over, so no empty "Sheet1" is left beside the real ones.
+    // Every report after that gets a sheet of its own — renaming the first
+    // sheet each time, which is what this used to do, quietly renamed the
+    // report written just before it and lost all but the last three.
     final String first = book.sheets.keys.first;
-    if (first != name) book.rename(first, name);
+    if (book.sheets.length == 1 && book.sheets[first]!.rows.isEmpty) {
+      book.rename(first, name);
+    }
     return book[name];
   }
 
@@ -534,3 +607,12 @@ String _methodName(String code) => switch (code) {
   'bpi' => 'BPI',
   _ => code,
 };
+
+
+/// A workbook, as bytes, with the name it should be saved under.
+class ExcelBook {
+  const ExcelBook({required this.name, required this.bytes});
+
+  final String name;
+  final List<int> bytes;
+}
