@@ -5,9 +5,9 @@ rules_version = '2';
 // Three facts decide everything below.
 //
 //  * The **owner** is an account — an email and a password she chose, and
-//    one that appears in `allowed_owners`. An account that is not on that
-//    list can be made, because no free setting prevents it, and is worth
-//    exactly nothing: it can open no shop and read none. Her
+//    one the owner has approved. An account that is not approved can be
+//    made, because no free setting prevents it, and is worth exactly
+//    nothing: it can open no shop and read none. Her
 //    uid is written on the shop when she opens it and is never changed, so
 //    she can sign in on any phone and still be the owner.
 //  * A **till** is a phone she has let in: a document under the shop named
@@ -24,20 +24,43 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // The owners list. One document per approved email, the email *is* the
-    // document id, and the document itself is empty — there is nothing to
-    // store beyond "this person is allowed".
+    // Who may own a shop. Two lists, and an email on either one is in.
     //
-    // Nobody can read it from a phone and nobody can write it from a phone.
-    // It is edited in the Firebase console, which answers to the Google
-    // account that owns the project and to nothing else. A rule may still
-    // consult it, because rules run on the server.
+    // The first is written here, as fingerprints rather than addresses.
+    // This file lives in a public repository, and an email address in a
+    // public repository is an email address in every spam list within the
+    // week. A SHA-256 proves "this is the same address" without publishing
+    // it. That is a courtesy, not a security measure: what actually keeps
+    // the shop hers is her password, and this list only decides who is
+    // allowed to try.
+    function fingerprinted() {
+      return hashing.sha256(request.auth.token.email.lower())
+          .toHexString().lower() in [
+        // The owner. The address itself is deliberately not written
+        // here; she knows it, and so does the account that signs in.
+        'a16e07c884966a1c5d1e9af90355f9906cce9bb819b7c2e3b70c98665df3d27c',
+      ];
+    }
+
+    // The second is a collection she keeps herself, so that approving
+    // somebody new never means waiting for a new version of the app. One
+    // empty document per approved email, the email *is* the document id,
+    // and there is nothing else to store beyond "this person is allowed".
+    //
+    // No phone can read it and no phone can write it. It is edited in the
+    // Firebase console, which answers to the Google account that owns the
+    // project and to nothing else. A rule may still consult it, because
+    // rules run on the server rather than on anybody's phone.
+    function listed() {
+      return exists(/databases/$(database)/documents/allowed_owners/$(
+        request.auth.token.email.lower()
+      ));
+    }
+
     function approved() {
       return signedIn()
         && request.auth.token.email != null
-        && exists(/databases/$(database)/documents/allowed_owners/$(
-             request.auth.token.email.lower()
-           ));
+        && (fingerprinted() || listed());
     }
 
     function shopPath(shopId) {
