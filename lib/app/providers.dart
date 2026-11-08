@@ -1,8 +1,11 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/time/clock.dart';
+import '../data/cloud/cloud_backup_service.dart';
+import '../data/cloud/google_drive_target.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
 import '../data/export/excel_export_service.dart';
@@ -51,6 +54,23 @@ final Provider<BackupService> backupServiceProvider = Provider<BackupService>(
     'backupServiceProvider must be overridden by bootstrapApp() or a test harness.',
   ),
 );
+
+/// Where the closing backup goes by itself.
+///
+/// Null target on the web and in any build that was not given a Google
+/// client id: the screen then says so rather than offering a button that
+/// cannot work.
+final Provider<CloudBackupService> cloudBackupServiceProvider =
+    Provider<CloudBackupService>(
+      (Ref ref) => CloudBackupService(
+        backups: ref.watch(backupServiceProvider),
+        settings: ref.watch(settingsRepositoryProvider),
+        clock: ref.watch(clockProvider),
+        target: !kIsWeb && GoogleDriveTarget.isAvailable
+            ? GoogleDriveTarget()
+            : null,
+      ),
+    );
 
 final Provider<Clock> clockProvider = Provider<Clock>(
   (Ref ref) => const SystemClock(),

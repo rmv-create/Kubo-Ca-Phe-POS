@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../data/cloud/cloud_backup_service.dart';
+import '../../../data/cloud/cloud_backup_target.dart';
 import '../../../data/db/backup_service.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../shared/widgets/section_header.dart';
@@ -56,6 +58,7 @@ class BackupScreen extends ConsumerWidget {
               style: theme.textTheme.bodySmall,
             ),
           ),
+          const _CloudSection(),
           if (ref.watch(backupNeedsSendingProvider).valueOrNull ?? false)
             const _StillOnThisPhone(),
           Padding(
@@ -130,6 +133,149 @@ class BackupScreen extends ConsumerWidget {
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
     }
+  }
+}
+
+/// Where the closing backup goes by itself, and whether it is getting there.
+class _CloudSection extends ConsumerWidget {
+  const _CloudSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    final CloudBackupService cloud = ref.watch(cloudBackupServiceProvider);
+
+    if (cloud.target == null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(
+          KuboSpacing.lg,
+          KuboSpacing.lg,
+          KuboSpacing.lg,
+          0,
+        ),
+        child: Text(
+          'Automatic cloud backup is not set up in this copy of the app. '
+          'Closing the day still takes a backup, and you can send a copy of '
+          'it anywhere from the list below.',
+          style: theme.textTheme.bodySmall,
+        ),
+      );
+    }
+
+    return FutureBuilder<_CloudStatus>(
+      future: _CloudStatus.of(cloud),
+      builder: (BuildContext context, AsyncSnapshot<_CloudStatus> snapshot) {
+        final _CloudStatus? status = snapshot.data;
+        if (status == null) return const SizedBox.shrink();
+
+        return Column(
+          children: <Widget>[
+            const SectionHeader('Cloud'),
+            ListTile(
+              leading: Icon(
+                status.connected
+                    ? Icons.cloud_done_outlined
+                    : Icons.cloud_off_outlined,
+                color: status.connected ? null : theme.colorScheme.error,
+              ),
+              title: Text(
+                status.connected
+                    ? '${cloud.target!.label} · ${status.account ?? ''}'
+                    : 'Connect ${cloud.target!.label}',
+              ),
+              subtitle: Text(status.describe()),
+              trailing: TextButton(
+                onPressed: () => _toggle(context, ref, status.connected),
+                child: Text(status.connected ? 'DISCONNECT' : 'CONNECT'),
+              ),
+            ),
+            if (status.connected)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  KuboSpacing.lg,
+                  0,
+                  KuboSpacing.lg,
+                  KuboSpacing.sm,
+                ),
+                child: OutlinedButton.icon(
+                  onPressed: () => _sendNow(context, ref),
+                  icon: const Icon(Icons.cloud_upload_outlined),
+                  label: const Text('Send the newest backup now'),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _toggle(
+    BuildContext context,
+    WidgetRef ref,
+    bool connected,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final CloudBackupTarget target = ref
+        .read(cloudBackupServiceProvider)
+        .target!;
+    try {
+      if (connected) {
+        await target.disconnect();
+      } else {
+        await target.connect();
+      }
+    } on CloudBackupException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+    ref.invalidate(backupListProvider);
+  }
+
+  Future<void> _sendNow(BuildContext context, WidgetRef ref) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final CloudBackupOutcome outcome = await ref
+        .read(cloudBackupServiceProvider)
+        .sendNewest();
+    ref.invalidate(backupListProvider);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(outcome.message)));
+  }
+}
+
+/// What to say about the cloud, gathered in one go.
+class _CloudStatus {
+  const _CloudStatus({
+    required this.connected,
+    this.account,
+    this.lastUploadAt,
+    this.lastError,
+  });
+
+  static Future<_CloudStatus> of(CloudBackupService cloud) async =>
+      _CloudStatus(
+        connected: await cloud.isConnected(),
+        account: await cloud.accountLabel(),
+        lastUploadAt: await cloud.lastUploadAt(),
+        lastError: await cloud.lastError(),
+      );
+
+  final bool connected;
+  final String? account;
+  final DateTime? lastUploadAt;
+  final String? lastError;
+
+  String describe() {
+    if (!connected) {
+      return 'Sign in once and every closing backup goes up by itself.';
+    }
+    final String? problem = lastError;
+    if (problem != null) return problem;
+    final DateTime? last = lastUploadAt;
+    if (last == null) return 'Nothing sent yet.';
+    return 'Last copy '
+        '${DateFormat('d MMM yyyy · HH:mm').format(last.toLocal())}';
   }
 }
 

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../data/cloud/cloud_backup_service.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
@@ -138,26 +139,44 @@ class DailyClosingScreen extends ConsumerWidget {
     }
 
     // The backup lives beside the database it was taken from, which is no
-    // help at all if the phone goes. Offered here, at the one moment in the
-    // day when she is finished and the figures are settled.
+    // help at all if the phone goes. Sent here, at the one moment in the day
+    // when she is finished and the figures are settled.
     if (backup == null || !context.mounted) return;
-    await _offerToSend(context, ref, backup, day);
+
+    final CloudBackupOutcome outcome = await ref
+        .read(cloudBackupServiceProvider)
+        .send(backup);
+    ref.invalidate(backupListProvider);
+    if (!context.mounted) return;
+
+    if (outcome.isSuccess) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$day saved to the cloud')));
+      return;
+    }
+
+    // No account, no signal, or a sign-in that has lapsed. Rather than leave
+    // the day's work on one phone, she is offered the two-tap way out.
+    await _offerToSend(context, ref, backup, day, because: outcome);
   }
 
   Future<void> _offerToSend(
     BuildContext context,
     WidgetRef ref,
     BackupEntry backup,
-    String day,
-  ) async {
+    String day, {
+    required CloudBackupOutcome because,
+  }) async {
     final bool? send = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('Keep a copy off the phone?'),
         content: Text(
-          "Today's backup is ${backup.sizeLabel}. Saving it to iCloud Drive, "
-          'Google Drive or even a message to yourself takes a second, and it '
-          'is the only copy that survives a lost or broken phone.',
+          '${because.message}.\n\n'
+          "Today's backup is ${backup.sizeLabel}. Saving it to Drive, iCloud "
+          'or even a message to yourself takes a second, and it is the only '
+          'copy that survives a lost or broken phone.',
         ),
         actions: <Widget>[
           TextButton(

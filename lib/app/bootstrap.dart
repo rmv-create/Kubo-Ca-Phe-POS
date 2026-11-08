@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -9,6 +10,8 @@ import 'package:sqflite_common/sqlite_api.dart';
 import 'package:sqflite_common_ffi_web/sqflite_ffi_web.dart';
 
 import '../core/time/clock.dart';
+import '../data/cloud/cloud_backup_service.dart';
+import '../data/cloud/google_drive_target.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
 import '../data/db/migrations/migration_runner.dart';
@@ -141,6 +144,20 @@ Future<void> _runDailyBackup({
   } catch (_) {
     // A failed backup must never stop the owner from taking orders. The
     // Backup screen surfaces the real state; the POS carries on.
+  }
+
+  // Yesterday's closing backup may never have gone up — she closed with no
+  // signal, or in a hurry. Opening the app is the next chance to try, and it
+  // costs nothing when there is nothing to send.
+  if (!kIsWeb && GoogleDriveTarget.isAvailable) {
+    unawaited(
+      CloudBackupService(
+        backups: backups,
+        settings: repository,
+        clock: clock,
+        target: GoogleDriveTarget(),
+      ).sendNewest().catchError((_) => CloudBackupOutcome.failed),
+    );
   }
 }
 

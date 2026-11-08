@@ -70,5 +70,20 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<!-- Google Sign-In hands control back to the app through this scheme.
+	     Replace the placeholder with the REVERSED client id from the Google
+	     Cloud console; see docs/google_drive_backup.md. Until it is replaced,
+	     the app builds and runs — it simply says cloud backup is not set up. -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>REVERSED_CLIENT_ID_GOES_HERE</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

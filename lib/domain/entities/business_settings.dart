@@ -241,6 +241,10 @@ abstract final class SettingKeys {
   /// Which edition of her setup worksheet the pantry was written from, so a
   /// corrected sheet can replace the recipes she has not edited herself.
   static const String pantrySeedVersion = 'data.pantry_seed_version';
+
+  /// When a backup last reached the cloud, and what stopped the last try.
+  static const String cloudLastUploadAt = 'cloud.last_upload_at';
+  static const String cloudLastError = 'cloud.last_error';
   static const String vatRegistered = 'tax.vat_registered';
   static const String vatRateBp = 'tax.vat_rate_bp';
   static const String statutoryDiscountRateBp =
