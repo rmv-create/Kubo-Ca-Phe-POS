@@ -38,6 +38,7 @@ import '../domain/repositories/payment_method_repository.dart';
 import '../domain/repositories/purchasing_repository.dart';
 import '../domain/repositories/recipe_repository.dart';
 import '../domain/repositories/settings_repository.dart';
+import '../domain/services/business_report_service.dart';
 import '../domain/services/nightly_backup_service.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/reporting_service.dart';
@@ -663,3 +664,40 @@ final FutureProvider<int?> daysSinceOffSiteCopyProvider =
       final DateTime now = ref.watch(clockProvider).now();
       return DateTime(now.year, now.month, now.day).difference(then).inDays;
     });
+
+
+// ───────────────────────── the month, read whole ─────────────────────────
+
+final Provider<BusinessReportService> businessReportProvider =
+    Provider<BusinessReportService>(
+      (Ref ref) => BusinessReportService(ref.watch(databaseProvider)),
+    );
+
+final FutureProviderFamily<BusinessReport, String> monthReportProvider =
+    FutureProvider.family<BusinessReport, String>(
+      (Ref ref, String month) =>
+          ref.watch(businessReportProvider).forMonth(month),
+    );
+
+final FutureProviderFamily<List<BusyPeriod>, String> busyByHourProvider =
+    FutureProvider.family<List<BusyPeriod>, String>(
+      (Ref ref, String month) => ref.watch(businessReportProvider).byHour(month),
+    );
+
+final FutureProviderFamily<List<BusyPeriod>, String> busyByWeekdayProvider =
+    FutureProvider.family<List<BusyPeriod>, String>(
+      (Ref ref, String month) =>
+          ref.watch(businessReportProvider).byWeekday(month),
+    );
+
+final FutureProviderFamily<List<DiscountGiven>, String>
+discountsGivenProvider = FutureProvider.family<List<DiscountGiven>, String>(
+  (Ref ref, String month) =>
+      ref.watch(businessReportProvider).discountsGiven(month),
+);
+
+final FutureProviderFamily<List<WasteByReason>, String> wasteByReasonProvider =
+    FutureProvider.family<List<WasteByReason>, String>(
+      (Ref ref, String month) =>
+          ref.watch(businessReportProvider).wasteByReason(month),
+    );

@@ -401,8 +401,8 @@ class ExcelExportService {
       ('Orders', IntCellValue(s.orderCount)),
       ('Drinks', IntCellValue(s.drinkCount)),
       ('Revenue', _money(s.revenue)),
-      ('Cash', _money(s.cash)),
-      ('GCash', _money(s.gcash)),
+      for (final MapEntry<String, Money> m in s.byMethod.entries)
+        (_methodName(m.key), _money(m.value)),
       ('Cost of goods sold', _money(s.cogs)),
       ('Gross profit', _money(s.grossProfit)),
       ('Gross margin', TextCellValue(s.marginLabel)),
@@ -523,3 +523,14 @@ class ExcelExportService {
     return file;
   }
 }
+
+
+/// The codes payments carry, in the words on the buttons.
+String _methodName(String code) => switch (code) {
+  'cash' => 'Cash',
+  'gcash' => 'GCash',
+  'maya' => 'Maya',
+  'maribank' => 'MariBank',
+  'bpi' => 'BPI',
+  _ => code,
+};

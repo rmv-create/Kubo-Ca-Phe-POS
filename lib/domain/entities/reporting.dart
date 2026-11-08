@@ -177,6 +177,7 @@ class SalesSummary {
     required this.revenue,
     required this.cash,
     required this.gcash,
+    this.byMethod = const <String, Money>{},
     required this.cogs,
     required this.grossProfit,
     required this.waste,
@@ -207,7 +208,16 @@ class SalesSummary {
   final int drinkCount;
   final Money revenue;
   final Money cash;
+
+  /// Kept for the screens that have always shown it. It is GCash alone now;
+  /// everything else is in [byMethod].
   final Money gcash;
+
+  /// What came in, by the way it came in: `cash`, `gcash`, `maya`,
+  /// `maribank`, `bpi`. Used to lump everything that was not cash under
+  /// GCash, which quietly told her she had taken money on GCash that she
+  /// had actually taken on Maya.
+  final Map<String, Money> byMethod;
   final Money cogs;
   final Money grossProfit;
   final Money waste;
@@ -228,7 +238,9 @@ class SalesSummary {
   final int unpaidOrderCount;
 
   /// What actually came in: everything taken, less what is still owed.
-  Money get collected => cash + gcash;
+  Money get collected => byMethod.isEmpty
+      ? cash + gcash
+      : byMethod.values.fold(Money.zero, (Money a, Money b) => a + b);
 
   Money get netRevenue => revenue - refunds;
 

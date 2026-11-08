@@ -70,15 +70,18 @@ class ReportingService {
       WHERE o.status = 'completed' AND ${where('o.')}
       GROUP BY p.method
       ''', args);
-    int cash = 0;
-    int gcash = 0;
+    // One line per way of paying. Cash and GCash keep their own fields
+    // because every screen and every export already names them; Maya,
+    // MariBank and BPI used to be silently added to GCash, which is a
+    // number she might have reconciled against a bank statement.
+    final Map<String, Money> byMethod = <String, Money>{};
     for (final Map<String, Object?> p in payments) {
-      if (p['method'] == 'cash') {
-        cash = p['total']! as int;
-      } else {
-        gcash = p['total']! as int;
-      }
+      final String method = p['method']! as String;
+      final int amount = p['total']! as int;
+      byMethod[method] = (byMethod[method] ?? Money.zero) + Money(amount);
     }
+    final int cash = byMethod['cash']?.centavos ?? 0;
+    final int gcash = byMethod['gcash']?.centavos ?? 0;
 
     final List<Map<String, Object?>> unpaidRows = await _db.db.rawQuery('''
       SELECT COUNT(*) AS n, IFNULL(SUM(total_centavos), 0) AS total
@@ -112,6 +115,7 @@ class ReportingService {
       revenue: Money(row['revenue']! as int),
       cash: Money(cash),
       gcash: Money(gcash),
+      byMethod: byMethod,
       cogs: Money(row['cogs']! as int),
       grossProfit: Money(row['profit']! as int),
       unpaid: Money(unpaidRows.first['total']! as int),

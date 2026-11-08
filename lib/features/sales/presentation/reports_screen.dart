@@ -6,6 +6,7 @@ import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
+import '../../../core/money/money.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
@@ -157,8 +158,13 @@ class SummaryCard extends StatelessWidget {
           value: summary.revenue.format(),
           emphasise: true,
         ),
-        _StatRow(label: 'Cash', value: summary.cash.format()),
-        _StatRow(label: 'GCash', value: summary.gcash.format()),
+        for (final MapEntry<String, Money> row
+            in summary.byMethod.entries.toList()
+              ..sort(
+                (MapEntry<String, Money> a, MapEntry<String, Money> b) =>
+                    b.value.centavos.compareTo(a.value.centavos),
+              ))
+          _StatRow(label: _methodName(row.key), value: row.value.format()),
         // Shown only when there is some, and immediately under the two
         // figures it explains the gap in.
         if (summary.unpaid.isPositive)
@@ -282,3 +288,14 @@ class _PerformanceList extends StatelessWidget {
     );
   }
 }
+
+
+/// The codes payments carry, in the words on the buttons.
+String _methodName(String code) => switch (code) {
+  'cash' => 'Cash',
+  'gcash' => 'GCash',
+  'maya' => 'Maya',
+  'maribank' => 'MariBank',
+  'bpi' => 'BPI',
+  _ => code,
+};

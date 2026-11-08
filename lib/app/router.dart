@@ -13,6 +13,7 @@ import '../features/menu/presentation/products_screen.dart';
 import '../features/menu/presentation/sizes_screen.dart';
 import '../features/pos/presentation/pos_screen.dart';
 import '../features/receipts/presentation/receipt_screen.dart';
+import '../features/sales/presentation/business_report_screen.dart';
 import '../features/sales/presentation/closing_screen.dart';
 import '../features/sales/presentation/orders_screen.dart';
 import '../features/sales/presentation/reports_screen.dart';
@@ -44,6 +45,7 @@ abstract final class Routes {
   static const String suppliers = '/manage/suppliers';
   static const String purchases = '/manage/purchases';
   static const String reports = '/manage/reports';
+  static const String monthReport = '/manage/month';
   static const String closing = '/manage/closing';
   static const String settings = '/manage/settings';
   static const String backup = '/manage/backup';
@@ -145,6 +147,7 @@ GoRouter createRouter() => GoRouter(
                 _section('suppliers', const SuppliersScreen()),
                 _section('purchases', const PurchasesScreen()),
                 _section('reports', const ReportsScreen()),
+                _section('month', const BusinessReportScreen()),
                 _section('closing', const DailyClosingScreen()),
                 _section('settings', const SettingsScreen()),
                 _section('backup', const BackupScreen()),
