@@ -87,6 +87,22 @@ class AccountService {
     }
   }
 
+  /// Removes the account that was just made, after it turned out not to be
+  /// allowed to open a shop.
+  ///
+  /// Without this, every refused attempt would leave a dead account in her
+  /// Firebase list for her to wonder about. It works because the account is
+  /// signed in at that moment — a few seconds later Firebase would ask it to
+  /// sign in again first, which is why this is only ever called straight
+  /// after a refusal.
+  Future<void> discardCurrentAccount() async {
+    try {
+      await _firebase?.currentUser?.delete();
+    } on Object {
+      await signOut();
+    }
+  }
+
   Future<void> sendPasswordReset(String email) async =>
       _firebase?.sendPasswordResetEmail(email: email.trim());
 

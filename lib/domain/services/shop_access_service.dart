@@ -28,7 +28,9 @@ enum ShopStanding {
 /// Three ways in, and only three:
 ///
 ///  * **She opens a shop.** An email and a password of her own, and the shop
-///    is made under that account. Her phone becomes its first till.
+///    is made under that account. Only an email on the owners list may do
+///    this, and that list is edited in the Firebase console and nowhere
+///    else \u2014 not in the app, which anybody can load.
 ///  * **She signs in** on another phone with the same account, and her shop
 ///    comes down from the log.
 ///  * **Somebody joins** with an invite she read out, and is a barista.
@@ -117,10 +119,20 @@ class ShopAccessService {
         deviceId: await _engine.deviceId(),
         label: deviceLabel,
       );
-    } on Object {
+    } on NotApproved {
+      // The account exists for a few seconds and is then taken away again,
+      // so a refused attempt leaves nothing behind — not a shop, not a menu,
+      // and not a dead account in her Firebase list.
+      await _account.discardCurrentAccount();
       return const AccessOutcome.failed(
-        'The account was made but the shop could not be opened. Find signal '
-        'and sign in again.',
+        'That email is not approved to open a shop. If this is your shop, '
+        'check the spelling; otherwise ask the owner.',
+      );
+    } on Object {
+      await _account.discardCurrentAccount();
+      return const AccessOutcome.failed(
+        'The shop could not be opened \u2014 no connection. Find signal and '
+        'try again.',
       );
     }
 

@@ -4,7 +4,10 @@ rules_version = '2';
 //
 // Three facts decide everything below.
 //
-//  * The **owner** is an account — an email and a password she chose. Her
+//  * The **owner** is an account — an email and a password she chose, and
+//    one that appears in `allowed_owners`. An account that is not on that
+//    list can be made, because no free setting prevents it, and is worth
+//    exactly nothing: it can open no shop and read none. Her
 //    uid is written on the shop when she opens it and is never changed, so
 //    she can sign in on any phone and still be the owner.
 //  * A **till** is a phone she has let in: a document under the shop named
@@ -19,6 +22,22 @@ service cloud.firestore {
 
     function signedIn() {
       return request.auth != null;
+    }
+
+    // The owners list. One document per approved email, the email *is* the
+    // document id, and the document itself is empty — there is nothing to
+    // store beyond "this person is allowed".
+    //
+    // Nobody can read it from a phone and nobody can write it from a phone.
+    // It is edited in the Firebase console, which answers to the Google
+    // account that owns the project and to nothing else. A rule may still
+    // consult it, because rules run on the server.
+    function approved() {
+      return signedIn()
+        && request.auth.token.email != null
+        && exists(/databases/$(database)/documents/allowed_owners/$(
+             request.auth.token.email.lower()
+           ));
     }
 
     function shopPath(shopId) {
@@ -75,15 +94,22 @@ service cloud.firestore {
     match /owners/{uid} {
       allow get: if signedIn() && uid == request.auth.uid;
       allow list: if false;
-      allow create: if signedIn() && uid == request.auth.uid;
+      allow create: if approved() && uid == request.auth.uid;
       allow update, delete: if false;
     }
 
+    // Shut to every client, in both directions. The console is not a client.
+    match /allowed_owners/{email} {
+      allow read, write: if false;
+    }
+
     match /shops/{shopId} {
-      // Opening a shop names its owner, and it must be the account doing
-      // the opening. Ids are 32 random hex characters, so there is nothing
-      // to guess at and nothing of hers to land on.
-      allow create: if signedIn()
+      // Opening a shop names its owner, it must be the account doing the
+      // opening, and that account must be on the owners list. Anybody can
+      // load the page and anybody can make themselves an account; this is
+      // the line where that stops being worth anything. Ids are 32 random
+      // hex characters, so there is nothing to guess at either.
+      allow create: if approved()
         && request.resource.data.owner_uid == request.auth.uid;
 
       allow get: if isTill(shopId);
@@ -99,10 +125,14 @@ service cloud.firestore {
         // You may only ever add yourself, and only as the very first till —
         // the owner, before the shop document exists — or by presenting an
         // invite that is live right now.
+        // The owner's own first till goes in before the shop document
+        // exists, so that one is allowed on the strength of the owners
+        // list. Everybody afterwards needs a live invite — which is how a
+        // barista gets in without an email or an account of her own.
         allow create: if signedIn()
           && uid == request.auth.uid
           && (
-            !shopExists(shopId)
+            (!shopExists(shopId) && approved())
             || inviteAdmits(shopId, request.resource.data.code)
           );
 

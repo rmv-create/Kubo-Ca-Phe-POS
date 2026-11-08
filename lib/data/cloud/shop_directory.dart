@@ -18,7 +18,13 @@ import 'cloud_start.dart';
 ///   shops/{shopId}/tills/{uid}  label, role, device_id, joined_at
 ///   invites/{code}              shop_id, expires_at, created_by
 ///   owners/{uid}                shop_id
+///   allowed_owners/{email}      (empty — the id is the whole point)
 /// ```
+///
+/// `allowed_owners` is the list of people who may open a shop at all. It is
+/// written only from the Firebase console, never from the app, and no client
+/// may read it: the rules consult it server-side, so a stranger cannot even
+/// find out who is on it.
 ///
 /// An invite is a document of its own rather than a field on the shop so
 /// that a phone holding nothing but the code can find the shop. Knowing a
@@ -74,6 +80,9 @@ class ShopDirectory {
       _db!.collection('shops').doc(shopId);
 
   /// Opens a new shop, owned by the account signing in right now.
+  /// Throws [NotApproved] when this email is not on the owners list, and
+  /// [CloudUnreachable] when the shop simply could not be reached. The
+  /// difference matters: one is a decision, the other is the weather.
   Future<void> createShop({
     required String shopId,
     required String ownerUid,
@@ -81,23 +90,33 @@ class ShopDirectory {
     required String label,
   }) async {
     await CloudStart.ready();
-    // The owner's own till first: the rules let the first one in unasked,
-    // and only while the shop does not exist yet.
-    await _shop(shopId).collection('tills').doc(ownerUid).set(<String, Object?>{
-      'label': label,
-      'role': 'owner',
-      'device_id': deviceId,
-      'joined_at': FieldValue.serverTimestamp(),
-    });
-    await _shop(shopId).set(<String, Object?>{
-      'owner_uid': ownerUid,
-      'opened_at': FieldValue.serverTimestamp(),
-    });
-    // So that she can sign in on a phone that knows nothing and still be
-    // told which shop is hers. Only she can read it.
-    await _db!.collection('owners').doc(ownerUid).set(<String, Object?>{
-      'shop_id': shopId,
-    });
+    try {
+      // The owner's own till first: the rules let the first one in unasked,
+      // and only while the shop does not exist yet.
+      await _shop(shopId)
+          .collection('tills')
+          .doc(ownerUid)
+          .set(<String, Object?>{
+            'label': label,
+            'role': 'owner',
+            'device_id': deviceId,
+            'joined_at': FieldValue.serverTimestamp(),
+          });
+      await _shop(shopId).set(<String, Object?>{
+        'owner_uid': ownerUid,
+        'opened_at': FieldValue.serverTimestamp(),
+      });
+      // So that she can sign in on a phone that knows nothing and still be
+      // told which shop is hers. Only she can read it.
+      await _db!.collection('owners').doc(ownerUid).set(<String, Object?>{
+        'shop_id': shopId,
+      });
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') throw const NotApproved();
+      throw const CloudUnreachable();
+    } on Object {
+      throw const CloudUnreachable();
+    }
   }
 
   /// The shop belonging to this account, or null if it never opened one.
@@ -228,4 +247,17 @@ class AdmittedTill {
   final DateTime? lastSeenAt;
 
   bool get isOwner => role == 'owner';
+}
+
+/// This email is not on the owners list, so it may not open a shop.
+///
+/// Not an error in the app: a decision somebody made, and the owner is the
+/// only one who can change it.
+class NotApproved implements Exception {
+  const NotApproved();
+}
+
+/// The shop could not be reached. Try again with signal.
+class CloudUnreachable implements Exception {
+  const CloudUnreachable();
 }

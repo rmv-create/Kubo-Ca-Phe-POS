@@ -141,6 +141,56 @@ void main() {
     });
   });
 
+  group('the owners list', () {
+    test('an email nobody approved opens no shop, and leaves no account',
+        () async {
+      directory.refuseAsUnapproved = true;
+
+      final AccessOutcome tried = await access.openShop(
+        email: 'a.stranger@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(tried.succeeded, isFalse);
+      expect(tried.problem, contains('not approved'));
+      expect(await access.standing(), ShopStanding.outside);
+      expect(await drinkCount(), 0, reason: 'no shop, not even a blank one');
+      expect(
+        account.discarded,
+        isTrue,
+        reason: 'a refused attempt should not leave a dead account behind',
+      );
+    });
+
+    test('being refused reads differently from having no signal', () async {
+      directory.refuseToCreate = true;
+
+      final AccessOutcome tried = await access.openShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(tried.succeeded, isFalse);
+      expect(tried.problem, contains('no connection'));
+      expect(
+        tried.problem,
+        isNot(contains('not approved')),
+        reason: 'bad weather is not a decision about who she is',
+      );
+    });
+
+    test('an approved email opens the shop as before', () async {
+      final AccessOutcome opened = await access.openShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(opened.succeeded, isTrue);
+      expect(account.discarded, isFalse);
+      expect(await drinkCount(), greaterThan(0));
+    });
+  });
+
   group('the barista joins', () {
     test('is let in by a live invite, as a barista', () async {
       directory.liveInvite = 'K7PQM39X';
@@ -292,6 +342,15 @@ class _Account extends AccountService {
 
   @override
   Future<bool> signInAsDevice() async => true;
+
+  bool discarded = false;
+
+  @override
+  Future<void> discardCurrentAccount() async {
+    discarded = true;
+    _user = null;
+    knownPassword = '';
+  }
 }
 
 /// Firestore, without Firestore.
@@ -303,6 +362,7 @@ class _Directory extends ShopDirectory {
   bool refuseToCreate = false;
   bool refuseToJoin = false;
 
+  bool refuseAsUnapproved = false;
   String? createdShop;
   String? createdOwner;
   String? joinedAs;
@@ -316,7 +376,8 @@ class _Directory extends ShopDirectory {
     required String deviceId,
     required String label,
   }) async {
-    if (refuseToCreate) throw StateError('no signal');
+    if (refuseAsUnapproved) throw const NotApproved();
+    if (refuseToCreate) throw const CloudUnreachable();
     createdShop = shopId;
     createdOwner = ownerUid;
     _owned[ownerUid] = shopId;
