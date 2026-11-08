@@ -45,5 +45,13 @@ jobs:
 
       # The Linux job cannot compile the iOS target; this is the gate that
       # proves the iPhone/iPad build still works.
-      - name: Build iOS (unsigned)
-        run: flutter build ios --release --no-codesign
+      #
+      # Built for the simulator rather than for a device. `--no-codesign`
+      # stopped being enough once the Google Sign-In SDK arrived: Xcode
+      # compiles the app, and then packaging it for a device demands a
+      # Development Team for the embedded frameworks. Signing in CI would
+      # mean putting the owner's Apple credentials in this repository, which
+      # is a far worse trade than losing the device-packaging step. The
+      # compile — every plugin, every line of Dart, for iOS — still happens.
+      - name: Build iOS (simulator, unsigned)
+        run: flutter build ios --debug --simulator
