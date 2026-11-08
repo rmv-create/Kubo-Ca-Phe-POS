@@ -325,6 +325,13 @@ final FutureProvider<List<Customer>> recentCustomersProvider =
     });
 
 /// Customer search. An empty query returns recent visitors.
+/// One customer, as they stand right now.
+final FutureProviderFamily<Customer?, int> customerByIdProvider =
+    FutureProvider.family<Customer?, int>((Ref ref, int id) {
+      ref.watch(customerRevisionProvider);
+      return ref.watch(customerRepositoryProvider).byId(id);
+    });
+
 final FutureProviderFamily<List<Customer>, String> customerSearchProvider =
     FutureProvider.family<List<Customer>, String>((Ref ref, String query) {
       ref.watch(salesRevisionProvider);

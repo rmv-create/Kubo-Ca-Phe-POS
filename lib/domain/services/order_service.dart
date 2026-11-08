@@ -326,19 +326,43 @@ class OrderService {
     required String at,
     required Money total,
   }) async {
-    final int orders = customer.orderCount + 1;
+    // Counted from the row as it stands, not from the copy the till is
+    // holding. That copy was loaded when she picked the customer, so two
+    // orders for the same person without reselecting them in between both
+    // wrote "order number one" and the history stopped growing.
+    await txn.rawUpdate(
+      '''
+      UPDATE customers SET
+        first_visit_at       = IFNULL(first_visit_at, ?),
+        last_visit_at        = ?,
+        visit_count          = visit_count + 1,
+        order_count          = order_count + 1,
+        item_count           = item_count + ?,
+        total_spend_centavos = total_spend_centavos + ?,
+        updated_at           = ?
+      WHERE id = ?
+      ''',
+      <Object?>[at, at, draft.drinkCount, total.centavos, at, customer.id],
+    );
+
+    // The segment follows the order count, except where she has marked
+    // somebody VIP herself. A judgement she made by hand should not be
+    // undone by the next cup they buy.
+    final List<Map<String, Object?>> row = await txn.query(
+      'customers',
+      columns: <String>['order_count', 'segment'],
+      where: 'id = ?',
+      whereArgs: <Object?>[customer.id],
+      limit: 1,
+    );
+    if (row.isEmpty) return;
+    if (row.first['segment'] == CustomerSegment.vip.code) return;
     await txn.update(
       'customers',
       <String, Object?>{
-        'first_visit_at':
-            customer.firstVisitAt?.toUtc().toIso8601String() ?? at,
-        'last_visit_at': at,
-        'visit_count': customer.visitCount + 1,
-        'order_count': orders,
-        'item_count': customer.itemCount + draft.drinkCount,
-        'total_spend_centavos': customer.totalSpend.centavos + total.centavos,
-        'segment': CustomerSegment.fromOrderCount(orders).code,
-        'updated_at': at,
+        'segment': CustomerSegment.fromOrderCount(
+          row.first['order_count']! as int,
+        ).code,
       },
       where: 'id = ?',
       whereArgs: <Object?>[customer.id],

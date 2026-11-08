@@ -109,6 +109,8 @@ class CustomerRepositoryImpl implements CustomerRepository {
             ? null
             : customer.mobile!.trim(),
         'notes': customer.notes,
+        'birthday': customer.birthday,
+        'segment': customer.storedSegment.code,
         'is_active': customer.isActive ? 1 : 0,
         'updated_at': _clock.nowIso(),
       },
@@ -280,6 +282,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
     storedSegment: CustomerSegment.fromCode(r['segment']! as String),
     isActive: r['is_active'] == 1,
     notes: r['notes'] as String?,
+    birthday: r['birthday'] as String?,
   );
 
   static CustomerOrderPattern _pattern(Map<String, Object?> r) =>

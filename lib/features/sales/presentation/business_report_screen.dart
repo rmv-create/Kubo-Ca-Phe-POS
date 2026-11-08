@@ -102,8 +102,8 @@ class _Headline extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Text('Took in', style: theme.textTheme.labelMedium),
-          MoneyText(report.revenue, emphasised: true),
+          Text('The coffee earned', style: theme.textTheme.labelMedium),
+          MoneyText(report.netSales, emphasised: true),
           const SizedBox(height: KuboSpacing.xs),
           Text(
             report.tradingDays == 0
@@ -141,8 +141,6 @@ class _ProfitAndLoss extends StatelessWidget {
         _Line('Drinks at menu price', report.grossSales),
         if (report.discounts.isPositive)
           _Line('Less discounts', -report.discounts),
-        if (report.deliveryFees.isPositive)
-          _Line('Delivery charged', report.deliveryFees),
         if (report.refunds.isPositive) _Line('Less refunds', -report.refunds),
         _Line('What you charged', report.netSales, strong: true),
         _Line('Less what the drinks cost to make', -report.cogs),
@@ -157,6 +155,23 @@ class _ProfitAndLoss extends StatelessWidget {
         if (report.waste.isPositive)
           _Line('Less spilled and thrown away', -report.waste),
         _Line('Trading profit', report.tradingProfit, strong: true),
+        if (report.deliveryFees.isPositive)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              KuboSpacing.lg,
+              KuboSpacing.sm,
+              KuboSpacing.lg,
+              0,
+            ),
+            child: Text(
+              'Delivery is not in any of this. '
+              '${report.deliveryFees.format()} was collected for riders and '
+              'handed straight over \u2014 it went through your hands and '
+              'none of it stayed, so counting it would flatter every figure '
+              'above.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
             KuboSpacing.lg,
@@ -245,6 +260,8 @@ class _CashFlow extends StatelessWidget {
       children: <Widget>[
         const SectionHeader('Cash in and out'),
         _Line('Money received', report.received),
+        if (report.deliveryFees.isPositive)
+          _Line('Less paid to riders', -report.deliveryFees),
         _Line('Less stock bought', -report.spentOnStock),
         _Line('Net movement', report.netCashMovement, strong: true),
         _Line('On the shelf today, at cost', report.stockOnHand),

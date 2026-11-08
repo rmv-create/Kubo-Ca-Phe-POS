@@ -177,6 +177,7 @@ class SalesSummary {
     required this.revenue,
     required this.cash,
     required this.gcash,
+    this.deliveryCollected = Money.zero,
     this.byMethod = const <String, Money>{},
     required this.cogs,
     required this.grossProfit,
@@ -213,6 +214,13 @@ class SalesSummary {
   /// everything else is in [byMethod].
   final Money gcash;
 
+  /// Collected from the customer for the rider and handed straight over.
+  ///
+  /// Never hers. It is on the receipt because the customer paid it, it is
+  /// in the cash because the cash came through her hands, and it is in
+  /// neither the sales nor the profit because none of it stayed.
+  final Money deliveryCollected;
+
   /// What came in, by the way it came in: `cash`, `gcash`, `maya`,
   /// `maribank`, `bpi`. Used to lump everything that was not cash under
   /// GCash, which quietly told her she had taken money on GCash that she
@@ -238,6 +246,11 @@ class SalesSummary {
   final int unpaidOrderCount;
 
   /// What actually came in: everything taken, less what is still owed.
+  /// What the coffee earned. The delivery money was never hers, so it is
+  /// not in here — counting it as revenue would flatter every margin in
+  /// the app by whatever the rider charged.
+  Money get salesRevenue => revenue - deliveryCollected;
+
   Money get collected => byMethod.isEmpty
       ? cash + gcash
       : byMethod.values.fold(Money.zero, (Money a, Money b) => a + b);

@@ -57,7 +57,8 @@ class ReportingService {
              IFNULL(SUM(cogs_centavos), 0) AS cogs,
              IFNULL(SUM(gross_profit_centavos), 0) AS profit,
              IFNULL(SUM(item_count), 0) AS drinks,
-             IFNULL(SUM(refunded_centavos), 0) AS refunded
+             IFNULL(SUM(refunded_centavos), 0) AS refunded,
+             IFNULL(SUM(delivery_fee_centavos), 0) AS delivery
       FROM orders
       WHERE status = 'completed' AND ${where('')}
       ''', args);
@@ -115,6 +116,7 @@ class ReportingService {
       revenue: Money(row['revenue']! as int),
       cash: Money(cash),
       gcash: Money(gcash),
+      deliveryCollected: Money(row['delivery']! as int),
       byMethod: byMethod,
       cogs: Money(row['cogs']! as int),
       grossProfit: Money(row['profit']! as int),

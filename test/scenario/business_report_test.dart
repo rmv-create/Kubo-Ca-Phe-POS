@@ -116,6 +116,61 @@ void main() {
     });
   });
 
+  group('delivery is not hers', () {
+    // She pays the rider herself out of what the customer handed her, so
+    // not a centavo of it stays. It is on the receipt, it is in the cash,
+    // and it must be in neither the sales nor the profit.
+    Future<void> sellWithDelivery(Money fee) async {
+      await shop.sell(
+        OrderDraft(
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
+          paymentMethod: PaymentMethod.cash,
+          deliveryFee: fee,
+        ),
+      );
+    }
+
+    test('it is not counted as something the coffee earned', () async {
+      await sellWithDelivery(Money.of(60));
+
+      final BusinessReport r = await reports.forMonth(month());
+
+      expect(r.revenue, Money.of(199), reason: 'the till took ₱139 + ₱60');
+      expect(r.deliveryFees, Money.of(60));
+      expect(r.netSales, Money.of(139), reason: 'the coffee earned ₱139');
+    });
+
+    test('it does not flatter the margin', () async {
+      await sellWithDelivery(Money.of(60));
+
+      final BusinessReport r = await reports.forMonth(month());
+
+      // ₱139 less ₱18 of beans. Counting the delivery would have made this
+      // look like 90.9%, which would be a lie about the coffee.
+      expect(r.grossProfit, Money.of(121));
+      expect(r.grossMarginBp, 8705);
+    });
+
+    test('it is in the cash, and then paid straight out again', () async {
+      await sellWithDelivery(Money.of(60));
+
+      final BusinessReport r = await reports.forMonth(month());
+
+      expect(r.received, Money.of(199), reason: 'she really held it');
+      expect(
+        r.netCashMovement,
+        Money.of(139),
+        reason: 'and really handed it over',
+      );
+    });
+
+    test('per order is what the coffee made, not what the till took',
+        () async {
+      await sellWithDelivery(Money.of(60));
+      expect((await reports.forMonth(month())).perOrder, Money.of(139));
+    });
+  });
+
   group('where the money came in', () {
     test('every way of paying is counted as itself', () async {
       await sell();

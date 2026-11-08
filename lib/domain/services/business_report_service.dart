@@ -240,9 +240,12 @@ class BusinessReport {
   /// What the drinks came to at menu price, before anything came off.
   final Money grossSales;
   final Money discounts;
+  /// Collected from the customer for the rider and handed straight over.
+  /// Hers to carry, never hers to keep.
   final Money deliveryFees;
 
-  /// What she actually charged, delivery included. The top line.
+  /// Everything that went through the till, delivery money included.
+  /// Use [salesRevenue] for anything about the shop's earnings.
   final Money revenue;
 
   /// What the drinks cost to make, from her own recipes.
@@ -266,8 +269,13 @@ class BusinessReport {
 
   // ───────────────────────── profit and loss ─────────────────────────
 
-  /// Menu price less what she took off. What the till should say.
-  Money get netSales => revenue - refunds;
+  /// What the coffee earned: everything that went through the till, less
+  /// the delivery money that was only passing through, less refunds.
+  ///
+  /// She pays the rider herself, out of what the customer handed her, so
+  /// not a centavo of it stays. Counting it as revenue would flatter every
+  /// margin in the app by whatever the rider charged that day.
+  Money get netSales => revenue - deliveryFees - refunds;
 
   Money get grossProfit => netSales - cogs;
 
@@ -281,10 +289,10 @@ class BusinessReport {
 
   Money? get perDay => tradingDays == 0
       ? null
-      : Money(revenue.centavos ~/ tradingDays);
+      : Money(netSales.centavos ~/ tradingDays);
 
   Money? get perOrder =>
-      orderCount == 0 ? null : Money(revenue.centavos ~/ orderCount);
+      orderCount == 0 ? null : Money(netSales.centavos ~/ orderCount);
 
   // ─────────────────────────── cash flow ───────────────────────────
 
@@ -295,7 +303,8 @@ class BusinessReport {
 
   /// Money in less money out. Not profit — it includes stock she has bought
   /// and not yet sold, and excludes sales she has not yet been paid for.
-  Money get netCashMovement => received - spentOnStock;
+  /// Money in, less stock bought, less what was handed to riders.
+  Money get netCashMovement => received - spentOnStock - deliveryFees;
 }
 
 /// A slice of the week or the day.

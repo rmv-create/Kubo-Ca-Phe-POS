@@ -12,6 +12,7 @@ import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../menu/state/menu_actions.dart';
+import 'statement_screen.dart';
 
 /// Who comes in, what they order, and what they are worth.
 class CustomersScreen extends ConsumerStatefulWidget {
@@ -168,14 +169,58 @@ class CustomerDetailScreen extends ConsumerWidget {
               _Stat(label: 'Segment', value: customer.segmentAt(now).label),
               if (customer.mobile != null)
                 _Stat(label: 'Mobile', value: customer.mobile!),
-              if (customer.lastVisitAt != null)
+              if (customer.firstVisitAt != null)
                 _Stat(
-                  label: 'Last visit',
-                  value: customer.lastVisitAt!.toLocal().toString().substring(
-                    0,
-                    16,
-                  ),
+                  label: 'First came in',
+                  value: _when(customer.firstVisitAt!),
                 ),
+              if (customer.lastVisitAt != null)
+                _Stat(label: 'Last order', value: _when(customer.lastVisitAt!)),
+
+              const SectionHeader('Worth remembering'),
+              ListTile(
+                leading: const Icon(Icons.cake_outlined),
+                title: const Text('Birthday'),
+                subtitle: Text(
+                  customer.birthdayLabel ??
+                      'Not set \u2014 optional, and most never will be',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _editBirthday(context, ref, customer),
+              ),
+              ListTile(
+                leading: const Icon(Icons.sticky_note_2_outlined),
+                title: const Text('Notes'),
+                subtitle: Text(
+                  customer.notes?.trim().isNotEmpty ?? false
+                      ? customer.notes!
+                      : 'Allergies, how they like it, where they work',
+                ),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => _editNotes(context, ref, customer),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.star_outline),
+                value: customer.storedSegment == CustomerSegment.vip,
+                title: const Text('VIP'),
+                subtitle: const Text(
+                  'Marks them by hand, whatever the figures say',
+                ),
+                onChanged: (_) => _toggleVip(context, ref, customer),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(KuboSpacing.lg),
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (BuildContext context) =>
+                          StatementScreen(customerId: customer.id),
+                    ),
+                  ),
+                  icon: const Icon(Icons.receipt_long_outlined),
+                  label: const Text('Statement of account'),
+                ),
+              ),
               const SectionHeader('Their usual'),
               AsyncView<UsualOrder?>(
                 value: usual,
@@ -251,28 +296,30 @@ class CustomerDetailScreen extends ConsumerWidget {
     );
     if (!context.mounted) return;
 
+    await _save(
+      context,
+      ref,
+      customer.copyWith(
+        name: name,
+        mobile: mobile,
+        clearMobile: (mobile ?? '').trim().isEmpty,
+      ),
+    );
+  }
+
+  /// Writes one changed customer, and says so.
+  ///
+  /// Everything that edits a customer goes through here with a `copyWith`,
+  /// rather than rebuilding the whole record by hand — which is how a
+  /// birthday or a note gets quietly wiped by a rename.
+  Future<void> _save(
+    BuildContext context,
+    WidgetRef ref,
+    Customer changed,
+  ) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     try {
-      await ref
-          .read(customerRepositoryProvider)
-          .update(
-            Customer(
-              id: customer.id,
-              name: name,
-              mobile: mobile,
-              createdAt: customer.createdAt,
-              firstVisitAt: customer.firstVisitAt,
-              lastVisitAt: customer.lastVisitAt,
-              visitCount: customer.visitCount,
-              orderCount: customer.orderCount,
-              itemCount: customer.itemCount,
-              totalSpend: customer.totalSpend,
-              storedSegment: customer.storedSegment,
-              isActive: customer.isActive,
-              savedUsualPatternId: customer.savedUsualPatternId,
-              notes: customer.notes,
-            ),
-          );
+      await ref.read(customerRepositoryProvider).update(changed);
       ref.read(salesRevisionProvider.notifier).bump();
       messenger
         ..clearSnackBars()
@@ -282,6 +329,107 @@ class CustomerDetailScreen extends ConsumerWidget {
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
     }
+  }
+
+  /// A birthday, month and day only. There is no year to ask for.
+  Future<void> _editBirthday(
+    BuildContext context,
+    WidgetRef ref,
+    Customer customer,
+  ) async {
+    const List<String> months = <String>[
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December',
+    ];
+    final int? month = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      builder: (BuildContext context) => ListView(
+        children: <Widget>[
+          const SectionHeader('Which month?'),
+          for (int m = 1; m <= 12; m++)
+            ListTile(
+              title: Text(months[m - 1]),
+              onTap: () => Navigator.of(context).pop(m),
+            ),
+          if (customer.birthday != null)
+            ListTile(
+              leading: const Icon(Icons.close),
+              title: const Text('Remove the birthday'),
+              onTap: () => Navigator.of(context).pop(0),
+            ),
+        ],
+      ),
+    );
+    if (month == null || !context.mounted) return;
+    if (month == 0) {
+      await _save(context, ref, customer.copyWith(clearBirthday: true));
+      return;
+    }
+
+    final int? day = await showModalBottomSheet<int>(
+      context: context,
+      useSafeArea: true,
+      builder: (BuildContext context) => ListView(
+        children: <Widget>[
+          SectionHeader('Which day of ${months[month - 1]}?'),
+          for (int d = 1; d <= _daysIn(month); d++)
+            ListTile(
+              title: Text('$d'),
+              onTap: () => Navigator.of(context).pop(d),
+            ),
+        ],
+      ),
+    );
+    if (day == null || !context.mounted) return;
+
+    await _save(
+      context,
+      ref,
+      customer.copyWith(
+        birthday: '${month.toString().padLeft(2, '0')}-'
+            '${day.toString().padLeft(2, '0')}',
+      ),
+    );
+  }
+
+  /// February gets 29 because a birthday has no year to rule it out.
+  static int _daysIn(int month) =>
+      <int>[31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1];
+
+  Future<void> _editNotes(
+    BuildContext context,
+    WidgetRef ref,
+    Customer customer,
+  ) async {
+    final String? notes = await promptForText(
+      context,
+      title: 'Notes',
+      label: 'Anything worth remembering',
+      initial: customer.notes ?? '',
+      helper: 'Allergies, how she likes it, where she works',
+    );
+    if (notes == null || !context.mounted) return;
+    await _save(
+      context,
+      ref,
+      customer.copyWith(notes: notes, clearNotes: notes.trim().isEmpty),
+    );
+  }
+
+  Future<void> _toggleVip(
+    BuildContext context,
+    WidgetRef ref,
+    Customer customer,
+  ) async {
+    final bool vip = customer.storedSegment == CustomerSegment.vip;
+    await _save(
+      context,
+      ref,
+      customer.copyWith(
+        storedSegment: vip ? CustomerSegment.regular : CustomerSegment.vip,
+      ),
+    );
   }
 
   Future<void> _saveUsual(
@@ -425,4 +573,15 @@ class _Stat extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// A moment, in words rather than in ISO.
+String _when(DateTime at) {
+  final DateTime local = at.toLocal();
+  const List<String> months = <String>[
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ];
+  return '${local.day} ${months[local.month - 1]} ${local.year}';
 }
