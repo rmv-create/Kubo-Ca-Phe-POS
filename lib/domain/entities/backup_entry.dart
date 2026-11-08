@@ -41,6 +41,7 @@ class BackupEntry {
     required this.sizeBytes,
     required this.schemaVersion,
     required this.sha256,
+    this.sentAt,
   });
 
   factory BackupEntry.fromJson(Map<String, Object?> json) => BackupEntry(
@@ -50,6 +51,9 @@ class BackupEntry {
     sizeBytes: json['size_bytes']! as int,
     schemaVersion: json['schema_version']! as int,
     sha256: json['sha256']! as String,
+    sentAt: json['sent_at'] == null
+        ? null
+        : DateTime.parse(json['sent_at']! as String),
   );
 
   final String fileName;
@@ -59,6 +63,23 @@ class BackupEntry {
   final int schemaVersion;
   final String sha256;
 
+  /// When a copy of this file was sent off the device — to iCloud Drive, a
+  /// chat, an email. Null means the only copy is on this phone.
+  final DateTime? sentAt;
+
+  /// True once there is a copy somewhere a dropped phone cannot take with it.
+  bool get isOffDevice => sentAt != null;
+
+  BackupEntry copyWith({DateTime? sentAt}) => BackupEntry(
+    fileName: fileName,
+    createdAt: createdAt,
+    reason: reason,
+    sizeBytes: sizeBytes,
+    schemaVersion: schemaVersion,
+    sha256: sha256,
+    sentAt: sentAt ?? this.sentAt,
+  );
+
   Map<String, Object?> toJson() => <String, Object?>{
     'file_name': fileName,
     'created_at': createdAt.toUtc().toIso8601String(),
@@ -66,6 +87,7 @@ class BackupEntry {
     'size_bytes': sizeBytes,
     'schema_version': schemaVersion,
     'sha256': sha256,
+    if (sentAt != null) 'sent_at': sentAt!.toUtc().toIso8601String(),
   };
 
   String get sizeLabel {

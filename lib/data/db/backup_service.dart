@@ -112,6 +112,40 @@ class BackupService {
     }
   }
 
+  /// Records that a copy of [entry] has left the device.
+  ///
+  /// A backup sitting beside the database it was taken from protects against
+  /// a mistake, not against a lost phone. This is how the app knows which it
+  /// has, so it can say so at closing time.
+  Future<void> markSent(BackupEntry entry) async {
+    final List<BackupEntry> all = await listBackups();
+    await _writeManifest(<BackupEntry>[
+      for (final BackupEntry e in all)
+        if (e.fileName == entry.fileName)
+          e.copyWith(sentAt: _clock.now())
+        else
+          e,
+    ]);
+  }
+
+  /// The newest backup, or null if there are none.
+  Future<BackupEntry?> newest() async {
+    final List<BackupEntry> all = await listBackups();
+    return all.isEmpty ? null : all.first;
+  }
+
+  /// True when something recorded on [businessDate] is still only on this
+  /// phone: there is a backup from that day, and no copy of it has been sent.
+  Future<bool> needsSendingFor(String businessDate) async {
+    final List<BackupEntry> all = await listBackups();
+    final Iterable<BackupEntry> ofDay = all.where(
+      (BackupEntry e) =>
+          e.createdAt.toLocal().toIso8601String().startsWith(businessDate),
+    );
+    if (ofDay.isEmpty) return false;
+    return !ofDay.any((BackupEntry e) => e.isOffDevice);
+  }
+
   /// Takes in backup files that were copied into the folder from elsewhere.
   ///
   /// This is how a shop moves to a new phone: copy the `.db` file out of the

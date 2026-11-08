@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
@@ -9,6 +8,7 @@ import '../../../core/errors/app_exception.dart';
 import '../../../data/db/backup_service.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../shared/widgets/section_header.dart';
+import 'send_backup.dart';
 
 /// Set once a backup has been restored over the live database. The app then
 /// refuses to keep running against a file its open connection no longer
@@ -56,6 +56,8 @@ class BackupScreen extends ConsumerWidget {
               style: theme.textTheme.bodySmall,
             ),
           ),
+          if (ref.watch(backupNeedsSendingProvider).valueOrNull ?? false)
+            const _StillOnThisPhone(),
           Padding(
             padding: const EdgeInsets.all(KuboSpacing.lg),
             child: FilledButton.icon(
@@ -131,6 +133,63 @@ class BackupScreen extends ConsumerWidget {
   }
 }
 
+/// Today's work exists in one place, and that place is in her pocket.
+class _StillOnThisPhone extends ConsumerWidget {
+  const _StillOnThisPhone();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        KuboSpacing.lg,
+        KuboSpacing.lg,
+        0,
+      ),
+      padding: const EdgeInsets.all(KuboSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(KuboRadius.md),
+        border: Border(
+          left: BorderSide(color: theme.colorScheme.error, width: 3),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            'Today is only on this phone',
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: theme.colorScheme.onErrorContainer,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'A backup beside the database it came from survives a mistake, '
+            'not a lost phone. Send one copy somewhere else.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onErrorContainer,
+            ),
+          ),
+          const SizedBox(height: KuboSpacing.sm),
+          FilledButton.icon(
+            onPressed: () => _send(context, ref),
+            icon: const Icon(Icons.ios_share),
+            label: const Text('SEND A COPY'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _send(BuildContext context, WidgetRef ref) async {
+    final BackupEntry? newest = await ref.read(backupServiceProvider).newest();
+    if (newest == null || !context.mounted) return;
+    await sendBackupOffDevice(context, ref, newest);
+  }
+}
+
 class _BackupTile extends ConsumerWidget {
   const _BackupTile({required this.entry});
 
@@ -141,13 +200,16 @@ class _BackupTile extends ConsumerWidget {
     final DateFormat format = DateFormat('d MMM yyyy · HH:mm');
     return ListTile(
       leading: Icon(
-        entry.reason.isProtected
+        entry.isOffDevice
+            ? Icons.cloud_done_outlined
+            : entry.reason.isProtected
             ? Icons.lock_outline
             : Icons.inventory_2_outlined,
       ),
       title: Text(format.format(entry.createdAt.toLocal())),
       subtitle: Text(
-        '${entry.reason.label} · ${entry.sizeLabel} · schema v${entry.schemaVersion}',
+        '${entry.reason.label} · ${entry.sizeLabel}'
+        '${entry.isOffDevice ? ' · copied off the phone' : ''}',
       ),
       trailing: PopupMenuButton<String>(
         onSelected: (String action) => switch (action) {
@@ -165,25 +227,8 @@ class _BackupTile extends ConsumerWidget {
     );
   }
 
-  /// Sends the backup file itself — to iCloud Drive, a chat, an email.
-  ///
-  /// This is the half of a device move that the phone cannot do for her: one
-  /// copy of the file, off this device, that she can open on the next one.
-  Future<void> _send(BuildContext context, WidgetRef ref) async {
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final BackupService service = ref.read(backupServiceProvider);
-    try {
-      await Share.shareXFiles(<XFile>[
-        XFile(service.pathOf(entry), name: entry.fileName),
-      ], subject: 'Kubo Cà Phê backup — ${entry.fileName}');
-    } on Object catch (error) {
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(
-          SnackBar(content: Text('The copy could not be sent. $error')),
-        );
-    }
-  }
+  Future<void> _send(BuildContext context, WidgetRef ref) =>
+      sendBackupOffDevice(context, ref, entry);
 
   Future<void> _verify(BuildContext context, WidgetRef ref) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);

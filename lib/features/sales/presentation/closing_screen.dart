@@ -4,9 +4,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../domain/entities/backup_entry.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../backup/presentation/backup_screen.dart';
+import '../../backup/presentation/send_backup.dart';
 import 'reports_screen.dart';
 
 /// Close the day: check the figures, confirm, and lock them in.
@@ -97,7 +100,9 @@ class DailyClosingScreen extends ConsumerWidget {
         title: Text('Close $day?'),
         content: const Text(
           "Today's totals will be saved as they are now. You can still take "
-          'orders — they will count towards the next day.',
+          'orders — they will count towards the next day.\n\n'
+          'A backup is taken as the day closes, and you will be offered the '
+          'chance to send a copy of it off the phone.',
         ),
         actions: <Widget>[
           TextButton(
@@ -114,17 +119,66 @@ class DailyClosingScreen extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    BackupEntry? backup;
     try {
       await ref.read(reportingServiceProvider).closeDay(day);
+      // The day's figures are final, so this is the copy worth keeping.
+      backup = await ref
+          .read(backupServiceProvider)
+          .create(reason: BackupReason.dailyClosing);
       ref.read(salesRevisionProvider.notifier).bump();
+      ref.invalidate(backupListProvider);
       messenger
         ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text('$day closed')));
+        ..showSnackBar(SnackBar(content: Text('$day closed · backed up')));
     } on AppException catch (error) {
       messenger
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
     }
+
+    // The backup lives beside the database it was taken from, which is no
+    // help at all if the phone goes. Offered here, at the one moment in the
+    // day when she is finished and the figures are settled.
+    if (backup == null || !context.mounted) return;
+    await _offerToSend(context, ref, backup, day);
+  }
+
+  Future<void> _offerToSend(
+    BuildContext context,
+    WidgetRef ref,
+    BackupEntry backup,
+    String day,
+  ) async {
+    final bool? send = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Keep a copy off the phone?'),
+        content: Text(
+          "Today's backup is ${backup.sizeLabel}. Saving it to iCloud Drive, "
+          'Google Drive or even a message to yourself takes a second, and it '
+          'is the only copy that survives a lost or broken phone.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Send a copy'),
+          ),
+        ],
+      ),
+    );
+    if (send != true || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final bool sent = await sendBackupOffDevice(context, ref, backup);
+    if (!sent) return;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text('$day is safe off the phone')));
   }
 }
 

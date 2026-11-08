@@ -87,6 +87,46 @@ void main() {
     await expectLater(backups.restore(entry), throwsA(isA<BackupException>()));
   });
 
+  group('getting a copy off the phone', () {
+    test('a backup starts out on this phone only', () async {
+      final BackupEntry entry = await backups.create();
+
+      expect(entry.isOffDevice, isFalse);
+      expect(await backups.needsSendingFor('2026-03-15'), isTrue);
+    });
+
+    test('sending one is remembered', () async {
+      final BackupEntry entry = await backups.create();
+
+      await backups.markSent(entry);
+
+      final BackupEntry stored = (await backups.listBackups()).first;
+      expect(stored.isOffDevice, isTrue);
+      expect(stored.sentAt!.toUtc(), clock.now().toUtc());
+      expect(await backups.needsSendingFor('2026-03-15'), isFalse);
+    });
+
+    test('it survives being written and read back', () async {
+      final BackupEntry entry = await backups.create();
+      await backups.markSent(entry);
+      // A fresh read of the manifest, as a later launch would do.
+      expect((await backups.listBackups()).single.isOffDevice, isTrue);
+    });
+
+    test('a day with no backup at all is not nagged about', () async {
+      expect(await backups.needsSendingFor('2026-03-15'), isFalse);
+    });
+
+    test('a new day needs its own copy', () async {
+      await backups.markSent(await backups.create());
+      clock.advance(const Duration(days: 1));
+      await backups.create();
+
+      expect(await backups.needsSendingFor('2026-03-16'), isTrue);
+      expect(await backups.needsSendingFor('2026-03-15'), isFalse);
+    });
+  });
+
   group('moving to another phone', () {
     test('a file copied into the folder is picked up and listed', () async {
       // The new phone's side of a device move: she saves the file from the
