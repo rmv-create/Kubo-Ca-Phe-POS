@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -5,6 +6,8 @@ import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../data/cloud/cloud_backup_service.dart';
+import '../../../data/db/archive_file.dart';
+import '../../../data/db/database_archive.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
@@ -123,19 +126,47 @@ class DailyClosingScreen extends ConsumerWidget {
     BackupEntry? backup;
     try {
       await ref.read(reportingServiceProvider).closeDay(day);
-      // The day's figures are final, so this is the copy worth keeping.
-      backup = await ref
-          .read(backupServiceProvider)
-          .create(reason: BackupReason.dailyClosing);
-      ref.read(salesRevisionProvider.notifier).bump();
-      ref.invalidate(backupListProvider);
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text('$day closed · backed up')));
     } on AppException catch (error) {
       messenger
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
+      return;
+    }
+    ref.read(salesRevisionProvider.notifier).bump();
+
+    // In a browser there is no file to copy: the database lives inside the
+    // browser's own storage and `dart:io` is not there at all. Closing the
+    // day used to try anyway and throw where nothing was catching, so the
+    // day closed and the screen never said so. In a browser the day's copy
+    // is the file she saves herself, offered below.
+    if (!kIsWeb) {
+      try {
+        // The day's figures are final, so this is the copy worth keeping.
+        backup = await ref
+            .read(backupServiceProvider)
+            .create(reason: BackupReason.dailyClosing);
+        ref.invalidate(backupListProvider);
+      } on Object catch (error) {
+        messenger
+          ..clearSnackBars()
+          ..showSnackBar(
+            SnackBar(content: Text('$day closed, but the backup failed: '
+                '$error')),
+          );
+      }
+    }
+
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(backup == null ? '$day closed' : '$day closed · backed up'),
+        ),
+      );
+
+    if (kIsWeb) {
+      if (context.mounted) await _offerToSaveAFile(context, ref, day);
+      return;
     }
 
     // The backup lives beside the database it was taken from, which is no
@@ -159,6 +190,60 @@ class DailyClosingScreen extends ConsumerWidget {
     // No account, no signal, or a sign-in that has lapsed. Rather than leave
     // the day's work on one phone, she is offered the two-tap way out.
     await _offerToSend(context, ref, backup, day, because: outcome);
+  }
+
+  /// In a browser, the day's copy is a file she keeps herself.
+  ///
+  /// Asked here rather than left to her to remember, because closing is the
+  /// one moment in the day when the figures are settled and she is not
+  /// holding a cup.
+  Future<void> _offerToSaveAFile(
+    BuildContext context,
+    WidgetRef ref,
+    String day,
+  ) async {
+    final bool? save = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Save today\u2019s copy?'),
+        content: const Text(
+          'The whole shop lives inside this browser, and a browser can '
+          'clear its own storage. A file saved now is the only copy that '
+          'survives a lost phone \u2014 put it in Google Drive, iCloud, or '
+          'even message it to yourself.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('SAVE A COPY'),
+          ),
+        ],
+      ),
+    );
+    if (save != true || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await saveArchive(
+        await DatabaseArchive(
+          ref.read(databaseProvider).db,
+          ref.read(clockProvider),
+        ).export(),
+        'kubo-${day.replaceAll('-', '')}.sql',
+        into: ref.read(backupServiceProvider).backupDirectory,
+      );
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$day is safe off the phone')));
+    } on Object catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$error')));
+    }
   }
 
   Future<void> _offerToSend(

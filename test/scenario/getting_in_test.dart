@@ -273,6 +273,100 @@ void main() {
     });
   });
 
+  group('a shop that was already running', () {
+    /// Her sister set Kubo up before any of this existed. The shop is on
+    /// the phone, there is no account anywhere, and she must not lose it.
+    Future<void> alreadyTrading() async {
+      await db.db.insert('product_categories', <String, Object?>{
+        'name': 'Coffee',
+        'display_order': 1,
+        'is_active': 1,
+        'created_at': clock.nowIso(),
+        'updated_at': clock.nowIso(),
+      });
+      await db.db.insert('products', <String, Object?>{
+        'category_id': 1,
+        'name': 'Spanish Latte',
+        'is_active': 1,
+        'created_at': clock.nowIso(),
+        'updated_at': clock.nowIso(),
+      });
+    }
+
+    test('can be claimed, and nothing of it is touched', () async {
+      await alreadyTrading();
+
+      final AccessOutcome claimed = await access.claimThisShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(claimed.succeeded, isTrue);
+      expect(await access.role(), 'owner');
+      expect(await access.shopId(), isNotNull);
+      expect(await drinkCount(), 1, reason: 'her drink, not a fresh seed');
+    });
+
+    test('claiming sends the shop she already has, not just what is next',
+        () async {
+      await alreadyTrading();
+      await access.claimThisShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      final SyncEngine engine = SyncEngine(database: db, clock: clock);
+      expect(await engine.pendingCount(), greaterThan(0));
+    });
+
+    test('a refused claim changes nothing on the phone', () async {
+      await alreadyTrading();
+      directory.refuseAsUnapproved = true;
+
+      final AccessOutcome tried = await access.claimThisShop(
+        email: 'a.stranger@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(tried.succeeded, isFalse);
+      expect(tried.problem, contains('not approved'));
+      expect(await access.shopId(), isNull);
+      expect(await drinkCount(), 1, reason: 'her shop is still here');
+      expect(await access.standing(), ShopStanding.inside);
+    });
+
+    test('no signal leaves the shop exactly as it was', () async {
+      await alreadyTrading();
+      directory.refuseToCreate = true;
+
+      final AccessOutcome tried = await access.claimThisShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(tried.succeeded, isFalse);
+      expect(tried.problem, contains('no connection'));
+      expect(await access.shopId(), isNull);
+      expect(await drinkCount(), 1);
+    });
+
+    test('a shop that already has an owner is not claimed twice', () async {
+      await alreadyTrading();
+      await access.claimThisShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      final AccessOutcome again = await access.claimThisShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+
+      expect(again.succeeded, isFalse);
+      expect(again.problem, contains('already belongs'));
+    });
+  });
+
   group('the owner hands out an invite', () {
     test('only once she has a shop and is signed in', () async {
       expect(await access.newInvite(), isNull);

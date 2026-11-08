@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../data/cloud/shop_directory.dart';
+import '../../../domain/services/shop_access_service.dart';
 
 /// Which phones are in the shop, and how another one gets in.
 ///
@@ -23,6 +24,7 @@ class _TillsScreenState extends ConsumerState<TillsScreen> {
   String? _invite;
   bool _working = false;
   List<AdmittedTill>? _tills;
+  bool? _claimed;
 
   @override
   void initState() {
@@ -31,16 +33,30 @@ class _TillsScreenState extends ConsumerState<TillsScreen> {
   }
 
   Future<void> _refresh() async {
-    final List<AdmittedTill> found = await ref
-        .read(shopAccessServiceProvider)
-        .tills();
-    if (mounted) setState(() => _tills = found);
+    final ShopAccessService access = ref.read(shopAccessServiceProvider);
+    final bool claimed = await access.shopId() != null;
+    final List<AdmittedTill> found = claimed
+        ? await access.tills()
+        : const <AdmittedTill>[];
+    if (mounted) {
+      setState(() {
+        _claimed = claimed;
+        _tills = found;
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final List<AdmittedTill> tills = _tills ?? const <AdmittedTill>[];
+
+    if (_claimed == false) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Phones in this shop')),
+        body: _ClaimForm(onDone: _refresh),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(title: const Text('Phones in this shop')),
@@ -212,5 +228,131 @@ class _InviteCard extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+
+/// Puts an account around a shop that is already running on this phone.
+///
+/// Shown instead of the list of phones while the shop has no owner. Until
+/// it has one there is nobody to invite anybody, and nothing to sign back
+/// in to if the phone is lost.
+class _ClaimForm extends ConsumerStatefulWidget {
+  const _ClaimForm({required this.onDone});
+
+  final Future<void> Function() onDone;
+
+  @override
+  ConsumerState<_ClaimForm> createState() => _ClaimFormState();
+}
+
+class _ClaimFormState extends ConsumerState<_ClaimForm> {
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
+  bool _busy = false;
+  bool _hidden = true;
+  String? _problem;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return ListView(
+      padding: const EdgeInsets.all(KuboSpacing.lg),
+      children: <Widget>[
+        Text('This shop has no owner yet', style: theme.textTheme.titleMedium),
+        const SizedBox(height: KuboSpacing.sm),
+        Text(
+          'Everything here works without one, and nothing will change about '
+          'your menu, your prices or your orders. But until the shop has an '
+          'account behind it you cannot invite a second phone, and if this '
+          'one is lost the only way back is a backup file.',
+          style: theme.textTheme.bodyMedium,
+        ),
+        const SizedBox(height: KuboSpacing.lg),
+        TextField(
+          controller: _email,
+          enabled: !_busy,
+          keyboardType: TextInputType.emailAddress,
+          autocorrect: false,
+          autofillHints: const <String>[AutofillHints.email],
+          decoration: const InputDecoration(labelText: 'Your email'),
+        ),
+        const SizedBox(height: KuboSpacing.sm),
+        TextField(
+          controller: _password,
+          enabled: !_busy,
+          obscureText: _hidden,
+          autofillHints: const <String>[AutofillHints.newPassword],
+          decoration: InputDecoration(
+            labelText: 'Choose a password',
+            helperText: 'At least six characters. Write it down somewhere.',
+            suffixIcon: IconButton(
+              icon: Icon(_hidden ? Icons.visibility : Icons.visibility_off),
+              onPressed: () => setState(() => _hidden = !_hidden),
+            ),
+          ),
+          onSubmitted: (_) => _go(),
+        ),
+        if (_problem != null) ...<Widget>[
+          const SizedBox(height: KuboSpacing.md),
+          Text(
+            _problem!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.error,
+            ),
+          ),
+        ],
+        const SizedBox(height: KuboSpacing.lg),
+        SizedBox(
+          height: KuboTouch.payButton,
+          child: FilledButton(
+            onPressed: _busy ? null : _go,
+            child: _busy
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('THIS SHOP IS MINE'),
+          ),
+        ),
+        const SizedBox(height: KuboSpacing.md),
+        Text(
+          'Needs signal, once. Nothing on this phone is sent anywhere until '
+          'it succeeds, and nothing is deleted either way.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+
+  Future<void> _go() async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _problem = null;
+    });
+
+    final AccessOutcome outcome = await ref
+        .read(shopAccessServiceProvider)
+        .claimThisShop(email: _email.text, password: _password.text);
+
+    if (!mounted) return;
+    if (outcome.succeeded) {
+      await widget.onDone();
+      return;
+    }
+    setState(() {
+      _busy = false;
+      _problem = outcome.problem;
+    });
   }
 }

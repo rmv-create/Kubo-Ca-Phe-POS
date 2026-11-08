@@ -144,6 +144,82 @@ class ShopAccessService {
     return const AccessOutcome.ok(ShopStanding.inside);
   }
 
+  /// Puts an account around a shop that is already running on this phone.
+  ///
+  /// Her sister set Kubo up before any of this existed: a menu, a PIN, no
+  /// account anywhere. That shop keeps working untouched — but until it has
+  /// an owner it cannot hand out an invite, and it cannot be recovered onto
+  /// a new phone from anything but a backup file.
+  ///
+  /// Nothing is seeded and nothing is overwritten. The shop on the phone is
+  /// the shop; this only gives it a name in the cloud and sends it up.
+  Future<AccessOutcome> claimThisShop({
+    required String email,
+    required String password,
+    String deviceLabel = 'Owner\u2019s phone',
+  }) async {
+    if (await shopId() != null) {
+      return const AccessOutcome.failed(
+        'This shop already belongs to an account.',
+      );
+    }
+
+    // Her account may or may not exist yet: she may be claiming from the
+    // phone she set up on, or from a second one. Try to sign in first, so a
+    // second attempt after a stumble does not trip over its own account.
+    AccountOutcome who = await _account.signIn(
+      email: email,
+      password: password,
+    );
+    bool accountIsNew = false;
+    if (!who.succeeded) {
+      who = await _account.createAccount(email: email, password: password);
+      accountIsNew = true;
+    }
+    if (!who.succeeded) return AccessOutcome.failed(who.problem!);
+
+    // She may already have opened a shop from another phone. Claiming a
+    // second one would leave her with two, and no way to tell which is the
+    // real one, so say so instead.
+    final String? already = await _directory.shopOwnedBy(who.user!.uid);
+    if (already != null) {
+      return const AccessOutcome.failed(
+        'That account already has a shop. Sign in on this phone instead of '
+        'claiming \u2014 but note that this phone\u2019s own orders would '
+        'then be the ones kept.',
+      );
+    }
+
+    final String fresh = ShopDirectory.newShopId();
+    try {
+      await _directory.createShop(
+        shopId: fresh,
+        ownerUid: who.user!.uid,
+        deviceId: await _engine.deviceId(),
+        label: deviceLabel,
+      );
+    } on NotApproved {
+      if (accountIsNew) await _account.discardCurrentAccount();
+      return const AccessOutcome.failed(
+        'That email is not approved to own a shop. Check the spelling, or '
+        'ask whoever set Kubo up to add it.',
+      );
+    } on Object {
+      if (accountIsNew) await _account.discardCurrentAccount();
+      return const AccessOutcome.failed(
+        'The shop could not be registered \u2014 no connection. Find signal '
+        'and try again. Nothing on this phone has changed.',
+      );
+    }
+
+    await _remember(shopId: fresh, role: 'owner', label: deviceLabel);
+    // Everything she has already done — her menu, her prices, her orders —
+    // has to reach the barista's phone, not just whatever she changes from
+    // here on.
+    await _engine.enqueueEverything();
+    return const AccessOutcome.ok(ShopStanding.inside);
+  }
+
   /// Signs in on a phone that has no shop on it yet — a new one, or one
   /// whose browser storage was cleared.
   ///
