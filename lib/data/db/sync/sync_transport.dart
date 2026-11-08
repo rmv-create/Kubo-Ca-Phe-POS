@@ -19,6 +19,35 @@ abstract interface class SyncTransport {
 
   /// Says hello, so the other till can show when this one was last seen.
   Future<void> heartbeat({required String label});
+
+  /// Makes this till the shop's first one. Only works while there is no
+  /// shop there: the second till has to be let in instead.
+  Future<void> openShop({required String label});
+
+  /// Shows a code for ten minutes so another till can be let in.
+  Future<void> offerCode(String code, DateTime until);
+
+  /// Asks to be let in with the code the other till is showing.
+  ///
+  /// Returns false when the code is wrong or has run out, which is a thing
+  /// she can fix by looking at the other till again — not an error.
+  Future<bool> joinWithCode(String code, {required String label});
+
+  /// The other tills, and when each was last heard from.
+  Future<List<TillPresence>> tills();
+}
+
+/// Another till, as this one last heard of it.
+class TillPresence {
+  const TillPresence({
+    required this.deviceId,
+    required this.label,
+    this.lastSeenAt,
+  });
+
+  final String deviceId;
+  final String label;
+  final DateTime? lastSeenAt;
 }
 
 /// What came back, and where to carry on from.

@@ -98,6 +98,69 @@ class FirestoreSyncTransport implements SyncTransport {
     return SyncFetch(changes: changes, cursor: cursor);
   }
 
+  DocumentReference<Map<String, Object?>> get _shop =>
+      _db.collection('shops').doc(shopId);
+
+  DocumentReference<Map<String, Object?>> get _me =>
+      _shop.collection('tills').doc(_auth.currentUser!.uid);
+
+  @override
+  Future<void> openShop({required String label}) async {
+    // The till document first: the rules let a till in unasked only while
+    // there is no shop yet, which is true for exactly one till, exactly
+    // once.
+    await _me.set(<String, Object?>{
+      'label': label,
+      'device_id': deviceId,
+      'joined_at': FieldValue.serverTimestamp(),
+    });
+    await _shop.set(<String, Object?>{
+      'opened_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<void> offerCode(String code, DateTime until) async {
+    await _shop.set(<String, Object?>{
+      'join_code': code,
+      'join_expires_at': Timestamp.fromDate(until),
+    }, SetOptions(merge: true));
+  }
+
+  @override
+  Future<bool> joinWithCode(String code, {required String label}) async {
+    try {
+      await _me.set(<String, Object?>{
+        'label': label,
+        'device_id': deviceId,
+        // The rules check this against the code the other till is showing.
+        // It is written once, to get in, and is of no use afterwards.
+        'code': code,
+        'joined_at': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') return false;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<List<TillPresence>> tills() async {
+    final QuerySnapshot<Map<String, Object?>> snapshot = await _shop
+        .collection('tills')
+        .get();
+    return <TillPresence>[
+      for (final QueryDocumentSnapshot<Map<String, Object?>> doc
+          in snapshot.docs)
+        TillPresence(
+          deviceId: doc.data()['device_id'] as String? ?? doc.id,
+          label: doc.data()['label'] as String? ?? 'A till',
+          lastSeenAt: (doc.data()['last_seen_at'] as Timestamp?)?.toDate(),
+        ),
+    ];
+  }
+
   @override
   Future<void> heartbeat({required String label}) async {
     await _db
