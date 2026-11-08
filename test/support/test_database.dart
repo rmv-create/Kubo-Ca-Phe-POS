@@ -80,6 +80,7 @@ const Set<String> expectedTables = <String>{
   'ingredients',
   'supplier_ingredients',
   'ingredient_cost_history',
+  'ingredient_avg_cost',
   'recipes',
   'recipe_versions',
   'recipe_items',

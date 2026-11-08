@@ -198,4 +198,33 @@ class _Postbox implements SyncTransport {
 
   @override
   Future<void> heartbeat({required String label}) async => _check();
+
+  // Pairing is the cloud's business, not the engine's. A postbox on the
+  // table has no shop to open and nobody to let in.
+  bool opened = false;
+  String? offeredCode;
+
+  @override
+  Future<void> openShop({required String label}) async {
+    _check();
+    opened = true;
+  }
+
+  @override
+  Future<void> offerCode(String code, DateTime until) async {
+    _check();
+    offeredCode = code;
+  }
+
+  @override
+  Future<bool> joinWithCode(String code, {required String label}) async {
+    _check();
+    return code == offeredCode;
+  }
+
+  @override
+  Future<List<TillPresence>> tills() async {
+    _check();
+    return const <TillPresence>[];
+  }
 }

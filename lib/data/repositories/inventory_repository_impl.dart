@@ -11,6 +11,7 @@ import '../../domain/entities/ingredient.dart';
 import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/services/costing_engine.dart';
 import '../../domain/services/inventory_engine.dart';
+import '../../domain/services/moving_average_cost.dart';
 import '../db/app_database.dart';
 
 class InventoryRepositoryImpl implements InventoryRepository {
@@ -19,13 +20,16 @@ class InventoryRepositoryImpl implements InventoryRepository {
     this._clock, {
     required BusinessSettings Function() settings,
     InventoryEngine engine = const InventoryEngine(),
+    MovingAverageCost averages = const MovingAverageCost(),
   }) : _settings = settings,
-       _engine = engine;
+       _engine = engine,
+       _averages = averages;
 
   final AppDatabase _db;
   final Clock _clock;
   final BusinessSettings Function() _settings;
   final InventoryEngine _engine;
+  final MovingAverageCost _averages;
 
   String get _businessDate => BusinessDay(
     cutoffHour: _settings().businessDayCutoffHour,
@@ -180,6 +184,9 @@ class InventoryRepositoryImpl implements InventoryRepository {
       'note': note,
       'created_at': now,
     });
+    // A price typed in by hand is a statement about what the stock is worth,
+    // so the running average starts again from it.
+    await _averages.rebuild(_db.db, ingredientId: ingredientId);
   }
 
   @override
@@ -476,6 +483,36 @@ class InventoryRepositoryImpl implements InventoryRepository {
 
   /// The most recent cost for every ingredient, in one query.
   Future<Map<int, int>> _currentCosts() async {
+    final Map<int, int> latest = await _latestCosts();
+    if (_settings().costingMethod != CostingMethod.weightedAverage) {
+      return latest;
+    }
+    // Show what the shelf cost, not what the last delivery cost, so the
+    // number on the stock list is the one the drinks are costed at.
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery('''
+      SELECT a.ingredient_id AS id,
+             a.avg_after_centavos_per_1000_base AS cost
+      FROM ingredient_avg_cost a
+      JOIN (
+        SELECT ingredient_id, MAX(id) AS newest_id
+        FROM ingredient_avg_cost
+        WHERE (ingredient_id, effective_from) IN (
+          SELECT ingredient_id, MAX(effective_from)
+          FROM ingredient_avg_cost
+          GROUP BY ingredient_id
+        )
+        GROUP BY ingredient_id
+      ) newest
+        ON newest.newest_id = a.id
+    ''');
+    return <int, int>{
+      ...latest,
+      for (final Map<String, Object?> r in rows)
+        r['id']! as int: r['cost']! as int,
+    };
+  }
+
+  Future<Map<int, int>> _latestCosts() async {
     // Two prices can land in the same second — setting a price by hand and
     // then recording a delivery. The later row wins, so the tie is broken on
     // id, exactly as the costing engine does it.

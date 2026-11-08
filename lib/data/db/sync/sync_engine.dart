@@ -1,6 +1,7 @@
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../../core/time/clock.dart';
+import '../../../domain/services/moving_average_cost.dart';
 import '../app_database.dart';
 import 'sync_change.dart';
 import 'sync_codec.dart';
@@ -307,6 +308,11 @@ class SyncEngine {
         qty_milli = excluded.qty_milli,
         updated_at = excluded.updated_at
     ''');
+
+    // What the shelf cost is derived the same way, and for the same reason:
+    // a delivery from the other till can land before or after ours, and the
+    // average has to come out the same on both phones either way.
+    await const MovingAverageCost().rebuildAll(_db.db);
   }
 
   Future<String?> _uidOfRow(String table, int? rowId) async {

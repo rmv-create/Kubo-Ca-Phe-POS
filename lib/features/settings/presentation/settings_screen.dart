@@ -173,15 +173,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   value: CostingMethod.latestCost,
                   title: Text('Latest cost'),
                   subtitle: Text(
-                    'Cost an order at the most recent price paid for each '
-                    'ingredient',
+                    'What it would cost to replace what the drink used — '
+                    'the most recent price paid',
                   ),
                 ),
                 RadioListTile<CostingMethod>(
                   value: CostingMethod.weightedAverage,
                   title: Text('Weighted average'),
                   subtitle: Text(
-                    'Cost an order at the average price paid across purchases',
+                    'What the stock on the shelf cost — 6 L at ₱125 with 10 '
+                    'more at ₱115 is ₱118.75 a litre',
                   ),
                 ),
               ],

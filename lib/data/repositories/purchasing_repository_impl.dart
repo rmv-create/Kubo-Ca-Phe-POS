@@ -11,6 +11,7 @@ import '../../domain/entities/ingredient.dart';
 import '../../domain/entities/purchasing.dart';
 import '../../domain/repositories/purchasing_repository.dart';
 import '../../domain/services/inventory_engine.dart';
+import '../../domain/services/moving_average_cost.dart';
 import '../db/app_database.dart';
 
 class PurchasingRepositoryImpl implements PurchasingRepository {
@@ -19,13 +20,16 @@ class PurchasingRepositoryImpl implements PurchasingRepository {
     this._clock, {
     required BusinessSettings Function() settings,
     InventoryEngine engine = const InventoryEngine(),
+    MovingAverageCost averages = const MovingAverageCost(),
   }) : _settings = settings,
-       _engine = engine;
+       _engine = engine,
+       _averages = averages;
 
   final AppDatabase _db;
   final Clock _clock;
   final BusinessSettings Function() _settings;
   final InventoryEngine _engine;
+  final MovingAverageCost _averages;
 
   @override
   Future<List<Supplier>> suppliers({bool includeInactive = false}) async {
@@ -201,6 +205,15 @@ class PurchasingRepositoryImpl implements PurchasingRepository {
       }
 
       await _engine.post(txn, movements, at: at, businessDate: date);
+
+      // The stock is in; work out what the shelf is now worth per unit. This
+      // has to come after posting, because the average needs to know how much
+      // was already there.
+      for (final int ingredientId in movements
+          .map((PendingMovement m) => m.ingredientId)
+          .toSet()) {
+        await _averages.rebuild(txn, ingredientId: ingredientId);
+      }
 
       await txn.update(
         'purchases',

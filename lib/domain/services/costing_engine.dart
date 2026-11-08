@@ -185,9 +185,13 @@ class CostingEngine {
 
   /// The cost of one ingredient under the configured method.
   ///
-  /// `latest` takes the most recent price effective on or before [asOf];
-  /// `weighted average` averages every price recorded up to then, weighted by
-  /// the quantity actually bought at each.
+  /// `latest` takes the most recent price effective on or before [asOf] —
+  /// what it would cost to replace what the drink used.
+  ///
+  /// `weighted average` takes what the stock on the shelf actually cost on
+  /// that day: a moving average, so six litres at ₱125 with ten more at ₱115
+  /// is ₱118.75, and the milk already drunk is not in it. See
+  /// [MovingAverageCost].
   Future<UnitCost?> costOfIngredient(
     int ingredientId, {
     required CostingMethod method,
@@ -207,23 +211,20 @@ class CostingEngine {
     );
 
     if (method == CostingMethod.weightedAverage) {
+      // What the stock on the shelf cost, as it stood on that day: stock
+      // already there at its cost, plus each delivery at its cost, averaged
+      // as it landed. Kept in `ingredient_avg_cost` by MovingAverageCost.
       final List<Map<String, Object?>> rows = await _db.rawQuery(
-        '''
-        SELECT SUM(pi.total_cost_centavos) AS spend,
-               SUM(pi.qty_milli) AS qty
-        FROM purchase_items pi
-        JOIN purchases p ON p.id = pi.purchase_id
-        WHERE pi.ingredient_id = ? AND p.purchased_at <= ?
-        ''',
+        'SELECT avg_after_centavos_per_1000_base AS cost '
+        'FROM ingredient_avg_cost '
+        'WHERE ingredient_id = ? AND effective_from <= ? '
+        'ORDER BY effective_from DESC, id DESC LIMIT 1',
         <Object?>[ingredientId, at],
       );
-      final int? spend = rows.first['spend'] as int?;
-      final int? qty = rows.first['qty'] as int?;
-      if (spend != null && qty != null && qty > 0) {
-        // spend is centavos for `qty` milli-base-units; scale to per 1000 base.
-        return UnitCost((spend * 1000000) ~/ qty, unit);
+      if (rows.isNotEmpty) {
+        return UnitCost(rows.first['cost']! as int, unit);
       }
-      // No purchases yet — fall back rather than reporting no cost at all.
+      // Nothing recorded yet — fall back rather than reporting no cost at all.
     }
 
     final List<Map<String, Object?>> rows = await _db.rawQuery(

@@ -8,6 +8,7 @@ import '../../../core/time/clock.dart';
 import '../../../domain/entities/business_settings.dart';
 import '../../../domain/entities/ingredient.dart';
 import '../../../domain/services/inventory_engine.dart';
+import '../../../domain/services/moving_average_cost.dart';
 import '../app_database.dart';
 import 'option_effects_seed.dart';
 import 'pantry_seed.dart';
@@ -214,6 +215,9 @@ class PantrySeeder {
     }
 
     await _writeOptionEffects(txn);
+
+    // The prices off her sheet are where the running average starts.
+    await const MovingAverageCost().rebuildAll(txn);
   }
 
   /// What each customisation adds to, or takes out of, the drink.
