@@ -199,7 +199,9 @@ class OrderService {
         await txn.insert('order_discounts', <String, Object?>{
           'order_id': orderId,
           'kind': discount.kind!.code,
-          'name': discount.kind!.label,
+          'name': draft.discountReason?.trim().isNotEmpty ?? false
+              ? draft.discountReason!.trim()
+              : discount.kind!.label,
           'rate_bp': discount.rateBp,
           'amount_centavos': discount.discountAmount.centavos,
           'vat_exempt_centavos': discount.vatRemoved.centavos,

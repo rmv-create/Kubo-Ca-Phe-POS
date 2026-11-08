@@ -41,6 +41,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
         values[SettingKeys.discountsEnabled],
         d.discountsEnabled,
       ),
+      statutoryDiscountsEnabled: _bool(
+        values[SettingKeys.statutoryDiscountsEnabled],
+        d.statutoryDiscountsEnabled,
+      ),
       lowStockAlertsEnabled: _bool(
         values[SettingKeys.lowStockAlertsEnabled],
         d.lowStockAlertsEnabled,
@@ -111,6 +115,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
         txn,
         SettingKeys.discountsEnabled,
         settings.discountsEnabled ? '1' : '0',
+      );
+      await _put(
+        txn,
+        SettingKeys.statutoryDiscountsEnabled,
+        settings.statutoryDiscountsEnabled ? '1' : '0',
       );
       await _put(
         txn,

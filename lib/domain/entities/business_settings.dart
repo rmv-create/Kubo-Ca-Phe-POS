@@ -37,6 +37,7 @@ class BusinessSettings {
     required this.backupRetentionCount,
     required this.autoBackupDaily,
     required this.discountsEnabled,
+    required this.statutoryDiscountsEnabled,
     required this.lowStockAlertsEnabled,
     required this.orderNumberResetDaily,
     required this.showCustomerName,
@@ -68,6 +69,9 @@ class BusinessSettings {
     autoBackupDaily: true,
     // V1 ships with discounts switched off; the POS shows no discount control.
     discountsEnabled: false,
+    // Senior Citizen and PWD are a separate decision from giving a friend
+    // ₱20 off, and the owner gives neither at the moment.
+    statutoryDiscountsEnabled: false,
     lowStockAlertsEnabled: true,
     // The owner numbers orders K-0001 onwards, continuously.
     orderNumberResetDaily: false,
@@ -114,7 +118,15 @@ class BusinessSettings {
   final int orderNumberStart;
   final int backupRetentionCount;
   final bool autoBackupDaily;
+  /// Whether the POS shows a discount button at all.
   final bool discountsEnabled;
+
+  /// Whether that button offers Senior Citizen and PWD as well as her own.
+  /// Statutory discounts carry legal duties — a recorded name and ID number,
+  /// and VAT exemption where the shop is registered — so they are a choice of
+  /// their own rather than something that arrives with the button.
+  final bool statutoryDiscountsEnabled;
+
   final bool lowStockAlertsEnabled;
 
   /// Whether order numbers start again at 1 each trading day.
@@ -178,6 +190,7 @@ class BusinessSettings {
     int? backupRetentionCount,
     bool? autoBackupDaily,
     bool? discountsEnabled,
+    bool? statutoryDiscountsEnabled,
     bool? lowStockAlertsEnabled,
     bool? orderNumberResetDaily,
     bool? showCustomerName,
@@ -203,6 +216,8 @@ class BusinessSettings {
     backupRetentionCount: backupRetentionCount ?? this.backupRetentionCount,
     autoBackupDaily: autoBackupDaily ?? this.autoBackupDaily,
     discountsEnabled: discountsEnabled ?? this.discountsEnabled,
+    statutoryDiscountsEnabled:
+        statutoryDiscountsEnabled ?? this.statutoryDiscountsEnabled,
     lowStockAlertsEnabled: lowStockAlertsEnabled ?? this.lowStockAlertsEnabled,
     orderNumberResetDaily: orderNumberResetDaily ?? this.orderNumberResetDaily,
     showCustomerName: showCustomerName ?? this.showCustomerName,
@@ -232,6 +247,8 @@ abstract final class SettingKeys {
   static const String autoBackupDaily = 'backup.auto_daily';
   static const String lastAutoBackupDate = 'backup.last_auto_date';
   static const String discountsEnabled = 'features.discounts_enabled';
+  static const String statutoryDiscountsEnabled =
+      'features.statutory_discounts_enabled';
   static const String lowStockAlertsEnabled = 'features.low_stock_alerts';
   static const String orderNumberResetDaily = 'orders.number_reset_daily';
   static const String showCustomerName = 'pos.show_customer_name';

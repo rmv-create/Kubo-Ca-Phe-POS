@@ -335,4 +335,85 @@ void main() {
       expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
     });
   });
+
+  group('a discount of her own', () {
+    // She gives no Senior Citizen or PWD discount, but wants to be able to
+    // knock something off now and then — for a friend, or when she gets an
+    // order wrong. SAMPLE amounts; these are not her prices policy.
+    Future<OrderRecord> sellOwn({
+      Money? amountOff,
+      int? rateBpOff,
+      String? reason,
+    }) async {
+      final CompletedOrder done = await shop.sell(
+        OrderDraft(
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
+          paymentMethod: PaymentMethod.cash,
+          discountKind: DiscountKind.other,
+          discountAmountOverride: amountOff,
+          discountRateBpOverride: rateBpOff,
+          discountReason: reason,
+        ),
+      );
+      return (await shop.sales.orderById(done.id))!;
+    }
+
+    test('takes pesos off, exactly as typed', () async {
+      final OrderRecord order = await sellOwn(amountOff: Money.of(20, 0));
+      expect(order.discount, Money.of(20, 0));
+      expect(order.total, Money.of(119, 0));
+    });
+
+    test('takes a percentage off', () async {
+      final OrderRecord order = await sellOwn(rateBpOff: 1000);
+      expect(order.discount, Money.of(13, 90));
+      expect(order.total, Money.of(125, 10));
+    });
+
+    test('more off than the order makes it free, never less than free', () async {
+      final OrderRecord order = await sellOwn(amountOff: Money.of(500, 0));
+      expect(order.discount, Money.of(139, 0));
+      expect(order.total, Money.zero);
+    });
+
+    test('is never VAT-exempt, because it is not statutory', () async {
+      shop.settings = shop.settings.copyWith(vatRegistered: true);
+      final OrderRecord order = await sellOwn(amountOff: Money.of(20, 0));
+      expect(order.discountVatExempt, Money.zero);
+      expect(order.discount, Money.of(20, 0));
+    });
+
+    test('keeps her reason, and reports as the rate it worked out to', () async {
+      final OrderRecord order = await sellOwn(
+        amountOff: Money.of(20, 0),
+        reason: 'Friend',
+      );
+      expect(order.discountLabel, 'Friend');
+      // ₱20 off ₱139 is 14.39%.
+      expect(order.discountRateBp, 1439);
+      expect(order.discountBeneficiaryName, isNull);
+    });
+
+    test('comes out of profit, not out of what the drink cost to make', () async {
+      final Ingredient coffee = await shop.addIngredient(
+        'Coffee',
+        price: Money.of(900),
+        openingStock: 1000,
+      );
+      await shop.setRecipe('Spanish Latte', 'Large', <Ingredient, double>{
+        coffee: 18,
+      });
+
+      final OrderRecord full = await sellWith();
+      final OrderRecord cheap = await sellOwn(amountOff: Money.of(20, 0));
+      expect(cheap.cogs, full.cogs);
+      expect(cheap.grossProfit, full.grossProfit - Money.of(20, 0));
+    });
+
+    test('nothing typed in takes nothing off', () async {
+      final OrderRecord order = await sellOwn();
+      expect(order.discount, Money.zero);
+      expect(order.total, Money.of(139, 0));
+    });
+  });
 }

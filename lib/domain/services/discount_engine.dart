@@ -113,8 +113,12 @@ class DiscountEngine {
   /// Applies [kind] to [grossSales], a VAT-inclusive menu total.
   ///
   /// A statutory discount sets its own rate. For [DiscountKind.other] the
-  /// caller supplies [rateBpOverride]; without one there is no rate to apply
-  /// and nothing is taken off.
+  /// caller supplies either [rateBpOverride] — ten per cent off — or
+  /// [amountOverride] — twenty pesos off, which is how most people say it.
+  /// With neither there is no discount to apply and nothing is taken off.
+  ///
+  /// An amount larger than the order is capped at the order: a drink can be
+  /// given away, but the shop does not end up owing the customer money.
   ///
   /// The discount covers the whole order. Where only part of a group is a
   /// cardholder, the law apportions the discount to that person's own
@@ -124,6 +128,7 @@ class DiscountEngine {
     required DiscountKind? kind,
     required Money grossSales,
     int? rateBpOverride,
+    Money? amountOverride,
   }) {
     if (kind == null || grossSales.isZero) {
       return DiscountBreakdown.none(grossSales);
@@ -137,6 +142,26 @@ class DiscountEngine {
         ? Money(_divideRound(grossSales.centavos * 10000, 10000 + vatRateBp))
         : grossSales;
     final Money vatRemoved = grossSales - net;
+
+    final Money? flat = kind.isStatutory ? null : amountOverride;
+    if (flat != null) {
+      if (!flat.isPositive) return DiscountBreakdown.none(grossSales);
+      final Money discount = flat.centavos > net.centavos ? net : flat;
+      return DiscountBreakdown(
+        kind: kind,
+        grossSales: grossSales,
+        vatRemoved: vatRemoved,
+        discountableBase: net,
+        discountAmount: discount,
+        vatOnBalance: Money.zero,
+        amountDue: net - discount,
+        // Recorded as the rate it worked out to, so a month of "₱20 off"
+        // still reports as a percentage of what was sold.
+        rateBp: net.isZero
+            ? 0
+            : _divideRound(discount.centavos * 10000, net.centavos),
+      );
+    }
 
     final int rateBp = kind.isStatutory
         ? settings.statutoryDiscountRateBp

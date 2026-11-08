@@ -239,6 +239,9 @@ class OrderDraft {
     this.discountKind,
     this.discountBeneficiaryName,
     this.discountBeneficiaryIdNo,
+    this.discountReason,
+    this.discountAmountOverride,
+    this.discountRateBpOverride,
     this.deliveryFee = Money.zero,
     this.unpaid = false,
     this.note,
@@ -267,6 +270,15 @@ class OrderDraft {
   final String? discountBeneficiaryName;
   final String? discountBeneficiaryIdNo;
 
+  /// What she is calling this one: "Friend", "Opening week", "Wrong order".
+  /// Only for her own discounts; the statutory ones are named by law.
+  final String? discountReason;
+
+  /// Her own discount, as she said it. One of the two, not both: twenty pesos
+  /// off, or ten per cent off. Both null means nothing comes off.
+  final Money? discountAmountOverride;
+  final int? discountRateBpOverride;
+
   /// Charged on top, after any discount. Never discounted itself.
   final Money deliveryFee;
 
@@ -293,7 +305,12 @@ class OrderDraft {
   /// What the discount, if any, does to [subtotal]. Pure arithmetic — call it
   /// as often as you like.
   DiscountBreakdown discountWith(BusinessSettings settings) =>
-      DiscountEngine(settings).apply(kind: discountKind, grossSales: subtotal);
+      DiscountEngine(settings).apply(
+        kind: discountKind,
+        grossSales: subtotal,
+        rateBpOverride: discountRateBpOverride,
+        amountOverride: discountAmountOverride,
+      );
 
   /// What the customer actually pays, discount and delivery included.
   Money totalWith(BusinessSettings settings) =>
@@ -340,6 +357,9 @@ class OrderDraft {
     bool clearDiscount = false,
     String? discountBeneficiaryName,
     String? discountBeneficiaryIdNo,
+    String? discountReason,
+    Money? discountAmountOverride,
+    int? discountRateBpOverride,
     Money? deliveryFee,
     bool? unpaid,
     String? note,
@@ -360,6 +380,15 @@ class OrderDraft {
     discountBeneficiaryIdNo: clearDiscount
         ? null
         : (discountBeneficiaryIdNo ?? this.discountBeneficiaryIdNo),
+    discountReason: clearDiscount
+        ? null
+        : (discountReason ?? this.discountReason),
+    discountAmountOverride: clearDiscount
+        ? null
+        : (discountAmountOverride ?? this.discountAmountOverride),
+    discountRateBpOverride: clearDiscount
+        ? null
+        : (discountRateBpOverride ?? this.discountRateBpOverride),
     deliveryFee: deliveryFee ?? this.deliveryFee,
     unpaid: unpaid ?? this.unpaid,
     note: clearNote ? null : (note ?? this.note),

@@ -240,20 +240,40 @@ class _ReceiptSettingsScreenState extends ConsumerState<ReceiptSettingsScreen> {
           const Divider(),
           SwitchListTile(
             value: settings.discountsEnabled,
-            title: const Text('Offer Senior Citizen and PWD discounts'),
+            title: const Text('Offer a discount'),
             subtitle: Text(
               settings.discountsEnabled
                   ? 'A discount button sits beside the delivery fee on the '
-                        'POS. The law requires the name and ID number of '
-                        'whoever claims it, and the receipt records them.'
-                  : 'Off. No discount button on the POS, and no discount line '
-                        'on any receipt. The 20% is worked out for you the '
-                        'moment you turn this on.',
+                        'POS. Take off pesos or a percentage, once, with a '
+                        'word about why — it prints on the receipt and is '
+                        'totalled in your reports.'
+                  : 'Off. No discount button on the POS, and no discount '
+                        'line on any receipt. Nothing changes about the '
+                        'prices; you simply cannot take anything off.',
             ),
             onChanged: (bool value) => ref
                 .read(settingsControllerProvider.notifier)
                 .update(settings.copyWith(discountsEnabled: value)),
           ),
+
+          if (settings.discountsEnabled)
+            SwitchListTile(
+              value: settings.statutoryDiscountsEnabled,
+              title: const Text('Also offer Senior Citizen and PWD'),
+              subtitle: Text(
+                settings.statutoryDiscountsEnabled
+                    ? 'The 20% the law sets is worked out for you, and '
+                          'cannot be edited at the counter. The name and ID '
+                          'number of whoever claims it are recorded on the '
+                          'receipt, as the law requires.'
+                    : 'Off. The discount button offers only your own. These '
+                          'two are a legal duty once offered, which is why '
+                          'they are a separate choice.',
+              ),
+              onChanged: (bool value) => ref
+                  .read(settingsControllerProvider.notifier)
+                  .update(settings.copyWith(statutoryDiscountsEnabled: value)),
+            ),
 
           const Divider(),
           SwitchListTile(

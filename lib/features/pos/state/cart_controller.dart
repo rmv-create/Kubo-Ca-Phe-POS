@@ -187,13 +187,21 @@ class CartController extends Notifier<OrderDraft> {
     DiscountKind? kind, {
     String? beneficiaryName,
     String? beneficiaryIdNo,
+    String? reason,
+    Money? amountOff,
+    int? rateBpOff,
   }) {
+    // Setting a discount replaces whatever was there, rather than merging
+    // with it: switching from "₱20 off" to "10% off" must not leave both.
     state = kind == null
         ? state.copyWith(clearDiscount: true)
-        : state.copyWith(
+        : state.copyWith(clearDiscount: true).copyWith(
             discountKind: kind,
             discountBeneficiaryName: beneficiaryName,
             discountBeneficiaryIdNo: beneficiaryIdNo,
+            discountReason: reason,
+            discountAmountOverride: amountOff,
+            discountRateBpOverride: rateBpOff,
           );
   }
 
