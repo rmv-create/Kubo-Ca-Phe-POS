@@ -6,10 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/time/clock.dart';
 import '../data/cloud/account_service.dart';
 import '../data/cloud/cloud_backup_service.dart';
+import '../data/cloud/firestore_backup_store.dart';
 import '../data/cloud/google_drive_target.dart';
+import '../data/cloud/shop_backup_store.dart';
 import '../data/cloud/shop_directory.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
+import '../data/db/database_archive.dart';
 import '../data/db/sync/sync_engine.dart';
 import '../data/export/excel_export_service.dart';
 import '../data/repositories/customer_repository_impl.dart';
@@ -35,6 +38,7 @@ import '../domain/repositories/payment_method_repository.dart';
 import '../domain/repositories/purchasing_repository.dart';
 import '../domain/repositories/recipe_repository.dart';
 import '../domain/repositories/settings_repository.dart';
+import '../domain/services/nightly_backup_service.dart';
 import '../domain/services/order_service.dart';
 import '../domain/services/reporting_service.dart';
 import '../domain/services/sales_service.dart';
@@ -616,3 +620,29 @@ final FutureProvider<ShopStanding> shopStandingProvider =
 final FutureProvider<bool> isOwnerTillProvider = FutureProvider<bool>(
   (Ref ref) => ref.watch(shopAccessServiceProvider).isOwner,
 );
+
+
+// ───────────────────────── the nightly copy ─────────────────────────
+
+final Provider<ShopBackupStore> shopBackupStoreProvider =
+    Provider<ShopBackupStore>((Ref ref) => FirestoreBackupStore());
+
+/// Puts the whole shop somewhere that is not this phone, once a day.
+final Provider<NightlyBackupService> nightlyBackupProvider =
+    Provider<NightlyBackupService>(
+      (Ref ref) => NightlyBackupService(
+        archive: DatabaseArchive(
+          ref.watch(databaseProvider).db,
+          ref.watch(clockProvider),
+        ),
+        settings: ref.watch(settingsRepositoryProvider),
+        clock: ref.watch(clockProvider),
+        store: ref.watch(shopBackupStoreProvider),
+      ),
+    );
+
+/// The nights already up there, newest first.
+final FutureProvider<List<CloudBackup>> cloudBackupsProvider =
+    FutureProvider<List<CloudBackup>>(
+      (Ref ref) => ref.watch(nightlyBackupProvider).list(),
+    );

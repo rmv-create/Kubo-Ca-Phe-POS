@@ -6,12 +6,16 @@ import 'package:intl/intl.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/time/clock.dart';
 import '../../../data/cloud/cloud_backup_service.dart';
 import '../../../data/cloud/cloud_backup_target.dart';
+import '../../../data/cloud/shop_backup_store.dart';
 import '../../../data/db/archive_file.dart';
 import '../../../data/db/backup_service.dart';
 import '../../../data/db/database_archive.dart';
 import '../../../domain/entities/backup_entry.dart';
+import '../../../domain/entities/business_settings.dart';
+import '../../../domain/services/nightly_backup_service.dart';
 import '../../../shared/widgets/section_header.dart';
 import 'send_backup.dart';
 
@@ -71,6 +75,7 @@ class BackupScreen extends ConsumerWidget {
             ),
           ),
           const _EverythingAsAFile(),
+          const _NightlySection(),
           const _CloudSection(),
           if (!kIsWeb &&
               (ref.watch(backupNeedsSendingProvider).valueOrNull ?? false))
@@ -606,6 +611,189 @@ class _BackupTile extends ConsumerWidget {
       messenger
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+}
+
+
+/// The copy that goes up by itself every night, into her own Firebase.
+///
+/// This is the one that matters. The file below it is hers to keep in a
+/// drawer; this is the one she does not have to remember.
+class _NightlySection extends ConsumerStatefulWidget {
+  const _NightlySection();
+
+  @override
+  ConsumerState<_NightlySection> createState() => _NightlySectionState();
+}
+
+class _NightlySectionState extends ConsumerState<_NightlySection> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    final AsyncValue<List<CloudBackup>> nights = ref.watch(
+      cloudBackupsProvider,
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SectionHeader('Every night, by itself'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            KuboSpacing.lg,
+            0,
+            KuboSpacing.lg,
+            KuboSpacing.sm,
+          ),
+          child: Text(
+            'A squeezed copy of the whole shop goes up when you close the '
+            'day, and again whenever you open Kubo if the day\u2019s copy '
+            'has not gone. The last ${NightlyBackupService.keepDays} nights '
+            'are kept.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+        nights.when(
+          loading: () => const Padding(
+            padding: EdgeInsets.all(KuboSpacing.lg),
+            child: Center(child: CircularProgressIndicator.adaptive()),
+          ),
+          error: (Object error, StackTrace _) => Padding(
+            padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
+            child: Text(
+              'The nights up there could not be read just now.',
+              style: theme.textTheme.bodySmall,
+            ),
+          ),
+          data: (List<CloudBackup> list) => list.isEmpty
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: KuboSpacing.lg,
+                  ),
+                  child: Text(
+                    'Nothing up there yet. It will go the first time you '
+                    'close a day \u2014 or tap below.',
+                    style: theme.textTheme.bodySmall,
+                  ),
+                )
+              : Column(
+                  children: <Widget>[
+                    for (final CloudBackup night in list.take(5))
+                      ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.cloud_done_outlined),
+                        title: Text(night.day),
+                        subtitle: Text(
+                          '${night.sizeLabel} \u00b7 ${night.device}',
+                        ),
+                        trailing: TextButton(
+                          onPressed: _busy
+                              ? null
+                              : () => _restore(context, night),
+                          child: const Text('RESTORE'),
+                        ),
+                      ),
+                    if (list.length > 5)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: KuboSpacing.lg,
+                        ),
+                        child: Text(
+                          'and ${list.length - 5} more',
+                          style: theme.textTheme.bodySmall,
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+        Padding(
+          padding: const EdgeInsets.all(KuboSpacing.lg),
+          child: OutlinedButton.icon(
+            onPressed: _busy ? null : _sendNow,
+            icon: const Icon(Icons.cloud_upload_outlined),
+            label: const Text('Send tonight\u2019s copy now'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _sendNow() async {
+    setState(() => _busy = true);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final BusinessSettings settings = ref.read(settingsControllerProvider);
+    final String day = BusinessDay(
+      cutoffHour: settings.businessDayCutoffHour,
+    ).dateOf(ref.read(clockProvider).now());
+
+    final BackupRound round = await ref
+        .read(nightlyBackupProvider)
+        .run(day: day, force: true);
+    ref.invalidate(cloudBackupsProvider);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            round.sent
+                ? 'Tonight\u2019s copy is up \u2014 ${_size(round.bytes)}'
+                : round.message ?? 'It could not go up.',
+          ),
+        ),
+      );
+  }
+
+  static String _size(int bytes) => bytes < 1024 * 1024
+      ? '${(bytes / 1024).round()} KB'
+      : '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+
+  Future<void> _restore(BuildContext context, CloudBackup night) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final bool? sure = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: Text('Go back to ${night.day}?'),
+        content: const Text(
+          'Everything on this phone is replaced by that night\u2019s copy. '
+          'Anything rung up since then is gone, and there is no undo.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep what I have'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('REPLACE EVERYTHING'),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+
+    setState(() => _busy = true);
+    try {
+      final String? sql = await ref
+          .read(nightlyBackupProvider)
+          .fetch(night.day);
+      if (sql == null) throw Exception('That night could not be read back.');
+      await DatabaseArchive(
+        ref.read(databaseProvider).db,
+        ref.read(clockProvider),
+      ).restore(sql);
+      if (!mounted) return;
+      ref.read(restartRequiredProvider.notifier).state = true;
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$error')));
     }
   }
 }

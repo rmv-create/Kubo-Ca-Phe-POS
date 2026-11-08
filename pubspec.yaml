@@ -36,6 +36,9 @@ dependencies:
   # Sharing an export or a backup off the device.
   share_plus: ^10.1.4
 
+  # Squeezing the nightly backup before it goes up.
+  archive: ^3.6.1
+
   # Small utilities
   collection: ^1.19.0
   meta: ^1.16.0

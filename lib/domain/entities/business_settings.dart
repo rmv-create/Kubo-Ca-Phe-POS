@@ -263,6 +263,10 @@ abstract final class SettingKeys {
   static const String cloudLastUploadAt = 'cloud.last_upload_at';
   static const String cloudLastError = 'cloud.last_error';
 
+  /// The last business day whose copy reached the cloud. Local to the
+  /// device: it is a statement about what this phone has managed to send.
+  static const String cloudLastBackupDay = 'cloud.last_backup_day';
+
   /// Which shop's log this till belongs to, where it had got to reading it,
   /// and how the last round went.
   static const String syncShopId = 'sync.shop_id';

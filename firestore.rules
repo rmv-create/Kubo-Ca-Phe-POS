@@ -169,6 +169,26 @@ service cloud.firestore {
         allow delete: if isOwner(shopId) || uid == request.auth.uid;
       }
 
+      // The nightly copy of the whole shop, one document per day with the
+      // squeezed data split across `parts` underneath it.
+      //
+      // Any till may write one: a backup that did not happen because the
+      // wrong phone closed the day is worse than a backup written by the
+      // barista. Only the owner may remove one, so nobody can quietly empty
+      // the safe — the pruning of old nights runs on her till.
+      match /backups/{day} {
+        allow read: if isTill(shopId);
+        allow create, update: if isTill(shopId)
+          && request.resource.data.parts is int;
+        allow delete: if isOwner(shopId);
+
+        match /parts/{index} {
+          allow read: if isTill(shopId);
+          allow create, update: if isTill(shopId);
+          allow delete: if isTill(shopId);
+        }
+      }
+
       // The log the tills leave for each other. Append only: a change is
       // written once, by the till it happened on, and nobody — including
       // that till, including the owner — may edit or remove it afterwards.

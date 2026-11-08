@@ -10,6 +10,7 @@ import '../../../data/db/archive_file.dart';
 import '../../../data/db/database_archive.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../domain/entities/reporting.dart';
+import '../../../domain/services/nightly_backup_service.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../backup/presentation/backup_screen.dart';
@@ -156,18 +157,35 @@ class DailyClosingScreen extends ConsumerWidget {
       }
     }
 
+    // The copy that goes up by itself, into her own Firebase. This is the
+    // one that survives a lost phone without anybody remembering anything.
+    final BackupRound round = await ref
+        .read(nightlyBackupProvider)
+        .run(day: day, force: true);
+    ref.invalidate(cloudBackupsProvider);
+
     messenger
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text(backup == null ? '$day closed' : '$day closed · backed up'),
+          content: Text(
+            switch (round.outcome) {
+              BackupOutcome.sent => '$day closed \u00b7 backed up to the cloud',
+              BackupOutcome.alreadyDone => '$day closed \u00b7 already backed up',
+              _ => '$day closed',
+            },
+          ),
         ),
       );
 
-    if (kIsWeb) {
-      if (context.mounted) await _offerToSaveAFile(context, ref, day);
+    // Only when the automatic copy did not go. She should not be asked to
+    // do by hand what has just been done for her; she should be asked when
+    // it has not.
+    if (!round.sent && context.mounted) {
+      await _offerToSaveAFile(context, ref, day, because: round.message);
       return;
     }
+    if (kIsWeb) return;
 
     // The backup lives beside the database it was taken from, which is no
     // help at all if the phone goes. Sent here, at the one moment in the day
@@ -200,13 +218,15 @@ class DailyClosingScreen extends ConsumerWidget {
   Future<void> _offerToSaveAFile(
     BuildContext context,
     WidgetRef ref,
-    String day,
-  ) async {
+    String day, {
+    String? because,
+  }) async {
     final bool? save = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
-        title: const Text('Save today\u2019s copy?'),
-        content: const Text(
+        title: const Text('Save today\u2019s copy by hand?'),
+        content: Text(
+          '${because ?? 'The automatic backup did not go up.'}\n\n'
           'The whole shop lives inside this browser, and a browser can '
           'clear its own storage. A file saved now is the only copy that '
           'survives a lost phone \u2014 put it in Google Drive, iCloud, or '

@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../core/time/clock.dart';
+import '../domain/entities/business_settings.dart';
 import '../domain/services/shop_access_service.dart';
 import '../features/access/presentation/welcome_screen.dart';
 import '../features/backup/presentation/backup_screen.dart';
@@ -19,6 +23,30 @@ class KuboApp extends ConsumerStatefulWidget {
 
 class _KuboAppState extends ConsumerState<KuboApp> {
   late final GoRouter _router = createRouter();
+  bool _askedForTonightsCopy = false;
+
+  /// Sends today's copy up if it has not gone yet.
+  ///
+  /// Closing the day does this too, but she will not always close the day —
+  /// she will be tired, or busy, or the phone will be at four per cent. A
+  /// backup that only happens when somebody remembers is not a backup, so
+  /// opening the app is another chance to take one. It costs nothing when
+  /// today's has already gone.
+  void _backUpIfTodayHasNotGone() {
+    if (_askedForTonightsCopy) return;
+    _askedForTonightsCopy = true;
+    final BusinessSettings settings = ref.read(settingsControllerProvider);
+    final String today = BusinessDay(
+      cutoffHour: settings.businessDayCutoffHour,
+    ).dateOf(ref.read(clockProvider).now());
+    unawaited(
+      ref
+          .read(nightlyBackupProvider)
+          .run(day: today)
+          .then((_) => null)
+          .catchError((Object _) => null),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -56,6 +84,8 @@ class _KuboAppState extends ConsumerState<KuboApp> {
         home: gate,
       );
     }
+
+    _backUpIfTodayHasNotGone();
 
     return MaterialApp.router(
       title: businessName,
