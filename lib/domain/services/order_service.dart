@@ -12,6 +12,7 @@ import '../entities/order_draft.dart';
 import 'costing_engine.dart';
 import 'discount_engine.dart';
 import 'inventory_engine.dart';
+import 'who_is_working.dart';
 
 /// Turns a finished draft into a permanent record, in one transaction.
 ///
@@ -25,13 +26,16 @@ class OrderService {
     required AppDatabase database,
     required Clock clock,
     InventoryEngine inventory = const InventoryEngine(),
+    WhoIsWorking who = nobody,
   }) : _db = database,
        _inventory = inventory,
-       _clock = clock;
+       _clock = clock,
+       _who = who;
 
   final AppDatabase _db;
   final Clock _clock;
   final InventoryEngine _inventory;
+  final WhoIsWorking _who;
 
   /// Commits [draft] and returns the record that was written.
   ///
@@ -251,6 +255,7 @@ class OrderService {
       }
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': businessDate,
         'action': 'order_completed',

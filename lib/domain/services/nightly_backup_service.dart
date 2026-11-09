@@ -68,10 +68,7 @@ class NightlyBackupService {
   ///
   /// [force] sends it again even if it did — for the button that says "back
   /// up now", where being told "already done" is not what she wants.
-  Future<BackupRound> run({
-    required String day,
-    bool force = false,
-  }) async {
+  Future<BackupRound> run({required String day, bool force = false}) async {
     final ShopBackupStore? store = _store;
     if (store == null) {
       return const BackupRound.skipped('This app has no cloud to back up to.');

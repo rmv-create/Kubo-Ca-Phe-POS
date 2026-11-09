@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../features/access/presentation/tills_screen.dart';
 import '../features/backup/presentation/backup_screen.dart';
 import '../features/customers/presentation/customers_screen.dart';
+import '../features/management/presentation/activity_screen.dart';
 import '../features/management/presentation/management_home_screen.dart';
 import '../features/menu/presentation/categories_screen.dart';
 import '../features/menu/presentation/customisations_screen.dart';
@@ -53,6 +54,7 @@ abstract final class Routes {
   static const String receiptSettings = '/manage/receipt';
   static const String staff = '/manage/staff';
   static const String tills = '/manage/tills';
+  static const String activity = '/manage/activity';
 }
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>(
@@ -155,6 +157,7 @@ GoRouter createRouter() => GoRouter(
                 _section('receipt', const ReceiptSettingsScreen()),
                 _section('staff', const StaffScreen()),
                 _section('tills', const TillsScreen()),
+                _section('activity', const ActivityScreen()),
                 GoRoute(
                   path: 'orders/:id/receipt',
                   // A receipt is the one thing in here a barista must be

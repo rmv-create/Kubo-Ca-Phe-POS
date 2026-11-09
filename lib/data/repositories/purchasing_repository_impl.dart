@@ -12,6 +12,7 @@ import '../../domain/entities/purchasing.dart';
 import '../../domain/repositories/purchasing_repository.dart';
 import '../../domain/services/inventory_engine.dart';
 import '../../domain/services/moving_average_cost.dart';
+import '../../domain/services/who_is_working.dart';
 import '../db/app_database.dart';
 
 class PurchasingRepositoryImpl implements PurchasingRepository {
@@ -21,15 +22,18 @@ class PurchasingRepositoryImpl implements PurchasingRepository {
     required BusinessSettings Function() settings,
     InventoryEngine engine = const InventoryEngine(),
     MovingAverageCost averages = const MovingAverageCost(),
+    WhoIsWorking who = nobody,
   }) : _settings = settings,
        _engine = engine,
-       _averages = averages;
+       _averages = averages,
+       _who = who;
 
   final AppDatabase _db;
   final Clock _clock;
   final BusinessSettings Function() _settings;
   final InventoryEngine _engine;
   final MovingAverageCost _averages;
+  final WhoIsWorking _who;
 
   @override
   Future<List<Supplier>> suppliers({bool includeInactive = false}) async {
@@ -209,9 +213,8 @@ class PurchasingRepositoryImpl implements PurchasingRepository {
       // The stock is in; work out what the shelf is now worth per unit. This
       // has to come after posting, because the average needs to know how much
       // was already there.
-      for (final int ingredientId in movements
-          .map((PendingMovement m) => m.ingredientId)
-          .toSet()) {
+      for (final int ingredientId
+          in movements.map((PendingMovement m) => m.ingredientId).toSet()) {
         await _averages.rebuild(txn, ingredientId: ingredientId);
       }
 
@@ -223,6 +226,7 @@ class PurchasingRepositoryImpl implements PurchasingRepository {
       );
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': date,
         'action': 'purchase_recorded',

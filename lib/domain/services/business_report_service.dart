@@ -24,7 +24,8 @@ class BusinessReportService {
   Future<BusinessReport> forMonth(String month) async {
     final String like = '$month-%';
 
-    final List<Map<String, Object?>> sales = await _db.db.rawQuery('''
+    final List<Map<String, Object?>> sales = await _db.db.rawQuery(
+      '''
       SELECT COUNT(*)                                  AS orders,
              IFNULL(SUM(o.subtotal_centavos), 0)       AS gross,
              IFNULL(SUM(o.discount_centavos), 0)       AS discounts,
@@ -35,47 +36,64 @@ class BusinessReportService {
              IFNULL(SUM(o.item_count), 0)              AS drinks
       FROM orders o
       WHERE o.status = 'completed' AND o.business_date LIKE ?
-      ''', <Object?>[like]);
+      ''',
+      <Object?>[like],
+    );
     final Map<String, Object?> s = sales.first;
 
     final Map<String, Money> received = <String, Money>{};
-    for (final Map<String, Object?> row in await _db.db.rawQuery('''
+    for (final Map<String, Object?> row in await _db.db.rawQuery(
+      '''
       SELECT p.method AS method, IFNULL(SUM(p.amount_centavos), 0) AS total
       FROM payments p
       JOIN orders o ON o.id = p.order_id
       WHERE o.status = 'completed' AND o.business_date LIKE ?
       GROUP BY p.method
-      ''', <Object?>[like])) {
+      ''',
+      <Object?>[like],
+    )) {
       received[row['method']! as String] = Money(row['total']! as int);
     }
 
-    final int owed = _one(await _db.db.rawQuery('''
+    final int owed = _one(
+      await _db.db.rawQuery(
+        '''
       SELECT IFNULL(SUM(total_centavos), 0) AS v FROM orders
       WHERE status = 'completed' AND payment_state = 'unpaid'
         AND business_date LIKE ?
-      ''', <Object?>[like]));
+      ''',
+        <Object?>[like],
+      ),
+    );
 
-    final int bought = _one(await _db.db.rawQuery(
-      'SELECT IFNULL(SUM(total_centavos), 0) AS v FROM purchases '
-      'WHERE business_date LIKE ?',
-      <Object?>[like],
-    ));
+    final int bought = _one(
+      await _db.db.rawQuery(
+        'SELECT IFNULL(SUM(total_centavos), 0) AS v FROM purchases '
+        'WHERE business_date LIKE ?',
+        <Object?>[like],
+      ),
+    );
 
-    final int wasted = _one(await _db.db.rawQuery(
-      'SELECT IFNULL(SUM(value_centavos), 0) AS v FROM waste '
-      'WHERE business_date LIKE ?',
-      <Object?>[like],
-    ));
+    final int wasted = _one(
+      await _db.db.rawQuery(
+        'SELECT IFNULL(SUM(value_centavos), 0) AS v FROM waste '
+        'WHERE business_date LIKE ?',
+        <Object?>[like],
+      ),
+    );
 
-    final int voided = _one(await _db.db.rawQuery(
-      'SELECT IFNULL(SUM(amount_centavos), 0) AS v FROM order_voids '
-      'WHERE business_date LIKE ?',
-      <Object?>[like],
-    ));
+    final int voided = _one(
+      await _db.db.rawQuery(
+        'SELECT IFNULL(SUM(amount_centavos), 0) AS v FROM order_voids '
+        'WHERE business_date LIKE ?',
+        <Object?>[like],
+      ),
+    );
 
     // What is on the shelf right now, at what it cost. Not a month figure —
     // a photograph of today — and labelled as such wherever it is shown.
-    final int shelf = _one(await _db.db.rawQuery('''
+    final int shelf = _one(
+      await _db.db.rawQuery('''
       SELECT IFNULL(SUM(
                i.qty_milli * IFNULL((
                  SELECT h.unit_cost_centavos_per_1000_base
@@ -86,12 +104,18 @@ class BusinessReportService {
              ), 0) AS v
       FROM inventory i
       WHERE i.qty_milli > 0
-      '''));
+      '''),
+    );
 
-    final int tradingDays = _one(await _db.db.rawQuery('''
+    final int tradingDays = _one(
+      await _db.db.rawQuery(
+        '''
       SELECT COUNT(DISTINCT business_date) AS v FROM orders
       WHERE status = 'completed' AND business_date LIKE ?
-      ''', <Object?>[like]));
+      ''',
+        <Object?>[like],
+      ),
+    );
 
     return BusinessReport(
       month: month,
@@ -119,14 +143,17 @@ class BusinessReportService {
   /// says which hours are worth being open for, and which are worth
   /// prepping in.
   Future<List<BusyPeriod>> byHour(String month) async {
-    final List<Map<String, Object?>> rows = await _db.db.rawQuery('''
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
       SELECT strftime('%H', o.created_at, 'localtime') AS bucket,
              COUNT(*) AS orders,
              IFNULL(SUM(o.total_centavos), 0) AS revenue
       FROM orders o
       WHERE o.status = 'completed' AND o.business_date LIKE ?
       GROUP BY bucket ORDER BY bucket
-      ''', <Object?>['$month-%']);
+      ''',
+      <Object?>['$month-%'],
+    );
     return <BusyPeriod>[
       for (final Map<String, Object?> r in rows)
         BusyPeriod(
@@ -148,14 +175,17 @@ class BusinessReportService {
       'Friday',
       'Saturday',
     ];
-    final List<Map<String, Object?>> rows = await _db.db.rawQuery('''
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
       SELECT strftime('%w', o.business_date) AS bucket,
              COUNT(*) AS orders,
              IFNULL(SUM(o.total_centavos), 0) AS revenue
       FROM orders o
       WHERE o.status = 'completed' AND o.business_date LIKE ?
       GROUP BY bucket ORDER BY bucket
-      ''', <Object?>['$month-%']);
+      ''',
+      <Object?>['$month-%'],
+    );
     return <BusyPeriod>[
       for (final Map<String, Object?> r in rows)
         BusyPeriod(
@@ -168,14 +198,17 @@ class BusinessReportService {
 
   /// Every discount she gave, grouped by what she called it.
   Future<List<DiscountGiven>> discountsGiven(String month) async {
-    final List<Map<String, Object?>> rows = await _db.db.rawQuery('''
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
       SELECT d.name AS name, COUNT(*) AS times,
              IFNULL(SUM(d.amount_centavos), 0) AS total
       FROM order_discounts d
       JOIN orders o ON o.id = d.order_id
       WHERE o.status = 'completed' AND o.business_date LIKE ?
       GROUP BY d.name ORDER BY total DESC
-      ''', <Object?>['$month-%']);
+      ''',
+      <Object?>['$month-%'],
+    );
     return <DiscountGiven>[
       for (final Map<String, Object?> r in rows)
         DiscountGiven(
@@ -188,12 +221,15 @@ class BusinessReportService {
 
   /// What was spilled or thrown, and why.
   Future<List<WasteByReason>> wasteByReason(String month) async {
-    final List<Map<String, Object?>> rows = await _db.db.rawQuery('''
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
       SELECT reason, COUNT(*) AS times,
              IFNULL(SUM(value_centavos), 0) AS total
       FROM waste WHERE business_date LIKE ?
       GROUP BY reason ORDER BY total DESC
-      ''', <Object?>['$month-%']);
+      ''',
+      <Object?>['$month-%'],
+    );
     return <WasteByReason>[
       for (final Map<String, Object?> r in rows)
         WasteByReason(
@@ -240,6 +276,7 @@ class BusinessReport {
   /// What the drinks came to at menu price, before anything came off.
   final Money grossSales;
   final Money discounts;
+
   /// Collected from the customer for the rider and handed straight over.
   /// Hers to carry, never hers to keep.
   final Money deliveryFees;
@@ -287,19 +324,16 @@ class BusinessReport {
       ? null
       : (grossProfit.centavos * 10000) ~/ netSales.centavos;
 
-  Money? get perDay => tradingDays == 0
-      ? null
-      : Money(netSales.centavos ~/ tradingDays);
+  Money? get perDay =>
+      tradingDays == 0 ? null : Money(netSales.centavos ~/ tradingDays);
 
   Money? get perOrder =>
       orderCount == 0 ? null : Money(netSales.centavos ~/ orderCount);
 
   // ─────────────────────────── cash flow ───────────────────────────
 
-  Money get received => receivedByMethod.values.fold(
-    Money.zero,
-    (Money a, Money b) => a + b,
-  );
+  Money get received =>
+      receivedByMethod.values.fold(Money.zero, (Money a, Money b) => a + b);
 
   /// Money in less money out. Not profit — it includes stock she has bought
   /// and not yet sold, and excludes sales she has not yet been paid for.

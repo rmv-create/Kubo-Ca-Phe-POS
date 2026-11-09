@@ -12,6 +12,7 @@ import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/services/costing_engine.dart';
 import '../../domain/services/inventory_engine.dart';
 import '../../domain/services/moving_average_cost.dart';
+import '../../domain/services/who_is_working.dart';
 import '../db/app_database.dart';
 
 class InventoryRepositoryImpl implements InventoryRepository {
@@ -21,15 +22,18 @@ class InventoryRepositoryImpl implements InventoryRepository {
     required BusinessSettings Function() settings,
     InventoryEngine engine = const InventoryEngine(),
     MovingAverageCost averages = const MovingAverageCost(),
+    WhoIsWorking who = nobody,
   }) : _settings = settings,
        _engine = engine,
-       _averages = averages;
+       _averages = averages,
+       _who = who;
 
   final AppDatabase _db;
   final Clock _clock;
   final BusinessSettings Function() _settings;
   final InventoryEngine _engine;
   final MovingAverageCost _averages;
+  final WhoIsWorking _who;
 
   String get _businessDate => BusinessDay(
     cutoffHour: _settings().businessDayCutoffHour,
@@ -329,6 +333,7 @@ class InventoryRepositoryImpl implements InventoryRepository {
       );
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': date,
         'action': 'waste_recorded',
@@ -453,6 +458,7 @@ class InventoryRepositoryImpl implements InventoryRepository {
       await _engine.post(txn, movements, at: at, businessDate: date);
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': date,
         'action': 'stock_count_applied',

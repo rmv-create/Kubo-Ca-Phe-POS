@@ -119,6 +119,12 @@ const List<ManagementEntry> managementEntries = <ManagementEntry>[
     route: Routes.monthReport,
   ),
   ManagementEntry(
+    label: 'Everything that happened',
+    description: 'Every order, void, refund and change \u2014 and who did it',
+    icon: Icons.history,
+    route: Routes.activity,
+  ),
+  ManagementEntry(
     label: 'Phones in this shop',
     description: 'Invite your barista’s phone, or shut one out',
     icon: Icons.smartphone_outlined,

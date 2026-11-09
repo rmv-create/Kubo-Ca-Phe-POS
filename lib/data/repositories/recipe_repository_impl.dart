@@ -8,14 +8,21 @@ import '../../domain/entities/ingredient.dart';
 import '../../domain/entities/recipe.dart';
 import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/repositories/recipe_repository.dart';
+import '../../domain/services/who_is_working.dart';
 import '../db/app_database.dart';
 
 class RecipeRepositoryImpl implements RecipeRepository {
-  RecipeRepositoryImpl(this._db, this._clock, this._inventory);
+  RecipeRepositoryImpl(
+    this._db,
+    this._clock,
+    this._inventory, {
+    WhoIsWorking who = nobody,
+  }) : _who = who;
 
   final AppDatabase _db;
   final Clock _clock;
   final InventoryRepository _inventory;
+  final WhoIsWorking _who;
 
   @override
   Future<List<Recipe>> recipes({bool withCosts = true}) async {
@@ -155,6 +162,7 @@ class RecipeRepositoryImpl implements RecipeRepository {
       }
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': now,
         'business_date': now.substring(0, 10),
         'action': 'recipe_version_saved',

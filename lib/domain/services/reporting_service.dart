@@ -6,6 +6,7 @@ import '../../core/time/clock.dart';
 import '../../data/db/app_database.dart';
 import '../entities/business_settings.dart';
 import '../entities/reporting.dart';
+import 'who_is_working.dart';
 
 /// Sums the day, the month, and how each drink is doing.
 ///
@@ -17,13 +18,16 @@ class ReportingService {
     required AppDatabase database,
     required Clock clock,
     required BusinessSettings Function() settings,
+    WhoIsWorking who = nobody,
   }) : _db = database,
        _clock = clock,
-       _settings = settings;
+       _settings = settings,
+       _who = who;
 
   final AppDatabase _db;
   final Clock _clock;
   final BusinessSettings Function() _settings;
+  final WhoIsWorking _who;
 
   String get today => BusinessDay(
     cutoffHour: _settings().businessDayCutoffHour,
@@ -279,6 +283,7 @@ class ReportingService {
       });
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': businessDate,
         'action': 'day_closed',

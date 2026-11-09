@@ -13,6 +13,7 @@ import '../entities/order_draft.dart';
 import '../entities/reporting.dart';
 import 'costing_engine.dart';
 import 'inventory_engine.dart';
+import 'who_is_working.dart';
 
 /// Reading sales back, and the two ways a sale can be undone.
 ///
@@ -24,15 +25,18 @@ class SalesService {
     required Clock clock,
     required BusinessSettings Function() settings,
     InventoryEngine inventory = const InventoryEngine(),
+    WhoIsWorking who = nobody,
   }) : _db = database,
        _clock = clock,
        _settings = settings,
-       _inventory = inventory;
+       _inventory = inventory,
+       _who = who;
 
   final AppDatabase _db;
   final Clock _clock;
   final BusinessSettings Function() _settings;
   final InventoryEngine _inventory;
+  final WhoIsWorking _who;
 
   String _businessDateOf(DateTime moment) =>
       BusinessDay(cutoffHour: _settings().businessDayCutoffHour).dateOf(moment);
@@ -318,6 +322,7 @@ class SalesService {
         whereArgs: <Object?>[orderId],
       );
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         // Dated to the day the money arrived, for the same reason.
         'business_date': _businessDateOf(now),
@@ -431,6 +436,7 @@ class SalesService {
       );
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': order['business_date'],
         'action': 'order_customer_attached',
@@ -641,6 +647,7 @@ class SalesService {
       await _inventory.post(txn, movements, at: at, businessDate: date);
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': date,
         'action': 'refund_issued',
@@ -747,6 +754,7 @@ class SalesService {
       }
 
       await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
         'at': at,
         'business_date': date,
         'action': 'order_voided',

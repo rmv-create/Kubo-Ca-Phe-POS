@@ -49,10 +49,7 @@ class MovingAverageCost {
   /// Replaying rather than appending is deliberate: it is the only way a
   /// delivery that turns up late — recorded a day after it arrived, or synced
   /// from the other till — lands in the right place in the sequence.
-  Future<void> rebuild(
-    DatabaseExecutor db, {
-    required int ingredientId,
-  }) async {
+  Future<void> rebuild(DatabaseExecutor db, {required int ingredientId}) async {
     final String now = DateTime.now().toUtc().toIso8601String();
 
     await db.delete(
@@ -93,7 +90,10 @@ class MovingAverageCost {
 
       // Stock already on the shelf, valued at what it cost. Below zero means
       // the shelf was oversold; there is nothing there to average against.
-      final int onHand = (qtyBefore[event.purchaseItemId!] ?? 0).clamp(0, 1 << 62);
+      final int onHand = (qtyBefore[event.purchaseItemId!] ?? 0).clamp(
+        0,
+        1 << 62,
+      );
       final int added = event.qtyMilli;
 
       // Micro-centavos throughout: a cost held per 1000 base units times a
@@ -102,7 +102,9 @@ class MovingAverageCost {
       final int valueBefore = onHand * before;
       final int valueAdded = event.totalCostCentavos * 1000000;
       final int total = onHand + added;
-      final int after = total <= 0 ? event.unitCost : (valueBefore + valueAdded) ~/ total;
+      final int after = total <= 0
+          ? event.unitCost
+          : (valueBefore + valueAdded) ~/ total;
 
       await _write(
         db,

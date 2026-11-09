@@ -38,6 +38,7 @@ import '../domain/repositories/payment_method_repository.dart';
 import '../domain/repositories/purchasing_repository.dart';
 import '../domain/repositories/recipe_repository.dart';
 import '../domain/repositories/settings_repository.dart';
+import '../domain/services/activity_log.dart';
 import '../domain/services/business_report_service.dart';
 import '../domain/services/nightly_backup_service.dart';
 import '../domain/services/order_service.dart';
@@ -45,6 +46,7 @@ import '../domain/services/reporting_service.dart';
 import '../domain/services/sales_service.dart';
 import '../domain/services/shop_access_service.dart';
 import '../domain/services/sign_in_service.dart';
+import '../domain/services/who_is_working.dart';
 
 /// Infrastructure providers.
 ///
@@ -287,10 +289,19 @@ final Provider<CustomerRepository> customerRepositoryProvider =
       ),
     );
 
+/// Whoever is signed in at the till, for the activity trail.
+///
+/// `ref.read` rather than `watch`: the services are built once and the
+/// person at the counter changes through the day, so this is called at the
+/// moment something is written rather than captured when it is wired up.
+WhoIsWorking _whoIsWorking(Ref ref) =>
+    () => ref.read(signedInUserProvider)?.name;
+
 final Provider<OrderService> orderServiceProvider = Provider<OrderService>(
   (Ref ref) => OrderService(
     database: ref.watch(databaseProvider),
     clock: ref.watch(clockProvider),
+    who: _whoIsWorking(ref),
   ),
 );
 
@@ -369,6 +380,7 @@ final Provider<InventoryRepository> inventoryRepositoryProvider =
         ref.watch(databaseProvider),
         ref.watch(clockProvider),
         settings: () => ref.read(settingsControllerProvider),
+        who: _whoIsWorking(ref),
       ),
     );
 
@@ -378,6 +390,7 @@ final Provider<RecipeRepository> recipeRepositoryProvider =
         ref.watch(databaseProvider),
         ref.watch(clockProvider),
         ref.watch(inventoryRepositoryProvider),
+        who: _whoIsWorking(ref),
       ),
     );
 
@@ -387,6 +400,7 @@ final Provider<PurchasingRepository> purchasingRepositoryProvider =
         ref.watch(databaseProvider),
         ref.watch(clockProvider),
         settings: () => ref.read(settingsControllerProvider),
+        who: _whoIsWorking(ref),
       ),
     );
 
@@ -395,6 +409,7 @@ final Provider<SalesService> salesServiceProvider = Provider<SalesService>(
     database: ref.watch(databaseProvider),
     clock: ref.watch(clockProvider),
     settings: () => ref.read(settingsControllerProvider),
+    who: _whoIsWorking(ref),
   ),
 );
 
@@ -404,6 +419,7 @@ final Provider<ReportingService> reportingServiceProvider =
         database: ref.watch(databaseProvider),
         clock: ref.watch(clockProvider),
         settings: () => ref.read(settingsControllerProvider),
+        who: _whoIsWorking(ref),
       ),
     );
 
@@ -723,3 +739,15 @@ final FutureProviderFamily<List<WasteByReason>, String> wasteByReasonProvider =
       (Ref ref, String month) =>
           ref.watch(businessReportProvider).wasteByReason(month),
     );
+
+
+/// Everything that has happened, newest first.
+final FutureProviderFamily<List<ActivityEntry>, String?> activityProvider =
+    FutureProvider.family<List<ActivityEntry>, String?>((
+      Ref ref,
+      String? day,
+    ) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(stockRevisionProvider);
+      return ActivityLog(ref.watch(databaseProvider)).recent(businessDate: day);
+    });

@@ -217,6 +217,20 @@ class PosFixture {
   Future<CompletedOrder> sell(OrderDraft draft, {BusinessSettings? using}) =>
       orders.complete(draft, settings: using ?? settings);
 
+  /// Rings up one drink with somebody named as being at the till, so the
+  /// activity trail has an actor to record.
+  Future<CompletedOrder> sellAs(String person) async => OrderService(
+    database: db,
+    clock: clock,
+    who: () => person,
+  ).complete(
+    OrderDraft(
+      items: <DraftItem>[await item('Spanish Latte', 'Large')],
+      paymentMethod: PaymentMethod.cash,
+    ),
+    settings: settings,
+  );
+
   /// Total of one order, straight from the database.
   Future<Money> storedTotal(int orderId) async {
     final List<Map<String, Object?>> rows = await db.db.query(
