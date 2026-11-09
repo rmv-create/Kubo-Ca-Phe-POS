@@ -13,10 +13,12 @@ import '../../../data/cloud/shop_backup_store.dart';
 import '../../../data/db/archive_file.dart';
 import '../../../data/db/backup_service.dart';
 import '../../../data/db/database_archive.dart';
+import '../../../data/db/shop_reset.dart';
 import '../../../domain/entities/backup_entry.dart';
 import '../../../domain/entities/business_settings.dart';
 import '../../../domain/services/nightly_backup_service.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../menu/state/menu_actions.dart';
 import 'send_backup.dart';
 
 /// Set once a backup has been restored over the live database. The app then
@@ -80,6 +82,7 @@ class BackupScreen extends ConsumerWidget {
           if (!kIsWeb &&
               (ref.watch(backupNeedsSendingProvider).valueOrNull ?? false))
             const _StillOnThisPhone(),
+          if (kIsWeb) const _StartOver(),
           // Copying the database file is a thing only a phone can do. In a
           // browser the file above *is* the backup, so the rest of this
           // screen would be a list of nothing and a button that fails.
@@ -879,5 +882,121 @@ class _SecondBasket extends ConsumerWidget {
         ],
       ),
     );
+  }
+}
+
+
+/// Emptying the shop and setting it up again from scratch.
+///
+/// At the bottom of the backup screen on purpose: the only honest place
+/// for it is underneath the thing that would let her undo it. Everything
+/// above this offers her a copy; this is the one button that needs one.
+class _StartOver extends ConsumerStatefulWidget {
+  const _StartOver();
+
+  @override
+  ConsumerState<_StartOver> createState() => _StartOverState();
+}
+
+class _StartOverState extends ConsumerState<_StartOver> {
+  bool _busy = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const SectionHeader('Starting again'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            KuboSpacing.lg,
+            0,
+            KuboSpacing.lg,
+            KuboSpacing.sm,
+          ),
+          child: Text(
+            'For while you are still trying the app out. It empties the '
+            'shop \u2014 orders, customers, stock, your PINs, your settings '
+            '\u2014 and puts the menu back exactly as it arrived, so you '
+            'can set it up properly from the beginning.',
+            style: theme.textTheme.bodySmall,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(
+            KuboSpacing.lg,
+            0,
+            KuboSpacing.lg,
+            KuboSpacing.xxl,
+          ),
+          child: OutlinedButton.icon(
+            onPressed: _busy ? null : _confirm,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: theme.colorScheme.error,
+              side: BorderSide(color: theme.colorScheme.error),
+            ),
+            icon: const Icon(Icons.restart_alt),
+            label: const Text('Start this shop over'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _confirm() async {
+    final bool? sure = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext context) => AlertDialog(
+        title: const Text('Empty the shop?'),
+        content: const Text(
+          'Every order, customer, payment and stock movement goes, and so '
+          'do your PINs and your settings. Your menu, prices, recipes and '
+          'opening stock come back exactly as they arrived.\n\n'
+          'There is no undo. If there is anything in here you would miss, '
+          'save a copy first \u2014 the button is further up this screen.',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep what I have'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('EMPTY IT'),
+          ),
+        ],
+      ),
+    );
+    if (sure != true || !mounted) return;
+
+    // Asked twice, and the second time by name. This is the only button in
+    // the app that cannot be taken back.
+    final String? typed = await promptForText(
+      context,
+      title: 'Type EMPTY to be sure',
+      label: 'EMPTY',
+      helper: 'In capitals',
+    );
+    if (typed?.trim().toUpperCase() != 'EMPTY' || !mounted) return;
+
+    setState(() => _busy = true);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await ShopReset(
+        ref.read(databaseProvider),
+        ref.read(clockProvider),
+      ).run();
+      if (!mounted) return;
+      // The open connection no longer matches what is in it; everything
+      // cached above this screen is about a shop that no longer exists.
+      ref.read(restartRequiredProvider.notifier).state = true;
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() => _busy = false);
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('$error')));
+    }
   }
 }
