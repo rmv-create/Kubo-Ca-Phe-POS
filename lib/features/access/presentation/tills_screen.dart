@@ -266,7 +266,10 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
     return ListView(
       padding: const EdgeInsets.all(KuboSpacing.lg),
       children: <Widget>[
-        Text('This shop has no owner yet', style: theme.textTheme.titleMedium),
+        Text(
+          'Register this shop to yourself',
+          style: theme.textTheme.titleMedium,
+        ),
         const SizedBox(height: KuboSpacing.sm),
         Text(
           'Everything here works without one, and nothing will change about '
@@ -282,7 +285,10 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
           keyboardType: TextInputType.emailAddress,
           autocorrect: false,
           autofillHints: const <String>[AutofillHints.email],
-          decoration: const InputDecoration(labelText: 'Your email'),
+          decoration: const InputDecoration(
+            labelText: 'Your email',
+            helperText: 'New here \u2014 you are making the account now',
+          ),
         ),
         const SizedBox(height: KuboSpacing.sm),
         TextField(
@@ -292,7 +298,7 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
           autofillHints: const <String>[AutofillHints.newPassword],
           decoration: InputDecoration(
             labelText: 'Choose a password',
-            helperText: 'At least six characters. Write it down somewhere.',
+            helperText: 'At least six characters, and new. Write it down.',
             suffixIcon: IconButton(
               icon: Icon(_hidden ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _hidden = !_hidden),
@@ -320,7 +326,7 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('THIS SHOP IS MINE'),
+                : const Text('REGISTER THIS SHOP'),
           ),
         ),
         const SizedBox(height: KuboSpacing.md),

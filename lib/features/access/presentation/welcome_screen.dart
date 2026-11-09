@@ -50,9 +50,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   Text(
                     switch (_door) {
                       _Door.none => 'This phone is not in a shop yet.',
-                      _Door.signIn => 'Sign in as the owner',
+                      _Door.signIn => 'Sign in to a shop you already set up',
                       _Door.join => 'Join with an invite',
-                      _Door.open => 'Open your shop',
+                      _Door.open => 'Set up the shop',
                     },
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -94,17 +94,47 @@ class _Doors extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+
+    Widget note(String text) => Padding(
+      padding: const EdgeInsets.only(
+        top: KuboSpacing.xs,
+        bottom: KuboSpacing.lg,
+      ),
+      child: Text(
+        text,
+        textAlign: TextAlign.center,
+        style: theme.textTheme.bodySmall,
+      ),
+    );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
+        // Setting up comes first, and is the big one. This used to lead
+        // with "sign in as the owner", which asks somebody opening the app
+        // for the first time to produce an account they have not made yet,
+        // and buried the thing they actually needed in grey text at the
+        // bottom.
         SizedBox(
           height: KuboTouch.payButton,
           child: FilledButton(
-            onPressed: () => onPick(_Door.signIn),
-            child: const Text('SIGN IN AS THE OWNER'),
+            onPressed: () => onPick(_Door.open),
+            child: const Text('SET UP THE SHOP'),
           ),
         ),
-        const SizedBox(height: KuboSpacing.sm),
+        note('First time here. Choose an email and a password, and the '
+            'menu goes on this phone.'),
+
+        SizedBox(
+          height: KuboTouch.payButton,
+          child: OutlinedButton(
+            onPressed: () => onPick(_Door.signIn),
+            child: const Text('SIGN IN'),
+          ),
+        ),
+        note('The shop is already set up and this is a new phone, or this '
+            'one forgot.'),
+
         SizedBox(
           height: KuboTouch.payButton,
           child: OutlinedButton(
@@ -112,20 +142,8 @@ class _Doors extends StatelessWidget {
             child: const Text('I HAVE AN INVITE'),
           ),
         ),
-        const SizedBox(height: KuboSpacing.xxl),
-        Text(
-          'Working here? Ask the owner for an invite. It is eight '
-          'characters and lasts ten minutes.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodySmall,
-        ),
-        const SizedBox(height: KuboSpacing.lg),
-        const Divider(),
-        const SizedBox(height: KuboSpacing.sm),
-        TextButton(
-          onPressed: () => onPick(_Door.open),
-          child: const Text('Opening a shop for the first time'),
-        ),
+        note('Working here? Ask the owner for an invite \u2014 eight '
+            'characters, good for ten minutes.'),
       ],
     );
   }
@@ -169,7 +187,12 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
           autofillHints: const <String>[AutofillHints.email],
           keyboardType: TextInputType.emailAddress,
           autocorrect: false,
-          decoration: const InputDecoration(labelText: 'Email'),
+          decoration: InputDecoration(
+            labelText: 'Email',
+            helperText: widget.isNewShop
+                ? 'The one the shop will belong to'
+                : null,
+          ),
         ),
         const SizedBox(height: KuboSpacing.sm),
         TextField(
@@ -179,7 +202,9 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
           autofillHints: const <String>[AutofillHints.password],
           decoration: InputDecoration(
             labelText: 'Password',
-            helperText: widget.isNewShop ? 'At least six characters' : null,
+            helperText: widget.isNewShop
+              ? 'At least six characters. You are choosing it now.'
+              : null,
             suffixIcon: IconButton(
               icon: Icon(_hidden ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _hidden = !_hidden),
@@ -207,7 +232,7 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(widget.isNewShop ? 'OPEN THE SHOP' : 'SIGN IN'),
+                : Text(widget.isNewShop ? 'SET IT UP' : 'SIGN IN'),
           ),
         ),
         const SizedBox(height: KuboSpacing.sm),
@@ -215,9 +240,9 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
         if (widget.isNewShop) ...<Widget>[
           const SizedBox(height: KuboSpacing.md),
           Text(
-            'This makes the shop and puts your menu on this phone. Do it '
-            'once. Everywhere else — your other phone, your barista — '
-            'signs in or joins instead.',
+            'This makes the account and the shop, and puts your menu on '
+            'this phone. Do it once. Everywhere else \u2014 your other '
+            'phone, your barista \u2014 signs in or joins instead.',
             textAlign: TextAlign.center,
             style: theme.textTheme.bodySmall,
           ),
