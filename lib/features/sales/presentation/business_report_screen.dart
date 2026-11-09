@@ -148,9 +148,7 @@ class _ProfitAndLoss extends StatelessWidget {
           'Gross profit',
           report.grossProfit,
           strong: true,
-          note: margin == null
-              ? null
-              : '${(margin / 100).toStringAsFixed(1)}%',
+          note: margin == null ? null : '${(margin / 100).toStringAsFixed(1)}%',
         ),
         if (report.waste.isPositive)
           _Line('Less spilled and thrown away', -report.waste),
@@ -210,11 +208,10 @@ class _MoneyIn extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final List<MapEntry<String, Money>> rows =
-        report.receivedByMethod.entries.toList()
-          ..sort(
-            (MapEntry<String, Money> a, MapEntry<String, Money> b) =>
-                b.value.centavos.compareTo(a.value.centavos),
-          );
+        report.receivedByMethod.entries.toList()..sort(
+          (MapEntry<String, Money> a, MapEntry<String, Money> b) =>
+              b.value.centavos.compareTo(a.value.centavos),
+        );
 
     return Column(
       children: <Widget>[

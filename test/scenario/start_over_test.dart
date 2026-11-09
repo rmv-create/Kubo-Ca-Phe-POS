@@ -94,10 +94,7 @@ void main() {
       await reset.run();
 
       expect(
-        await SignInService(
-          database: shop.db,
-          clock: shop.clock,
-        ).hasAnyUser(),
+        await SignInService(database: shop.db, clock: shop.clock).hasAnyUser(),
         isFalse,
       );
     });
@@ -118,13 +115,18 @@ void main() {
       expect(await settings.readRaw(SettingKeys.syncRole), 'owner');
     });
 
-    test('a phone that never joined a shop keeps nothing, and is fine',
-        () async {
-      await tradeABit();
-      await reset.run();
+    test(
+      'a phone that never joined a shop keeps nothing, and is fine',
+      () async {
+        await tradeABit();
+        await reset.run();
 
-      expect(await settings.readRaw(SettingKeys.syncShopId), anyOf(isNull, ''));
-    });
+        expect(
+          await settings.readRaw(SettingKeys.syncShopId),
+          anyOf(isNull, ''),
+        );
+      },
+    );
 
     test('the migration ledger, so the schema is not rebuilt', () async {
       final int before = await rows('schema_migrations');

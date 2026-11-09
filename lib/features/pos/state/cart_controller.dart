@@ -195,14 +195,16 @@ class CartController extends Notifier<OrderDraft> {
     // with it: switching from "₱20 off" to "10% off" must not leave both.
     state = kind == null
         ? state.copyWith(clearDiscount: true)
-        : state.copyWith(clearDiscount: true).copyWith(
-            discountKind: kind,
-            discountBeneficiaryName: beneficiaryName,
-            discountBeneficiaryIdNo: beneficiaryIdNo,
-            discountReason: reason,
-            discountAmountOverride: amountOff,
-            discountRateBpOverride: rateBpOff,
-          );
+        : state
+              .copyWith(clearDiscount: true)
+              .copyWith(
+                discountKind: kind,
+                discountBeneficiaryName: beneficiaryName,
+                discountBeneficiaryIdNo: beneficiaryIdNo,
+                discountReason: reason,
+                discountAmountOverride: amountOff,
+                discountRateBpOverride: rateBpOff,
+              );
   }
 
   // ──────────────────────────────── note ────────────────────────────────

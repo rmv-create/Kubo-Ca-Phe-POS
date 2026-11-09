@@ -618,7 +618,6 @@ class _BackupTile extends ConsumerWidget {
   }
 }
 
-
 /// The copy that goes up by itself every night, into her own Firebase.
 ///
 /// This is the one that matters. The file below it is hers to keep in a
@@ -807,7 +806,6 @@ class _NightlySectionState extends ConsumerState<_NightlySection> {
   }
 }
 
-
 /// How long since a copy left Kubo altogether.
 ///
 /// The nightly copy lives in the shop's own Firebase, which is the same
@@ -859,9 +857,7 @@ class _SecondBasket extends ConsumerWidget {
                     _ => 'A copy last left Kubo $days days ago',
                   },
                   style: theme.textTheme.titleSmall?.copyWith(
-                    color: overdue
-                        ? theme.colorScheme.onErrorContainer
-                        : null,
+                    color: overdue ? theme.colorScheme.onErrorContainer : null,
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -871,9 +867,7 @@ class _SecondBasket extends ConsumerWidget {
                   'Google Drive now and then \u2014 closing the day offers '
                   'it every night.',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: overdue
-                        ? theme.colorScheme.onErrorContainer
-                        : null,
+                    color: overdue ? theme.colorScheme.onErrorContainer : null,
                   ),
                 ),
               ],
@@ -884,7 +878,6 @@ class _SecondBasket extends ConsumerWidget {
     );
   }
 }
-
 
 /// Emptying the shop and setting it up again from scratch.
 ///

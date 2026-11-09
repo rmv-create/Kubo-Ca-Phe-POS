@@ -66,10 +66,7 @@ void main() {
   test('a joining till ends up holding the whole shop', () async {
     // Everything she has already set up has to reach the new phone, not
     // just whatever changes from now on.
-    await SyncEngine(
-      database: hers.db,
-      clock: hers.clock,
-    ).enqueueEverything();
+    await SyncEngine(database: hers.db, clock: hers.clock).enqueueEverything();
 
     expect(await drinksOn(barista), 0, reason: 'it really does start empty');
 
@@ -84,30 +81,22 @@ void main() {
   });
 
   test('and at her prices, not at a default', () async {
-    await SyncEngine(
-      database: hers.db,
-      clock: hers.clock,
-    ).enqueueEverything();
+    await SyncEngine(database: hers.db, clock: hers.clock).enqueueEverything();
     await hersSync.catchUp();
     await baristaSync.catchUp();
 
-    final List<Map<String, Object?>> rows = await barista.db.db.rawQuery(
-      '''
+    final List<Map<String, Object?>> rows = await barista.db.db.rawQuery('''
       SELECT ps.price_centavos AS price
       FROM product_sizes ps
       JOIN products p ON p.id = ps.product_id
       JOIN sizes s ON s.id = ps.size_id
       WHERE p.name = 'Spanish Latte' AND s.name = 'Large'
-      ''',
-    );
+      ''');
     expect(Money(rows.single['price']! as int), Money.of(139));
   });
 
   test('an order rung up on one shows up on the other', () async {
-    await SyncEngine(
-      database: hers.db,
-      clock: hers.clock,
-    ).enqueueEverything();
+    await SyncEngine(database: hers.db, clock: hers.clock).enqueueEverything();
     await hersSync.catchUp();
     await baristaSync.catchUp();
 
@@ -126,10 +115,7 @@ void main() {
   });
 
   test('and the other way round', () async {
-    await SyncEngine(
-      database: hers.db,
-      clock: hers.clock,
-    ).enqueueEverything();
+    await SyncEngine(database: hers.db, clock: hers.clock).enqueueEverything();
     await hersSync.catchUp();
     await baristaSync.catchUp();
 
@@ -146,29 +132,28 @@ void main() {
     expect(await hers.countOf('orders'), 1);
   });
 
-  test('catching up stops when there is nothing left, rather than spinning',
-      () async {
-    await SyncEngine(
-      database: hers.db,
-      clock: hers.clock,
-    ).enqueueEverything();
-    await hersSync.catchUp();
-    await baristaSync.catchUp();
+  test(
+    'catching up stops when there is nothing left, rather than spinning',
+    () async {
+      await SyncEngine(
+        database: hers.db,
+        clock: hers.clock,
+      ).enqueueEverything();
+      await hersSync.catchUp();
+      await baristaSync.catchUp();
 
-    final int before = postbox.fetches;
-    await baristaSync.catchUp();
-    expect(
-      postbox.fetches - before,
-      lessThanOrEqualTo(2),
-      reason: 'level already: one look, not two hundred',
-    );
-  });
+      final int before = postbox.fetches;
+      await baristaSync.catchUp();
+      expect(
+        postbox.fetches - before,
+        lessThanOrEqualTo(2),
+        reason: 'level already: one look, not two hundred',
+      );
+    },
+  );
 
   test('a till with no signal sells anyway, and catches up after', () async {
-    await SyncEngine(
-      database: hers.db,
-      clock: hers.clock,
-    ).enqueueEverything();
+    await SyncEngine(database: hers.db, clock: hers.clock).enqueueEverything();
     await hersSync.catchUp();
     await baristaSync.catchUp();
 

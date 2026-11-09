@@ -24,8 +24,7 @@ class KuboApp extends ConsumerStatefulWidget {
   ConsumerState<KuboApp> createState() => _KuboAppState();
 }
 
-class _KuboAppState extends ConsumerState<KuboApp>
-    with WidgetsBindingObserver {
+class _KuboAppState extends ConsumerState<KuboApp> with WidgetsBindingObserver {
   late final GoRouter _router = createRouter();
   bool _askedForTonightsCopy = false;
   DateTime? _wentAway;
@@ -79,7 +78,6 @@ class _KuboAppState extends ConsumerState<KuboApp>
       _wentAway ??= DateTime.now();
     }
   }
-
 
   /// Sends today's copy up if it has not gone yet.
   ///

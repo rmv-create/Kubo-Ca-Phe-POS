@@ -163,11 +163,10 @@ class SummaryCard extends StatelessWidget {
           emphasise: true,
         ),
         for (final MapEntry<String, Money> row
-            in summary.byMethod.entries.toList()
-              ..sort(
-                (MapEntry<String, Money> a, MapEntry<String, Money> b) =>
-                    b.value.centavos.compareTo(a.value.centavos),
-              ))
+            in summary.byMethod.entries.toList()..sort(
+              (MapEntry<String, Money> a, MapEntry<String, Money> b) =>
+                  b.value.centavos.compareTo(a.value.centavos),
+            ))
           _StatRow(label: _methodName(row.key), value: row.value.format()),
         // Shown only when there is some, and immediately under the two
         // figures it explains the gap in.
@@ -292,7 +291,6 @@ class _PerformanceList extends StatelessWidget {
     );
   }
 }
-
 
 /// The codes payments carry, in the words on the buttons.
 String _methodName(String code) => switch (code) {

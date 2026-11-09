@@ -77,9 +77,9 @@ class FirestoreBackupStore implements ShopBackupStore {
     required Uint8List data,
     required String device,
   }) async {
-    final DocumentReference<Map<String, Object?>> doc = _backups(shopId).doc(
-      day,
-    );
+    final DocumentReference<Map<String, Object?>> doc = _backups(
+      shopId,
+    ).doc(day);
 
     // Last night's parts first. A shorter backup landing on top of a longer
     // one would otherwise leave the tail of the old one behind, and the two
@@ -105,10 +105,9 @@ class FirestoreBackupStore implements ShopBackupStore {
 
   @override
   Future<List<CloudBackup>> list(String shopId) async {
-    final QuerySnapshot<Map<String, Object?>> snapshot = await _backups(shopId)
-        .orderBy(FieldPath.documentId, descending: true)
-        .limit(60)
-        .get();
+    final QuerySnapshot<Map<String, Object?>> snapshot = await _backups(
+      shopId,
+    ).orderBy(FieldPath.documentId, descending: true).limit(60).get();
     return <CloudBackup>[
       for (final QueryDocumentSnapshot<Map<String, Object?>> doc
           in snapshot.docs)
@@ -124,10 +123,7 @@ class FirestoreBackupStore implements ShopBackupStore {
   }
 
   @override
-  Future<Uint8List?> get({
-    required String shopId,
-    required String day,
-  }) async {
+  Future<Uint8List?> get({required String shopId, required String day}) async {
     final DocumentSnapshot<Map<String, Object?>> head = await _backups(
       shopId,
     ).doc(day).get();
@@ -136,11 +132,9 @@ class FirestoreBackupStore implements ShopBackupStore {
 
     final BytesBuilder whole = BytesBuilder(copy: false);
     for (int i = 0; i < parts; i++) {
-      final DocumentSnapshot<Map<String, Object?>> part = await _backups(shopId)
-          .doc(day)
-          .collection('parts')
-          .doc('$i')
-          .get();
+      final DocumentSnapshot<Map<String, Object?>> part = await _backups(
+        shopId,
+      ).doc(day).collection('parts').doc('$i').get();
       final Blob? blob = part.data()?['data'] as Blob?;
       // A missing part means a half-finished upload. Half a database is
       // worse than none, so say none.
@@ -152,9 +146,9 @@ class FirestoreBackupStore implements ShopBackupStore {
 
   @override
   Future<void> remove({required String shopId, required String day}) async {
-    final DocumentReference<Map<String, Object?>> doc = _backups(shopId).doc(
-      day,
-    );
+    final DocumentReference<Map<String, Object?>> doc = _backups(
+      shopId,
+    ).doc(day);
     await _clearParts(doc);
     await doc.delete();
   }

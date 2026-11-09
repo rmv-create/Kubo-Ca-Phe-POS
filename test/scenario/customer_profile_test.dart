@@ -94,8 +94,7 @@ void main() {
       expect(owed, Money.of(139));
     });
 
-    test('a guest order belongs to nobody and stays out of the book',
-        () async {
+    test('a guest order belongs to nobody and stays out of the book', () async {
       await shop.sell(
         OrderDraft(
           items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
@@ -138,11 +137,15 @@ void main() {
       );
 
       // The usual is still the latte — it has come up twice.
-      expect((await shop.customers.usualFor(who.id))!.productName,
-          'Spanish Latte');
+      expect(
+        (await shop.customers.usualFor(who.id))!.productName,
+        'Spanish Latte',
+      );
       // Last time was the Iced Black, which is what she would be asked.
-      expect((await shop.customers.lastOrderedFor(who.id))!.productName,
-          'Iced Black');
+      expect(
+        (await shop.customers.lastOrderedFor(who.id))!.productName,
+        'Iced Black',
+      );
     });
 
     test('a customer who has never ordered has nothing to repeat', () async {
@@ -178,22 +181,24 @@ void main() {
       expect(await shop.customers.lapsed(), isEmpty);
     });
 
-    test('somebody who only ever comes monthly is not missed after ten days',
-        () async {
-      final Customer who = await regular('Tito Ben');
-      for (int month = 0; month < 4; month++) {
-        await buy(who);
-        shop.clock.advance(const Duration(days: 30));
-      }
-      // Ten days past their last visit is nothing for this person.
-      shop.clock.set(shop.clock.now().subtract(const Duration(days: 20)));
+    test(
+      'somebody who only ever comes monthly is not missed after ten days',
+      () async {
+        final Customer who = await regular('Tito Ben');
+        for (int month = 0; month < 4; month++) {
+          await buy(who);
+          shop.clock.advance(const Duration(days: 30));
+        }
+        // Ten days past their last visit is nothing for this person.
+        shop.clock.set(shop.clock.now().subtract(const Duration(days: 20)));
 
-      expect(
-        await shop.customers.lapsed(),
-        isEmpty,
-        reason: 'their own rhythm is monthly, not weekly',
-      );
-    });
+        expect(
+          await shop.customers.lapsed(),
+          isEmpty,
+          reason: 'their own rhythm is monthly, not weekly',
+        );
+      },
+    );
 
     test('a one-off visitor is not a regular who stopped', () async {
       final Customer who = await regular('Walk-in Wally');
@@ -249,7 +254,10 @@ void main() {
       final Customer who = await regular('Tita Baby');
 
       await shop.customers.update(
-        who.copyWith(notes: 'Oat milk, no sugar', storedSegment: CustomerSegment.vip),
+        who.copyWith(
+          notes: 'Oat milk, no sugar',
+          storedSegment: CustomerSegment.vip,
+        ),
       );
       final Customer after = (await shop.customers.byId(who.id))!;
 
@@ -257,8 +265,7 @@ void main() {
       expect(after.storedSegment, CustomerSegment.vip);
     });
 
-    test('renaming somebody does not wipe what she wrote about them',
-        () async {
+    test('renaming somebody does not wipe what she wrote about them', () async {
       // The reason `copyWith` exists: the edit screen used to rebuild the
       // whole customer by hand, so every field added later was one that
       // could be silently dropped by a rename.

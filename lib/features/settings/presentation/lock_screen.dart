@@ -413,9 +413,7 @@ class _Keypad extends StatelessWidget {
           children: <Widget>[
             const Expanded(child: SizedBox()),
             Expanded(child: digit(0)),
-            Expanded(
-              child: key(const Icon(Icons.backspace_outlined), onBack),
-            ),
+            Expanded(child: key(const Icon(Icons.backspace_outlined), onBack)),
           ],
         ),
       ],

@@ -352,8 +352,18 @@ class CustomerDetailScreen extends ConsumerWidget {
     Customer customer,
   ) async {
     const List<String> months = <String>[
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     final int? month = await showModalBottomSheet<int>(
       context: context,
@@ -401,7 +411,8 @@ class CustomerDetailScreen extends ConsumerWidget {
       context,
       ref,
       customer.copyWith(
-        birthday: '${month.toString().padLeft(2, '0')}-'
+        birthday:
+            '${month.toString().padLeft(2, '0')}-'
             '${day.toString().padLeft(2, '0')}',
       ),
     );
@@ -589,13 +600,22 @@ class _Stat extends StatelessWidget {
   }
 }
 
-
 /// A moment, in words rather than in ISO.
 String _when(DateTime at) {
   final DateTime local = at.toLocal();
   const List<String> months = <String>[
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
   ];
   return '${local.day} ${months[local.month - 1]} ${local.year}';
 }

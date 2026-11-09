@@ -99,7 +99,9 @@ class ShopReset {
         whereArgs: <Object?>[key],
         limit: 1,
       );
-      final String? value = rows.isEmpty ? null : rows.first['value'] as String?;
+      final String? value = rows.isEmpty
+          ? null
+          : rows.first['value'] as String?;
       if (value != null && value.isNotEmpty) kept[key] = value;
     }
     return kept;

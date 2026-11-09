@@ -212,5 +212,4 @@ class _Postbox implements SyncTransport {
 
   @override
   Future<void> heartbeat({required String label}) async => _check();
-
 }

@@ -32,57 +32,56 @@ class LapsedScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('Who stopped coming')),
       body: AsyncView<List<LapsedCustomer>>(
         value: lapsed,
-        builder: (BuildContext context, List<LapsedCustomer> list) =>
-            ListView(
-              padding: const EdgeInsets.only(bottom: KuboSpacing.xxl),
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.all(KuboSpacing.lg),
+        builder: (BuildContext context, List<LapsedCustomer> list) => ListView(
+          padding: const EdgeInsets.only(bottom: KuboSpacing.xxl),
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.all(KuboSpacing.lg),
+              child: Text(
+                list.isEmpty
+                    ? 'Nobody is missing. Everyone who comes regularly '
+                          'has been in recently — which is the '
+                          'answer you want from this page.'
+                    : 'People who used to come regularly and have not '
+                          'been in for noticeably longer than usual. '
+                          'Worth most first.',
+                style: theme.textTheme.bodyMedium,
+              ),
+            ),
+            for (final LapsedCustomer gone in list)
+              ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: theme.colorScheme.surfaceContainerHigh,
                   child: Text(
-                    list.isEmpty
-                        ? 'Nobody is missing. Everyone who comes regularly '
-                              'has been in recently — which is the '
-                              'answer you want from this page.'
-                        : 'People who used to come regularly and have not '
-                              'been in for noticeably longer than usual. '
-                              'Worth most first.',
-                    style: theme.textTheme.bodyMedium,
+                    gone.customer.initials,
+                    style: theme.textTheme.labelLarge,
                   ),
                 ),
-                for (final LapsedCustomer gone in list)
-                  ListTile(
-                    leading: CircleAvatar(
-                      backgroundColor: theme.colorScheme.surfaceContainerHigh,
-                      child: Text(
-                        gone.customer.initials,
-                        style: theme.textTheme.labelLarge,
-                      ),
-                    ),
-                    title: Text(gone.customer.name),
-                    subtitle: Text(
-                      '${_away(gone.daysAway)} · ${gone.rhythm} · '
-                      '${gone.customer.orderCount} orders',
-                    ),
-                    trailing: MoneyText(gone.customer.totalSpend),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (BuildContext context) =>
-                            CustomerDetailScreen(customerId: gone.customer.id),
-                      ),
-                    ),
+                title: Text(gone.customer.name),
+                subtitle: Text(
+                  '${_away(gone.daysAway)} · ${gone.rhythm} · '
+                  '${gone.customer.orderCount} orders',
+                ),
+                trailing: MoneyText(gone.customer.totalSpend),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) =>
+                        CustomerDetailScreen(customerId: gone.customer.id),
                   ),
-                if (list.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.all(KuboSpacing.lg),
-                    child: Text(
-                      'Their mobile number is on their page, and so is what '
-                      'they usually order — which is most of a message, '
-                      'already written.',
-                      style: theme.textTheme.bodySmall,
-                    ),
-                  ),
-              ],
-            ),
+                ),
+              ),
+            if (list.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.all(KuboSpacing.lg),
+                child: Text(
+                  'Their mobile number is on their page, and so is what '
+                  'they usually order — which is most of a message, '
+                  'already written.',
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

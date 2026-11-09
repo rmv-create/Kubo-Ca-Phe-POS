@@ -152,8 +152,12 @@ class DailyClosingScreen extends ConsumerWidget {
         messenger
           ..clearSnackBars()
           ..showSnackBar(
-            SnackBar(content: Text('$day closed, but the backup failed: '
-                '$error')),
+            SnackBar(
+              content: Text(
+                '$day closed, but the backup failed: '
+                '$error',
+              ),
+            ),
           );
       }
     }
@@ -169,13 +173,11 @@ class DailyClosingScreen extends ConsumerWidget {
       ..clearSnackBars()
       ..showSnackBar(
         SnackBar(
-          content: Text(
-            switch (round.outcome) {
-              BackupOutcome.sent => '$day closed \u00b7 backed up to the cloud',
-              BackupOutcome.alreadyDone => '$day closed \u00b7 already backed up',
-              _ => '$day closed',
-            },
-          ),
+          content: Text(switch (round.outcome) {
+            BackupOutcome.sent => '$day closed \u00b7 backed up to the cloud',
+            BackupOutcome.alreadyDone => '$day closed \u00b7 already backed up',
+            _ => '$day closed',
+          }),
         ),
       );
 

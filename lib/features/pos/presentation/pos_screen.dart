@@ -202,8 +202,7 @@ class _PosHeader extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.lock_outline),
             tooltip: 'Lock',
-            onPressed: () =>
-                ref.read(signedInUserProvider.notifier).signOut(),
+            onPressed: () => ref.read(signedInUserProvider.notifier).signOut(),
           ),
           if (compact)
             IconButton(

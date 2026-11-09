@@ -140,16 +140,14 @@ class AccountService {
     'user-disabled' => 'That account has been switched off.',
     'user-not-found' ||
     'wrong-password' ||
-    'invalid-credential' =>
-      'That email and password do not match an account.',
+    'invalid-credential' => 'That email and password do not match an account.',
     'email-already-in-use' =>
       'There is already an account with that email. Sign in instead.',
-    'weak-password' => 'That password is too short. Use at least six '
-        'characters.',
-    'too-many-requests' =>
-      'Too many tries. Wait a few minutes and try again.',
-    'network-request-failed' =>
-      'No connection. Find signal and try again.',
+    'weak-password' =>
+      'That password is too short. Use at least six '
+          'characters.',
+    'too-many-requests' => 'Too many tries. Wait a few minutes and try again.',
+    'network-request-failed' => 'No connection. Find signal and try again.',
     'operation-not-allowed' =>
       'Email sign-in has not been switched on for this shop yet.',
     _ => 'Could not sign in. Please try again.',

@@ -63,8 +63,7 @@ void main() {
   String month() => shop.clock.now().toIso8601String().substring(0, 7);
 
   group('what the month earned', () {
-    test('the top line is what she charged, not what the menu says',
-        () async {
+    test('the top line is what she charged, not what the menu says', () async {
       await sell();
       await sell(discountOff: Money.of(20));
 
@@ -76,17 +75,19 @@ void main() {
       expect(r.netSales, Money.of(258));
     });
 
-    test('gross profit is what she charged less what it cost to make',
-        () async {
-      await sell();
+    test(
+      'gross profit is what she charged less what it cost to make',
+      () async {
+        await sell();
 
-      final BusinessReport r = await reports.forMonth(month());
+        final BusinessReport r = await reports.forMonth(month());
 
-      // 20 g of beans at ₱900/kg is ₱18.
-      expect(r.cogs, Money.of(18));
-      expect(r.grossProfit, Money.of(121));
-      expect(r.grossMarginBp, 8705, reason: '121 ÷ 139 = 87.05%');
-    });
+        // 20 g of beans at ₱900/kg is ₱18.
+        expect(r.cogs, Money.of(18));
+        expect(r.grossProfit, Money.of(121));
+        expect(r.grossMarginBp, 8705, reason: '121 ÷ 139 = 87.05%');
+      },
+    );
 
     test('spilling coffee comes off the trading profit', () async {
       await sell();
@@ -164,8 +165,7 @@ void main() {
       );
     });
 
-    test('per order is what the coffee made, not what the till took',
-        () async {
+    test('per order is what the coffee made, not what the till took', () async {
       await sellWithDelivery(Money.of(60));
       expect((await reports.forMonth(month())).perOrder, Money.of(139));
     });
@@ -205,28 +205,30 @@ void main() {
   });
 
   group('cash in and cash out', () {
-    test('stock bought is cash out, and is not a cost of this coffee',
-        () async {
-      await sell();
-      await shop.purchasing.recordPurchase(
-        lines: <PurchaseDraftLine>[
-          PurchaseDraftLine(
-            ingredientId: beans.id,
-            quantityInPurchaseUnits: 2,
-            totalCost: Money.of(1800),
-          ),
-        ],
-      );
+    test(
+      'stock bought is cash out, and is not a cost of this coffee',
+      () async {
+        await sell();
+        await shop.purchasing.recordPurchase(
+          lines: <PurchaseDraftLine>[
+            PurchaseDraftLine(
+              ingredientId: beans.id,
+              quantityInPurchaseUnits: 2,
+              totalCost: Money.of(1800),
+            ),
+          ],
+        );
 
-      final BusinessReport r = await reports.forMonth(month());
+        final BusinessReport r = await reports.forMonth(month());
 
-      expect(r.spentOnStock, Money.of(1800));
-      expect(r.netCashMovement, Money.of(139) - Money.of(1800));
-      // Most of those beans are still on the shelf, so they are not what
-      // this month's coffee cost. The profit must not move.
-      expect(r.cogs, Money.of(18));
-      expect(r.grossProfit, Money.of(121));
-    });
+        expect(r.spentOnStock, Money.of(1800));
+        expect(r.netCashMovement, Money.of(139) - Money.of(1800));
+        // Most of those beans are still on the shelf, so they are not what
+        // this month's coffee cost. The profit must not move.
+        expect(r.cogs, Money.of(18));
+        expect(r.grossProfit, Money.of(121));
+      },
+    );
 
     test('what is on the shelf is valued at what it cost', () async {
       final BusinessReport r = await reports.forMonth(month());
@@ -242,10 +244,7 @@ void main() {
       final List<BusyPeriod> hours = await reports.byHour(month());
 
       expect(hours, isNotEmpty);
-      expect(
-        hours.fold<int>(0, (int a, BusyPeriod b) => a + b.orderCount),
-        2,
-      );
+      expect(hours.fold<int>(0, (int a, BusyPeriod b) => a + b.orderCount), 2);
     });
 
     test('and by the day of the week', () async {

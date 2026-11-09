@@ -93,15 +93,14 @@ class ShopDirectory {
     try {
       // The owner's own till first: the rules let the first one in unasked,
       // and only while the shop does not exist yet.
-      await _shop(shopId)
-          .collection('tills')
-          .doc(ownerUid)
-          .set(<String, Object?>{
-            'label': label,
-            'role': 'owner',
-            'device_id': deviceId,
-            'joined_at': FieldValue.serverTimestamp(),
-          });
+      await _shop(
+        shopId,
+      ).collection('tills').doc(ownerUid).set(<String, Object?>{
+        'label': label,
+        'role': 'owner',
+        'device_id': deviceId,
+        'joined_at': FieldValue.serverTimestamp(),
+      });
       await _shop(shopId).set(<String, Object?>{
         'owner_uid': ownerUid,
         'opened_at': FieldValue.serverTimestamp(),

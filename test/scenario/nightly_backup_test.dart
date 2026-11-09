@@ -88,7 +88,10 @@ void main() {
       await nightly.run(day: '2026-11-08');
       await nightly.run(day: '2026-11-09');
 
-      expect(store.kept.keys, containsAll(<String>['2026-11-08', '2026-11-09']));
+      expect(
+        store.kept.keys,
+        containsAll(<String>['2026-11-08', '2026-11-09']),
+      );
     });
   });
 
@@ -115,15 +118,17 @@ void main() {
       expect(await nightly.lastProblem(), isNull);
     });
 
-    test('a shop with no owner says so, rather than failing silently',
-        () async {
-      await settings.writeRaw(SettingKeys.syncShopId, '');
+    test(
+      'a shop with no owner says so, rather than failing silently',
+      () async {
+        await settings.writeRaw(SettingKeys.syncShopId, '');
 
-      final BackupRound round = await nightly.run(day: '2026-11-08');
+        final BackupRound round = await nightly.run(day: '2026-11-08');
 
-      expect(round.outcome, BackupOutcome.skipped);
-      expect(round.message, contains('no owner yet'));
-    });
+        expect(round.outcome, BackupOutcome.skipped);
+        expect(round.message, contains('no owner yet'));
+      },
+    );
 
     test('a refusal reads as a refusal, not as weather', () async {
       store.throwWith = Exception('permission-denied: not a till');

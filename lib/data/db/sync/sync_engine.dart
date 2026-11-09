@@ -73,7 +73,8 @@ class SyncEngine {
       for (final SyncedTable table in syncedTables) {
         // Derived rows are recomputed at the far end, never carried.
         if (table.kind == SyncKind.derived) continue;
-        final List<Map<String, Object?>> rows = await txn.rawQuery('''
+        final List<Map<String, Object?>> rows = await txn.rawQuery(
+          '''
           SELECT t.rowid AS rid, t.uid AS uid FROM ${table.name} t
           WHERE t.uid IS NOT NULL
             AND NOT EXISTS (
@@ -81,7 +82,9 @@ class SyncEngine {
               WHERE o.table_name = ? AND o.sent_at IS NULL
                 AND (o.row_id = t.rowid OR o.row_uid = t.uid)
             )
-        ''', <Object?>[table.name]);
+        ''',
+          <Object?>[table.name],
+        );
         for (final Map<String, Object?> row in rows) {
           await txn.insert('sync_outbox', <String, Object?>{
             'table_name': table.name,

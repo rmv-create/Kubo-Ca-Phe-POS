@@ -25,6 +25,8 @@ class M015CustomerBirthday extends Migration {
   @override
   Future<void> up(DatabaseExecutor db) async {
     await db.execute('ALTER TABLE customers ADD COLUMN birthday TEXT');
-    await db.execute('CREATE INDEX idx_customers_birthday ON customers(birthday)');
+    await db.execute(
+      'CREATE INDEX idx_customers_birthday ON customers(birthday)',
+    );
   }
 }

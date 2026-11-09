@@ -42,7 +42,9 @@ class ActivityLog {
       'ORDER BY d DESC LIMIT ?',
       <Object?>[limit],
     );
-    return <String>[for (final Map<String, Object?> r in rows) r['d']! as String];
+    return <String>[
+      for (final Map<String, Object?> r in rows) r['d']! as String,
+    ];
   }
 }
 

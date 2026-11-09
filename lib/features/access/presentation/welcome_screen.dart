@@ -62,7 +62,9 @@ class _WelcomeScreenState extends ConsumerState<WelcomeScreen> {
                   ),
                   const SizedBox(height: KuboSpacing.xxl),
                   switch (_door) {
-                    _Door.none => _Doors(onPick: (_Door d) => setState(() => _door = d)),
+                    _Door.none => _Doors(
+                      onPick: (_Door d) => setState(() => _door = d),
+                    ),
                     _Door.signIn => _AccountForm(
                       key: const ValueKey<String>('signIn'),
                       isNewShop: false,
@@ -123,8 +125,10 @@ class _Doors extends StatelessWidget {
             child: const Text('SET UP THE SHOP'),
           ),
         ),
-        note('First time here. Choose an email and a password, and the '
-            'menu goes on this phone.'),
+        note(
+          'First time here. Choose an email and a password, and the '
+          'menu goes on this phone.',
+        ),
 
         SizedBox(
           height: KuboTouch.payButton,
@@ -133,8 +137,10 @@ class _Doors extends StatelessWidget {
             child: const Text('SIGN IN'),
           ),
         ),
-        note('The shop is already set up and this is a new phone, or this '
-            'one forgot.'),
+        note(
+          'The shop is already set up and this is a new phone, or this '
+          'one forgot.',
+        ),
 
         SizedBox(
           height: KuboTouch.payButton,
@@ -143,8 +149,10 @@ class _Doors extends StatelessWidget {
             child: const Text('I HAVE AN INVITE'),
           ),
         ),
-        note('Working here? Ask the owner for an invite \u2014 eight '
-            'characters, good for ten minutes.'),
+        note(
+          'Working here? Ask the owner for an invite \u2014 eight '
+          'characters, good for ten minutes.',
+        ),
       ],
     );
   }
@@ -153,7 +161,11 @@ class _Doors extends StatelessWidget {
 /// Signing in, or opening a shop. The same two fields either way; what
 /// differs is whether the account is being made or found.
 class _AccountForm extends ConsumerStatefulWidget {
-  const _AccountForm({required this.isNewShop, required this.onBack, super.key});
+  const _AccountForm({
+    required this.isNewShop,
+    required this.onBack,
+    super.key,
+  });
 
   final bool isNewShop;
   final VoidCallback onBack;
@@ -204,8 +216,8 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
           decoration: InputDecoration(
             labelText: 'Password',
             helperText: widget.isNewShop
-              ? 'At least six characters. You are choosing it now.'
-              : null,
+                ? 'At least six characters. You are choosing it now.'
+                : null,
             suffixIcon: IconButton(
               icon: Icon(_hidden ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _hidden = !_hidden),
@@ -237,7 +249,10 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
           ),
         ),
         const SizedBox(height: KuboSpacing.sm),
-        TextButton(onPressed: _busy ? null : widget.onBack, child: const Text('Back')),
+        TextButton(
+          onPressed: _busy ? null : widget.onBack,
+          child: const Text('Back'),
+        ),
         if (widget.isNewShop) ...<Widget>[
           const SizedBox(height: KuboSpacing.md),
           Text(
@@ -261,10 +276,7 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
 
     final ShopAccessService access = ref.read(shopAccessServiceProvider);
     final AccessOutcome outcome = widget.isNewShop
-        ? await access.openShop(
-            email: _email.text,
-            password: _password.text,
-          )
+        ? await access.openShop(email: _email.text, password: _password.text)
         : await access.signIn(email: _email.text, password: _password.text);
 
     if (!mounted) return;
@@ -381,7 +393,10 @@ class _JoinFormState extends ConsumerState<_JoinForm> {
           ),
         ),
         const SizedBox(height: KuboSpacing.sm),
-        TextButton(onPressed: _busy ? null : widget.onBack, child: const Text('Back')),
+        TextButton(
+          onPressed: _busy ? null : widget.onBack,
+          child: const Text('Back'),
+        ),
         const SizedBox(height: KuboSpacing.md),
         Text(
           'Joining needs signal, just this once. Afterwards the till works '

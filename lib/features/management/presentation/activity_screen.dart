@@ -35,10 +35,7 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
       appBar: AppBar(
         title: const Text('Everything that happened'),
         actions: <Widget>[
-          TextButton(
-            onPressed: _pickDay,
-            child: Text(_day ?? 'All'),
-          ),
+          TextButton(onPressed: _pickDay, child: Text(_day ?? 'All')),
         ],
       ),
       body: AsyncView<List<ActivityEntry>>(
@@ -70,7 +67,8 @@ class _ActivityScreenState extends ConsumerState<ActivityScreen> {
                   ),
                 ),
               for (int i = 0; i < shown.length; i++) ...<Widget>[
-                if (i == 0 || shown[i].businessDate != shown[i - 1].businessDate)
+                if (i == 0 ||
+                    shown[i].businessDate != shown[i - 1].businessDate)
                   SectionHeader(shown[i].businessDate),
                 ListTile(
                   dense: true,

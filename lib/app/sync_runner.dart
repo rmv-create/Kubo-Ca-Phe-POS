@@ -71,8 +71,7 @@ class SyncRunner {
     }
   }
 
-  Future<String> _label() =>
-      _ref.read(shopAccessServiceProvider).deviceLabel();
+  Future<String> _label() => _ref.read(shopAccessServiceProvider).deviceLabel();
 }
 
 final Provider<SyncRunner> syncRunnerProvider = Provider<SyncRunner>((Ref ref) {

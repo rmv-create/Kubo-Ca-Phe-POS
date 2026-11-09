@@ -125,7 +125,9 @@ class CloudSyncService {
       onProgress?.call(applied);
 
       // Nothing sent, nothing taken in, nothing waiting: we are level.
-      if (last.sent == 0 && tookIn == 0 && (last.applied?.waitingForParent ?? 0) == 0) {
+      if (last.sent == 0 &&
+          tookIn == 0 &&
+          (last.applied?.waitingForParent ?? 0) == 0) {
         break;
       }
     }

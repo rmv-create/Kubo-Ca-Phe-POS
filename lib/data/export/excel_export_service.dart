@@ -78,7 +78,6 @@ class ExcelExportService {
     return file;
   }
 
-
   // ── one sheet at a time, each in its own workbook ──
   //
   // Kept because each is separately useful and separately tested: a test
@@ -164,7 +163,6 @@ class ExcelExportService {
       ]);
     }
     _totalsRow(sheet, row, products);
-
   }
 
   Future<void> _fillMonthlySales(Excel book, String month) async {
@@ -202,15 +200,16 @@ class ExcelExportService {
       ]);
     }
     _totalsRow(sheet, row, products);
-
   }
 
-  Future<void> _fillProductProfitability(Excel book, {required String month}) async {
+  Future<void> _fillProductProfitability(
+    Excel book, {
+    required String month,
+  }) async {
     final List<ProductPerformance> bestSellers = await _reporting
         .productPerformance(month: month);
     final List<ProductPerformance> mostProfitable = await _reporting
         .mostProfitable(month: month);
-
 
     // Two sheets, because the drink that sells most and the drink that earns
     // most are usually not the same one.
@@ -221,7 +220,6 @@ class ExcelExportService {
     final Sheet profit = book['Most Profitable'];
     _title(profit, 'MOST PROFITABLE', month);
     _performanceTable(profit, mostProfitable, startRow: 3);
-
   }
 
   Future<void> _fillInventory(Excel book) async {
@@ -282,7 +280,6 @@ class ExcelExportService {
         TextCellValue(mv.reason ?? ''),
       ]);
     }
-
   }
 
   Future<void> _fillWaste(Excel book) async {
@@ -319,7 +316,6 @@ class ExcelExportService {
         .value = _money(
       Money(total),
     );
-
   }
 
   Future<void> _fillCustomers(Excel book) async {
@@ -352,7 +348,6 @@ class ExcelExportService {
         TextCellValue(c.storedSegment.label),
       ]);
     }
-
   }
 
   Future<void> _fillPurchases(Excel book) async {
@@ -381,7 +376,6 @@ class ExcelExportService {
         ]);
       }
     }
-
   }
 
   Future<void> _fillSuppliers(Excel book) async {
@@ -406,7 +400,6 @@ class ExcelExportService {
         TextCellValue(s.notes ?? ''),
       ]);
     }
-
   }
 
   Future<File> exportDailyClosing(DailyClosing closing) async {
@@ -597,7 +590,6 @@ class ExcelExportService {
   }
 }
 
-
 /// The codes payments carry, in the words on the buttons.
 String _methodName(String code) => switch (code) {
   'cash' => 'Cash',
@@ -607,7 +599,6 @@ String _methodName(String code) => switch (code) {
   'bpi' => 'BPI',
   _ => code,
 };
-
 
 /// A workbook, as bytes, with the name it should be saved under.
 class ExcelBook {

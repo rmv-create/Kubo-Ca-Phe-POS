@@ -25,9 +25,7 @@ void main() {
 
   Future<void> build({bool separate = false}) async {
     clock = testClock();
-    db = separate
-        ? await openSeparateTestDatabase()
-        : await openTestDatabase();
+    db = separate ? await openSeparateTestDatabase() : await openTestDatabase();
     account = _Account();
     directory = _Directory();
     access = ShopAccessService(
@@ -112,18 +110,21 @@ void main() {
       expect(directory.createdOwner, account.current!.uid);
     });
 
-    test('a shop that could not be opened leaves no half-shop behind', () async {
-      directory.refuseToCreate = true;
+    test(
+      'a shop that could not be opened leaves no half-shop behind',
+      () async {
+        directory.refuseToCreate = true;
 
-      final AccessOutcome opened = await access.openShop(
-        email: 'her@example.com',
-        password: 'a-good-password',
-      );
+        final AccessOutcome opened = await access.openShop(
+          email: 'her@example.com',
+          password: 'a-good-password',
+        );
 
-      expect(opened.succeeded, isFalse);
-      expect(await access.standing(), ShopStanding.outside);
-      expect(await drinkCount(), 0, reason: 'no orphan menu');
-    });
+        expect(opened.succeeded, isFalse);
+        expect(await access.standing(), ShopStanding.outside);
+        expect(await drinkCount(), 0, reason: 'no orphan menu');
+      },
+    );
 
     test('everything she already has is queued for the barista', () async {
       await access.openShop(
@@ -135,32 +136,35 @@ void main() {
       expect(
         await engine.pendingCount(),
         greaterThan(100),
-        reason: 'the whole menu has to reach the other phone, not just '
+        reason:
+            'the whole menu has to reach the other phone, not just '
             'what changes from now on',
       );
     });
   });
 
   group('the owners list', () {
-    test('an email nobody approved opens no shop, and leaves no account',
-        () async {
-      directory.refuseAsUnapproved = true;
+    test(
+      'an email nobody approved opens no shop, and leaves no account',
+      () async {
+        directory.refuseAsUnapproved = true;
 
-      final AccessOutcome tried = await access.openShop(
-        email: 'a.stranger@example.com',
-        password: 'a-good-password',
-      );
+        final AccessOutcome tried = await access.openShop(
+          email: 'a.stranger@example.com',
+          password: 'a-good-password',
+        );
 
-      expect(tried.succeeded, isFalse);
-      expect(tried.problem, contains('not approved'));
-      expect(await access.standing(), ShopStanding.outside);
-      expect(await drinkCount(), 0, reason: 'no shop, not even a blank one');
-      expect(
-        account.discarded,
-        isTrue,
-        reason: 'a refused attempt should not leave a dead account behind',
-      );
-    });
+        expect(tried.succeeded, isFalse);
+        expect(tried.problem, contains('not approved'));
+        expect(await access.standing(), ShopStanding.outside);
+        expect(await drinkCount(), 0, reason: 'no shop, not even a blank one');
+        expect(
+          account.discarded,
+          isTrue,
+          reason: 'a refused attempt should not leave a dead account behind',
+        );
+      },
+    );
 
     test('being refused reads differently from having no signal', () async {
       directory.refuseToCreate = true;
@@ -307,17 +311,19 @@ void main() {
       expect(await drinkCount(), 1, reason: 'her drink, not a fresh seed');
     });
 
-    test('claiming sends the shop she already has, not just what is next',
-        () async {
-      await alreadyTrading();
-      await access.claimThisShop(
-        email: 'her@example.com',
-        password: 'a-good-password',
-      );
+    test(
+      'claiming sends the shop she already has, not just what is next',
+      () async {
+        await alreadyTrading();
+        await access.claimThisShop(
+          email: 'her@example.com',
+          password: 'a-good-password',
+        );
 
-      final SyncEngine engine = SyncEngine(database: db, clock: clock);
-      expect(await engine.pendingCount(), greaterThan(0));
-    });
+        final SyncEngine engine = SyncEngine(database: db, clock: clock);
+        expect(await engine.pendingCount(), greaterThan(0));
+      },
+    );
 
     test('a refused claim changes nothing on the phone', () async {
       await alreadyTrading();

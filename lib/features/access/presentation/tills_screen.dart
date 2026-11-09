@@ -114,13 +114,13 @@ class _TillsScreenState extends ConsumerState<TillsScreen> {
             for (final AdmittedTill till in tills)
               ListTile(
                 leading: Icon(
-                  till.isOwner ? Icons.verified_user_outlined : Icons.smartphone,
+                  till.isOwner
+                      ? Icons.verified_user_outlined
+                      : Icons.smartphone,
                 ),
                 title: Text(till.label),
                 subtitle: Text(
-                  till.isOwner
-                      ? 'You — everything'
-                      : 'Barista — the POS only',
+                  till.isOwner ? 'You — everything' : 'Barista — the POS only',
                 ),
                 trailing: till.isOwner
                     ? null
@@ -207,9 +207,7 @@ class _InviteCard extends StatelessWidget {
               code,
               style: theme.textTheme.displaySmall?.copyWith(
                 letterSpacing: 6,
-                fontFeatures: const <FontFeature>[
-                  FontFeature.tabularFigures(),
-                ],
+                fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
               ),
             ),
             const SizedBox(height: KuboSpacing.sm),
@@ -233,7 +231,6 @@ class _InviteCard extends StatelessWidget {
     );
   }
 }
-
 
 /// Puts an account around a shop that is already running on this phone.
 ///
@@ -366,7 +363,6 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
   }
 }
 
-
 /// Where this till stands with the others.
 ///
 /// A sync that works silently and a sync that is broken look identical
@@ -415,9 +411,7 @@ class _SyncLine extends ConsumerWidget {
                           ? 'Not synced yet'
                           : 'Synced ${_ago(standing.lastAt!)}'),
                   style: theme.textTheme.bodyMedium?.copyWith(
-                    color: unhappy
-                        ? theme.colorScheme.onErrorContainer
-                        : null,
+                    color: unhappy ? theme.colorScheme.onErrorContainer : null,
                   ),
                 ),
                 Text(
@@ -427,9 +421,7 @@ class _SyncLine extends ConsumerWidget {
                             '${standing.waiting == 1 ? 'thing' : 'things'} '
                             'waiting to go',
                   style: theme.textTheme.bodySmall?.copyWith(
-                    color: unhappy
-                        ? theme.colorScheme.onErrorContainer
-                        : null,
+                    color: unhappy ? theme.colorScheme.onErrorContainer : null,
                   ),
                 ),
               ],

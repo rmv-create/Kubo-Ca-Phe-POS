@@ -74,11 +74,7 @@ class StatementScreen extends ConsumerWidget {
   }
 
   /// Plain text, because it has to survive being pasted into Messenger.
-  static String _asText(
-    String shop,
-    Customer who,
-    List<OrderRecord> orders,
-  ) {
+  static String _asText(String shop, Customer who, List<OrderRecord> orders) {
     final StringBuffer out = StringBuffer()
       ..writeln(shop)
       ..writeln('Statement for ${who.name}')

@@ -118,6 +118,7 @@ class BusinessSettings {
   final int orderNumberStart;
   final int backupRetentionCount;
   final bool autoBackupDaily;
+
   /// Whether the POS shows a discount button at all.
   final bool discountsEnabled;
 

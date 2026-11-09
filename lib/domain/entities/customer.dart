@@ -125,8 +125,18 @@ class Customer {
     final String? raw = birthday;
     if (raw == null || raw.length != 5) return null;
     const List<String> months = <String>[
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December',
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
     ];
     final int? month = int.tryParse(raw.substring(0, 2));
     final int? day = int.tryParse(raw.substring(3));
@@ -222,7 +232,6 @@ class UsualOrder {
   String get title => '$sizeName $productName';
   String get subtitle => optionNames.join(' · ');
 }
-
 
 /// A regular who has stopped coming.
 ///

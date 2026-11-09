@@ -629,7 +629,6 @@ final Provider<ExcelExportService> excelExportProvider =
       ),
     );
 
-
 // ─────────────────────────── getting in ───────────────────────────
 
 /// The owner's account. One per app, because signing in is a fact about
@@ -672,7 +671,6 @@ final FutureProvider<bool> isOwnerTillProvider = FutureProvider<bool>(
   (Ref ref) => ref.watch(shopAccessServiceProvider).isOwner,
 );
 
-
 // ───────────────────────── the nightly copy ─────────────────────────
 
 final Provider<ShopBackupStore> shopBackupStoreProvider =
@@ -698,23 +696,22 @@ final FutureProvider<List<CloudBackup>> cloudBackupsProvider =
       (Ref ref) => ref.watch(nightlyBackupProvider).list(),
     );
 
-
 /// How many days since she last saved a copy out of Kubo altogether.
 ///
 /// Null when she never has. The shop's own cloud is one basket; this counts
 /// the days since she put an egg in another.
-final FutureProvider<int?> daysSinceOffSiteCopyProvider =
-    FutureProvider<int?>((Ref ref) async {
-      final String? day = await ref
-          .watch(settingsRepositoryProvider)
-          .readRaw(SettingKeys.cloudLastOffSiteDay);
-      if (day == null || day.isEmpty) return null;
-      final DateTime? then = DateTime.tryParse(day);
-      if (then == null) return null;
-      final DateTime now = ref.watch(clockProvider).now();
-      return DateTime(now.year, now.month, now.day).difference(then).inDays;
-    });
-
+final FutureProvider<int?> daysSinceOffSiteCopyProvider = FutureProvider<int?>((
+  Ref ref,
+) async {
+  final String? day = await ref
+      .watch(settingsRepositoryProvider)
+      .readRaw(SettingKeys.cloudLastOffSiteDay);
+  if (day == null || day.isEmpty) return null;
+  final DateTime? then = DateTime.tryParse(day);
+  if (then == null) return null;
+  final DateTime now = ref.watch(clockProvider).now();
+  return DateTime(now.year, now.month, now.day).difference(then).inDays;
+});
 
 // ───────────────────────── the month, read whole ─────────────────────────
 
@@ -731,7 +728,8 @@ final FutureProviderFamily<BusinessReport, String> monthReportProvider =
 
 final FutureProviderFamily<List<BusyPeriod>, String> busyByHourProvider =
     FutureProvider.family<List<BusyPeriod>, String>(
-      (Ref ref, String month) => ref.watch(businessReportProvider).byHour(month),
+      (Ref ref, String month) =>
+          ref.watch(businessReportProvider).byHour(month),
     );
 
 final FutureProviderFamily<List<BusyPeriod>, String> busyByWeekdayProvider =
@@ -740,11 +738,11 @@ final FutureProviderFamily<List<BusyPeriod>, String> busyByWeekdayProvider =
           ref.watch(businessReportProvider).byWeekday(month),
     );
 
-final FutureProviderFamily<List<DiscountGiven>, String>
-discountsGivenProvider = FutureProvider.family<List<DiscountGiven>, String>(
-  (Ref ref, String month) =>
-      ref.watch(businessReportProvider).discountsGiven(month),
-);
+final FutureProviderFamily<List<DiscountGiven>, String> discountsGivenProvider =
+    FutureProvider.family<List<DiscountGiven>, String>(
+      (Ref ref, String month) =>
+          ref.watch(businessReportProvider).discountsGiven(month),
+    );
 
 final FutureProviderFamily<List<WasteByReason>, String> wasteByReasonProvider =
     FutureProvider.family<List<WasteByReason>, String>(
@@ -752,18 +750,13 @@ final FutureProviderFamily<List<WasteByReason>, String> wasteByReasonProvider =
           ref.watch(businessReportProvider).wasteByReason(month),
     );
 
-
 /// Everything that has happened, newest first.
 final FutureProviderFamily<List<ActivityEntry>, String?> activityProvider =
-    FutureProvider.family<List<ActivityEntry>, String?>((
-      Ref ref,
-      String? day,
-    ) {
+    FutureProvider.family<List<ActivityEntry>, String?>((Ref ref, String? day) {
       ref.watch(salesRevisionProvider);
       ref.watch(stockRevisionProvider);
       return ActivityLog(ref.watch(databaseProvider)).recent(businessDate: day);
     });
-
 
 // ─────────────────────────── who is holding it ───────────────────────────
 
@@ -787,12 +780,9 @@ final FutureProvider<PeopleGate> peopleGateProvider =
     FutureProvider<PeopleGate>((Ref ref) async {
       if (ref.watch(signedInUserProvider) != null) return PeopleGate.open;
       ref.watch(userRevisionProvider);
-      final bool anybody = await ref
-          .watch(signInServiceProvider)
-          .hasAnyUser();
+      final bool anybody = await ref.watch(signInServiceProvider).hasAnyUser();
       return anybody ? PeopleGate.locked : PeopleGate.needsPins;
     });
-
 
 // ──────────────────────── telling the other till ────────────────────────
 
@@ -803,9 +793,7 @@ final FutureProvider<PeopleGate> peopleGateProvider =
 /// "this phone is not in a shop yet".
 final FutureProvider<SyncTransport?> syncTransportProvider =
     FutureProvider<SyncTransport?>((Ref ref) async {
-      final String? shop = await ref
-          .watch(shopAccessServiceProvider)
-          .shopId();
+      final String? shop = await ref.watch(shopAccessServiceProvider).shopId();
       if (shop == null) return null;
       return FirestoreSyncTransport(
         shopId: shop,

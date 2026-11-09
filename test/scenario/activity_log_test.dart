@@ -43,41 +43,48 @@ void main() {
     );
 
     final List<ActivityEntry> entries = await log.recent();
-    final List<String> actions =
-        entries.map((ActivityEntry e) => e.action).toList();
+    final List<String> actions = entries
+        .map((ActivityEntry e) => e.action)
+        .toList();
 
     expect(actions, contains('order_completed'));
     expect(actions, contains('order_voided'));
     expect(actions, contains('waste_recorded'));
   });
 
-  test('newest first, so the last thing done is the first thing seen',
-      () async {
-    await sell();
-    shop.clock.advance(const Duration(minutes: 5));
-    final CompletedOrder second = await sell();
+  test(
+    'newest first, so the last thing done is the first thing seen',
+    () async {
+      await sell();
+      shop.clock.advance(const Duration(minutes: 5));
+      final CompletedOrder second = await sell();
 
-    final List<ActivityEntry> entries = await log.recent();
-    expect(entries.first.summary, contains(second.orderNo));
-  });
+      final List<ActivityEntry> entries = await log.recent();
+      expect(entries.first.summary, contains(second.orderNo));
+    },
+  );
 
-  test('a void is flagged as worth noticing; an ordinary order is not',
-      () async {
-    final CompletedOrder done = await sell();
-    await shop.sales.voidOrder(orderId: done.id, reason: 'Mistake');
+  test(
+    'a void is flagged as worth noticing; an ordinary order is not',
+    () async {
+      final CompletedOrder done = await sell();
+      await shop.sales.voidOrder(orderId: done.id, reason: 'Mistake');
 
-    final List<ActivityEntry> entries = await log.recent();
-    expect(
-      entries.firstWhere((ActivityEntry e) => e.action == 'order_voided')
-          .isNotable,
-      isTrue,
-    );
-    expect(
-      entries.firstWhere((ActivityEntry e) => e.action == 'order_completed')
-          .isNotable,
-      isFalse,
-    );
-  });
+      final List<ActivityEntry> entries = await log.recent();
+      expect(
+        entries
+            .firstWhere((ActivityEntry e) => e.action == 'order_voided')
+            .isNotable,
+        isTrue,
+      );
+      expect(
+        entries
+            .firstWhere((ActivityEntry e) => e.action == 'order_completed')
+            .isNotable,
+        isFalse,
+      );
+    },
+  );
 
   test('it records who was at the till', () async {
     // The column has existed since staff PINs were added and nothing ever
@@ -103,9 +110,7 @@ void main() {
     shop.clock.advance(const Duration(days: 1));
     await sell();
 
-    final List<ActivityEntry> justToday = await log.recent(
-      businessDate: today,
-    );
+    final List<ActivityEntry> justToday = await log.recent(businessDate: today);
     expect(justToday, isNotEmpty);
     expect(
       justToday.every((ActivityEntry e) => e.businessDate == today),
