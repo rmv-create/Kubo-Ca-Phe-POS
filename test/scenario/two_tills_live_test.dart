@@ -5,11 +5,9 @@ import 'package:kubo_pos/data/db/sync/sync_change.dart';
 import 'package:kubo_pos/data/db/sync/sync_engine.dart';
 import 'package:kubo_pos/data/db/sync/sync_transport.dart';
 import 'package:kubo_pos/data/repositories/settings_repository_impl.dart';
-import 'package:kubo_pos/domain/entities/business_settings.dart';
 import 'package:kubo_pos/domain/entities/order_draft.dart';
 
 import '../support/pos_fixture.dart';
-import '../support/test_database.dart';
 
 /// Two phones, one shop — the whole errand, not just the merge.
 ///
