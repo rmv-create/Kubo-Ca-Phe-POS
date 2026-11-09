@@ -6,11 +6,11 @@ const { chromium } = require('playwright');
     ['barista.html','Kubo Ca Phe - Barista Guide.pdf', 'Barista'],
   ]) {
     const p = await b.newPage();
-    await p.goto('file:///tmp/manual/' + src, { waitUntil: 'networkidle' });
+    await p.goto('file://' + __dirname + '/' + src, { waitUntil: 'networkidle' });
     await p.evaluate(() => document.fonts.ready);
     await p.waitForTimeout(500);
     await p.pdf({
-      path: '/tmp/manual/' + out,
+      path: __dirname + '/' + out,
       format: 'A4',
       printBackground: true,
       displayHeaderFooter: true,
