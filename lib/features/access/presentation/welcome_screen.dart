@@ -180,6 +180,8 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
   bool _busy = false;
   bool _hidden = true;
   String? _problem;
+  bool _pulling = false;
+  int _pulled = 0;
 
   @override
   void dispose() {
@@ -234,6 +236,18 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
             ),
           ),
         ],
+        // Bringing the shop down can take a moment on a new phone, and a
+        // button that only spins looks like nothing is happening.
+        if (_pulling) ...<Widget>[
+          const SizedBox(height: KuboSpacing.md),
+          Text(
+            _pulled == 0
+                ? 'Getting your shop\u2026'
+                : 'Getting your shop\u2026 $_pulled so far',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
         const SizedBox(height: KuboSpacing.lg),
         SizedBox(
           height: KuboTouch.payButton,
@@ -281,6 +295,31 @@ class _AccountFormState extends ConsumerState<_AccountForm> {
 
     if (!mounted) return;
     if (outcome.succeeded) {
+      // Being let in is not the same as having the shop. Signing in on a
+      // phone that has never held it — a new one, or a browser that was
+      // cleared — left her looking at an empty POS and being asked to set
+      // everything up again, which is what a broken app looks like.
+      //
+      // This runs behind both doors, not just SIGN IN. Setting the shop up
+      // again with an email that already owns one adopts that shop rather
+      // than making a second, and an adopted shop arrives just as empty.
+      setState(() => _pulling = true);
+      ref.invalidate(syncTransportProvider);
+      ref.invalidate(cloudSyncProvider);
+      try {
+        final CloudSyncService sync = await ref.read(cloudSyncProvider.future);
+        await sync.catchUp(
+          onProgress: (int applied) {
+            if (mounted) setState(() => _pulled = applied);
+          },
+        );
+      } on Object {
+        // No signal, or nothing up there yet. Either way she is better off
+        // inside her shop with the menu than outside it with an error.
+      }
+      // Whatever the pull did or did not bring, she ends up with a menu.
+      await access.fillIfStillEmpty();
+      if (!mounted) return;
       ref.invalidate(shopStandingProvider);
       return;
     }

@@ -48,6 +48,13 @@ void main() {
     return rows.first['n']! as int;
   }
 
+  Future<int> countOf(String table) async {
+    final List<Map<String, Object?>> rows = await db.db.rawQuery(
+      'SELECT COUNT(*) AS n FROM $table',
+    );
+    return rows.first['n']! as int;
+  }
+
   group('a phone nobody has let in', () {
     test('holds no shop, so there is nothing to show', () async {
       expect(await access.standing(), ShopStanding.outside);
@@ -140,6 +147,108 @@ void main() {
             'the whole menu has to reach the other phone, not just '
             'what changes from now on',
       );
+    });
+  });
+
+  group('coming back to a shop she already has', () {
+    // She signed in on a phone that had never held the shop, and landed in
+    // an empty app being asked to set everything up from the beginning.
+    // Signing in said which shop was hers; nothing ever put it on the phone.
+    test('signing in alone leaves the phone empty', () async {
+      await access.openShop(email: 'her@kubo.ph', password: 'longenough');
+      await db.close();
+      await build(separate: true);
+      directory.ownShop('uid-of-her@kubo.ph', 'shop-1');
+      account.knownPassword = 'longenough';
+
+      final AccessOutcome back = await access.signIn(
+        email: 'her@kubo.ph',
+        password: 'longenough',
+      );
+
+      expect(back.succeeded, isTrue);
+      expect(await drinkCount(), 0, reason: 'this is the bug she hit');
+    });
+
+    test('and filling afterwards gives her the whole shop back', () async {
+      await db.close();
+      await build(separate: true);
+      directory.ownShop('uid-of-her@kubo.ph', 'shop-1');
+      account.knownPassword = 'longenough';
+      await access.signIn(email: 'her@kubo.ph', password: 'longenough');
+
+      await access.fillIfStillEmpty();
+
+      expect(await drinkCount(), 9);
+      expect(await countOf('ingredients'), 22);
+      expect(await countOf('recipes'), 18);
+      expect(await countOf('recipe_items'), 180);
+      expect(await countOf('option_ingredient_effects'), 25);
+    });
+
+    test('filling never writes over a shop that did come down', () async {
+      await access.openShop(email: 'her@kubo.ph', password: 'longenough');
+      final int before = await countOf('recipe_items');
+
+      await access.fillIfStillEmpty();
+      await access.fillIfStillEmpty();
+
+      expect(await drinkCount(), 9, reason: 'no second menu beside the first');
+      expect(await countOf('recipe_items'), before);
+    });
+  });
+
+  group('setting the shop up again with the same email', () {
+    // Clearing the browser, or moving to a new phone, leaves Firebase
+    // holding the account while the phone remembers nothing. Setting up
+    // again is the obvious thing to try, and it used to dead-end.
+    test('adopts the shop that account already owns', () async {
+      await access.openShop(email: 'her@kubo.ph', password: 'longenough');
+      final String? first = await access.shopId();
+      directory.createdShop = null;
+
+      await db.close();
+      await build(separate: true);
+      account.registered.add('her@kubo.ph');
+      account.knownPassword = 'longenough';
+      directory.ownShop('uid-of-her@kubo.ph', first!);
+
+      final AccessOutcome again = await access.openShop(
+        email: 'her@kubo.ph',
+        password: 'longenough',
+      );
+
+      expect(again.succeeded, isTrue);
+      expect(
+        await access.shopId(),
+        first,
+        reason: 'the same shop, not a new one',
+      );
+      expect(directory.createdShop, isNull, reason: 'no second shop beside it');
+
+      // An adopted shop arrives as empty as a signed-into one, so the same
+      // fill has to run behind this door too.
+      expect(await drinkCount(), 0);
+      await access.fillIfStillEmpty();
+      expect(await drinkCount(), 9);
+      expect(await countOf('recipe_items'), 180);
+    });
+
+    test('the wrong password says so, and opens nothing', () async {
+      await db.close();
+      await build(separate: true);
+      account.registered.add('her@kubo.ph');
+      account.knownPassword = 'longenough';
+
+      final AccessOutcome refused = await access.openShop(
+        email: 'her@kubo.ph',
+        password: 'notthatone',
+      );
+
+      expect(refused.succeeded, isFalse);
+      expect(refused.problem, contains('already a shop under that email'));
+      expect(await access.shopId(), isNull);
+      expect(await drinkCount(), 0);
     });
   });
 
@@ -404,6 +513,9 @@ class _Account extends AccountService {
   String knownPassword = '';
   AccountUser? _user;
 
+  /// Emails Firebase already holds an account for.
+  final Set<String> registered = <String>{};
+
   @override
   bool get isAvailable => true;
 
@@ -420,6 +532,12 @@ class _Account extends AccountService {
   }) async {
     if (password.length < 6) {
       return const AccountOutcome.failed('That password is too short.');
+    }
+    if (!registered.add(email)) {
+      return const AccountOutcome.failed(
+        'There is already an account with that email. Sign in instead.',
+        code: 'email-already-in-use',
+      );
     }
     knownPassword = password;
     _user = AccountUser(uid: 'uid-of-$email', email: email);
@@ -485,6 +603,9 @@ class _Directory extends ShopDirectory {
 
   @override
   Future<String?> shopOwnedBy(String uid) async => _owned[uid];
+
+  /// Firebase already knows this account owns this shop.
+  void ownShop(String uid, String shopId) => _owned[uid] = shopId;
 
   @override
   Future<void> offerInvite({

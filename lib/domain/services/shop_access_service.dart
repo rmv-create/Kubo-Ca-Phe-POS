@@ -109,10 +109,36 @@ class ShopAccessService {
     required String password,
     String deviceLabel = 'Owner’s phone',
   }) async {
-    final AccountOutcome made = await _account.createAccount(
+    AccountOutcome made = await _account.createAccount(
       email: email,
       password: password,
     );
+
+    // Setting the shop up a second time with the same email is not a
+    // mistake she should have to decode. It happens whenever she starts
+    // over on a new phone, or clears the browser and comes back: Firebase
+    // still holds the account even though this phone remembers nothing. So
+    // the password she just typed is tried against it, and if it is hers
+    // she carries on through the same door.
+    if (!made.succeeded && made.emailAlreadyHasAnAccount) {
+      made = await _account.signIn(email: email, password: password);
+      if (!made.succeeded) {
+        return const AccessOutcome.failed(
+          'There is already a shop under that email, and that password does '
+          'not open it. Use the password you chose the first time, or reset '
+          'it from the sign-in screen.',
+        );
+      }
+
+      // That account may already own the shop. Opening a second one beside
+      // it would strand every sale in the first, so it is adopted instead.
+      final String? already = await _directory.shopOwnedBy(made.user!.uid);
+      if (already != null) {
+        await _remember(shopId: already, role: 'owner', label: deviceLabel);
+        return const AccessOutcome.ok(ShopStanding.inside);
+      }
+    }
+
     if (!made.succeeded) return AccessOutcome.failed(made.problem!);
 
     final String shopId = ShopDirectory.newShopId();
@@ -252,6 +278,23 @@ class ShopAccessService {
     await _remember(shopId: shopId, role: 'owner', label: deviceLabel);
     return const AccessOutcome.ok(ShopStanding.inside);
   }
+
+  /// Makes sure this phone has a shop to work in, once it has been let into
+  /// one.
+  ///
+  /// Signing in proves which shop is hers; it does not put the shop on the
+  /// phone. On a phone that has never held it — a new one, or a browser
+  /// whose storage was cleared — everything has to come down from the cloud
+  /// first, and that is the caller's job, because it is slow enough to need
+  /// a progress line.
+  ///
+  /// This is what runs afterwards. If the pull brought the shop down, both
+  /// seeders find their tables full and do nothing. If it brought nothing —
+  /// the shop was only ever a name in the directory, or it was opened before
+  /// any of this was written — she gets the menu and the pantry from the
+  /// setup worksheet rather than an empty app, which is the one thing that
+  /// reads as broken rather than new.
+  Future<void> fillIfStillEmpty() async => _fillWithTheMenu();
 
   // ───────────────────────────── joining ─────────────────────────────
 

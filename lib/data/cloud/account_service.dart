@@ -126,7 +126,7 @@ class AccountService {
         AccountUser(uid: user.uid, email: user.email ?? ''),
       );
     } on FirebaseAuthException catch (error) {
-      return AccountOutcome.failed(_readable(error.code));
+      return AccountOutcome.failed(_readable(error.code), code: error.code);
     } on Object {
       return const AccountOutcome.failed(
         'Could not reach the shop account. Check the connection.',
@@ -163,11 +163,21 @@ class AccountUser {
 
 /// What happened, in a form the screen can show without knowing Firebase.
 class AccountOutcome {
-  const AccountOutcome.ok(AccountUser this.user) : problem = null;
-  const AccountOutcome.failed(String this.problem) : user = null;
+  const AccountOutcome.ok(AccountUser this.user) : problem = null, code = null;
+  const AccountOutcome.failed(String this.problem, {this.code}) : user = null;
 
   final AccountUser? user;
   final String? problem;
 
+  /// Firebase's own code for the failure, when there was one.
+  ///
+  /// The sentence in [problem] is for her; this is for the one case the app
+  /// can handle on her behalf rather than report — an email that already
+  /// has an account behind it.
+  final String? code;
+
   bool get succeeded => user != null;
+
+  /// She is setting the shop up again with the email she used last time.
+  bool get emailAlreadyHasAnAccount => code == 'email-already-in-use';
 }
