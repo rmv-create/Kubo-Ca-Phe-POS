@@ -76,47 +76,53 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
             total: total,
           ),
 
-        // Only shown once there is something to take off, so the fast path
-        // stays two taps.
-        if (!discount.isEmpty || draft.deliveryFee.isPositive)
-          _Adjustments(discount: discount, deliveryFee: draft.deliveryFee),
+        // Everything below here is for paying, and there is nothing to pay
+        // for until a drink is in the order. Until then the block is one
+        // line, so the drinks keep the screen — which is what she is
+        // looking at while she takes the order.
+        if (!draft.isEmpty) ...<Widget>[
+          // Only shown once there is something to take off, so the fast path
+          // stays two taps.
+          if (!discount.isEmpty || draft.deliveryFee.isPositive)
+            _Adjustments(discount: discount, deliveryFee: draft.deliveryFee),
 
-        const SizedBox(height: KuboSpacing.sm),
-        _DiscountAndDeliveryBar(draft: draft, settings: settings),
-        const SizedBox(height: KuboSpacing.md),
+          const SizedBox(height: KuboSpacing.sm),
+          _DiscountAndDeliveryBar(draft: draft, settings: settings),
+          const SizedBox(height: KuboSpacing.md),
 
-        if (draft.paymentMethod?.needsConfirmation ?? false)
-          _PaymentConfirmation(draft: draft, total: total),
+          if (draft.paymentMethod?.needsConfirmation ?? false)
+            _PaymentConfirmation(draft: draft, total: total),
 
-        _PayButtons(
-          methods: methods,
-          selected: draft.paymentMethod,
-          enabled: !draft.isEmpty,
-          onTap: (PaymentMethod method) => cart.setPaymentMethod(
-            draft.paymentMethod == method ? null : method,
+          _PayButtons(
+            methods: methods,
+            selected: draft.paymentMethod,
+            enabled: true,
+            onTap: (PaymentMethod method) => cart.setPaymentMethod(
+              draft.paymentMethod == method ? null : method,
+            ),
           ),
-        ),
-        const SizedBox(height: KuboSpacing.sm),
-        _UnpaidToggle(draft: draft),
-        const SizedBox(height: KuboSpacing.sm),
-        SizedBox(
-          height: KuboTouch.primaryAction,
-          child: FilledButton(
-            onPressed: draft.canComplete && !_completing ? _complete : null,
-            child: _completing
-                ? const SizedBox(
-                    width: 22,
-                    height: 22,
-                    child: CircularProgressIndicator(strokeWidth: 2.5),
-                  )
-                : Text(
-                    draft.whyNotComplete() ??
-                        (draft.unpaid
-                            ? 'COMPLETE · NOT PAID YET'
-                            : 'COMPLETE ORDER'),
-                  ),
+          const SizedBox(height: KuboSpacing.sm),
+          _UnpaidToggle(draft: draft),
+          const SizedBox(height: KuboSpacing.sm),
+          SizedBox(
+            height: KuboTouch.primaryAction,
+            child: FilledButton(
+              onPressed: draft.canComplete && !_completing ? _complete : null,
+              child: _completing
+                  ? const SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(strokeWidth: 2.5),
+                    )
+                  : Text(
+                      draft.whyNotComplete() ??
+                          (draft.unpaid
+                              ? 'COMPLETE · NOT PAID YET'
+                              : 'COMPLETE ORDER'),
+                    ),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

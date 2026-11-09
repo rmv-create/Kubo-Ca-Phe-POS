@@ -83,23 +83,57 @@ void main() {
       );
     });
 
-    testWidgets('the payment block is pinned inside the thumb arc', (
+    testWidgets('an empty order shows no payment block at all', (
       WidgetTester tester,
     ) async {
       await pumpPos(tester, iPhone16Plus);
-      final Offset complete = tester.getCenter(find.text('Add a drink first.'));
-      expect(complete.dy, greaterThan(iPhone16Plus.height * 0.75));
+
+      // She takes the order looking at the drinks. Nothing about paying is
+      // useful until something is in the order, and on a phone it was
+      // costing two thirds of the screen.
+      expect(find.text('CASH'), findsNothing);
+      expect(find.text('GCASH'), findsNothing);
+      expect(find.textContaining('COMPLETE'), findsNothing);
+      expect(find.textContaining('Not paid yet'), findsNothing);
+      expect(find.text('Delivery'), findsNothing);
+      expect(find.byType(FilledButton), findsNothing);
+
+      // What stays is one line: the state of the order and its total.
+      expect(find.text('No drinks yet'), findsOneWidget);
+      expect(find.text('\u20b10.00'), findsOneWidget);
     });
 
-    testWidgets('the complete button says what is missing, and is disabled', (
+    testWidgets('the empty bottom bar leaves the drinks the screen', (
       WidgetTester tester,
     ) async {
       await pumpPos(tester, iPhone16Plus);
+
+      // The one remaining line sits low, inside the thumb arc, and the grid
+      // above it keeps the rest.
+      final Offset line = tester.getCenter(find.text('No drinks yet'));
+      expect(line.dy, greaterThan(iPhone16Plus.height * 0.85));
+    });
+
+    testWidgets('paying appears as soon as a drink is in the order', (
+      WidgetTester tester,
+    ) async {
+      await pumpPos(tester, iPhone16Plus);
+
+      await tester.tap(find.text('SPANISH LATTE'));
+      await settle(tester);
+      await tester.tap(find.textContaining('ADD TO ORDER'));
+      await settle(tester);
+
+      // Still two taps to a finished sale: a method, then complete.
+      expect(find.text('CASH'), findsOneWidget);
+      expect(find.text('GCASH'), findsOneWidget);
+      expect(find.text('Delivery'), findsOneWidget);
+
       final FilledButton button = tester.widget<FilledButton>(
         find.byType(FilledButton).last,
       );
       expect(button.onPressed, isNull);
-      expect(find.text('Add a drink first.'), findsOneWidget);
+      expect(find.text('Choose how it was paid.'), findsOneWidget);
     });
 
     testWidgets('switching category swaps the drinks shown', (
