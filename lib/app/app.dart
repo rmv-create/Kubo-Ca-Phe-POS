@@ -9,6 +9,8 @@ import '../domain/entities/business_settings.dart';
 import '../domain/services/shop_access_service.dart';
 import '../features/access/presentation/welcome_screen.dart';
 import '../features/backup/presentation/backup_screen.dart';
+import '../features/settings/presentation/first_pins_screen.dart';
+import '../features/settings/presentation/lock_screen.dart';
 import 'providers.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
@@ -21,9 +23,50 @@ class KuboApp extends ConsumerStatefulWidget {
   ConsumerState<KuboApp> createState() => _KuboAppState();
 }
 
-class _KuboAppState extends ConsumerState<KuboApp> {
+class _KuboAppState extends ConsumerState<KuboApp>
+    with WidgetsBindingObserver {
   late final GoRouter _router = createRouter();
   bool _askedForTonightsCopy = false;
+  DateTime? _wentAway;
+
+  /// How long the app can be in somebody's pocket before it asks again.
+  ///
+  /// Long enough that stepping out to the grinder, taking a photo of the
+  /// drink, or answering a message does not cost her six digits; short
+  /// enough that a phone left on the counter does not stay open all
+  /// afternoon.
+  static const Duration _lockAfter = Duration(minutes: 5);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      final DateTime? away = _wentAway;
+      _wentAway = null;
+      if (away != null &&
+          DateTime.now().difference(away) >= _lockAfter &&
+          ref.read(signedInUserProvider) != null) {
+        ref.read(signedInUserProvider.notifier).signOut();
+      }
+      return;
+    }
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _wentAway ??= DateTime.now();
+    }
+  }
+
 
   /// Sends today's copy up if it has not gone yet.
   ///
@@ -86,6 +129,30 @@ class _KuboAppState extends ConsumerState<KuboApp> {
     }
 
     _backUpIfTodayHasNotGone();
+
+    // Behind the shop gate, a second one: who is holding the phone. The
+    // POS used to be open to anybody who picked it up, which is fine for a
+    // till bolted to a counter and wrong for a phone that goes home in
+    // somebody's pocket.
+    final Widget? lock = ref
+        .watch(peopleGateProvider)
+        .maybeWhen(
+          orElse: () => const _Opening(),
+          data: (PeopleGate gate) => switch (gate) {
+            PeopleGate.needsPins => const FirstPinsScreen(),
+            PeopleGate.locked => const LockScreen(),
+            PeopleGate.open => null,
+          },
+        );
+    if (lock != null) {
+      return MaterialApp(
+        title: businessName,
+        theme: AppTheme.light,
+        darkTheme: AppTheme.dark,
+        debugShowCheckedModeBanner: false,
+        home: lock,
+      );
+    }
 
     return MaterialApp.router(
       title: businessName,

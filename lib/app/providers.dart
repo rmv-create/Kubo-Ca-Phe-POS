@@ -751,3 +751,32 @@ final FutureProviderFamily<List<ActivityEntry>, String?> activityProvider =
       ref.watch(stockRevisionProvider);
       return ActivityLog(ref.watch(databaseProvider)).recent(businessDate: day);
     });
+
+
+// ─────────────────────────── who is holding it ───────────────────────────
+
+/// What the app should show before any of the shop is built.
+enum PeopleGate {
+  /// Nobody has been set up. Ask for the PINs, once, and insist.
+  needsPins,
+
+  /// Somebody is set up and nobody has signed in.
+  locked,
+
+  /// Signed in. Carry on.
+  open,
+}
+
+/// The lock on the phone itself, as distinct from the lock on the shop.
+///
+/// Kept separate from `ShopStanding`, which answers "does this phone belong
+/// to a shop at all". This one answers "and who is holding it right now".
+final FutureProvider<PeopleGate> peopleGateProvider =
+    FutureProvider<PeopleGate>((Ref ref) async {
+      if (ref.watch(signedInUserProvider) != null) return PeopleGate.open;
+      ref.watch(userRevisionProvider);
+      final bool anybody = await ref
+          .watch(signInServiceProvider)
+          .hasAnyUser();
+      return anybody ? PeopleGate.locked : PeopleGate.needsPins;
+    });

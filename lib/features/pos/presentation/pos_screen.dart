@@ -197,6 +197,14 @@ class _PosHeader extends ConsumerWidget {
               subtitle: 'New order',
             ),
           ),
+          // Handing the phone to somebody, or putting it down: one tap
+          // rather than waiting out the five-minute auto-lock.
+          IconButton(
+            icon: const Icon(Icons.lock_outline),
+            tooltip: 'Lock',
+            onPressed: () =>
+                ref.read(signedInUserProvider.notifier).signOut(),
+          ),
           if (compact)
             IconButton(
               icon: const Icon(Icons.tune),
