@@ -120,6 +120,19 @@ class PosFixture {
 
   /// [separate] gives this shop a database of its own rather than the
   /// shared in-memory one — what two tills in the same test need.
+  /// A phone with the app on it and no shop in it: migrated, and not a
+  /// single drink. What a barista's phone looks like before it is let in.
+  static Future<PosFixture> openBlank({
+    FixedClock? clock,
+    bool separate = false,
+  }) async {
+    final FixedClock c = clock ?? testClock();
+    final AppDatabase db = separate
+        ? await openSeparateTestDatabase()
+        : await openTestDatabase();
+    return PosFixture._(db, c);
+  }
+
   static Future<PosFixture> open({
     FixedClock? clock,
     bool separate = false,

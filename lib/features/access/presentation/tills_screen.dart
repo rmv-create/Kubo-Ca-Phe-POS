@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/sync_runner.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../data/cloud/shop_directory.dart';
 import '../../../domain/services/shop_access_service.dart';
@@ -72,6 +73,8 @@ class _TillsScreenState extends ConsumerState<TillsScreen> {
               style: theme.textTheme.bodyMedium,
             ),
           ),
+
+          const _SyncLine(),
 
           if (_invite != null) _InviteCard(code: _invite!),
 
@@ -360,5 +363,98 @@ class _ClaimFormState extends ConsumerState<_ClaimForm> {
       _busy = false;
       _problem = outcome.problem;
     });
+  }
+}
+
+
+/// Where this till stands with the others.
+///
+/// A sync that works silently and a sync that is broken look identical
+/// from the counter, so this says which it is in words, with the one
+/// number that matters: how much this till has done that the others have
+/// not heard about.
+class _SyncLine extends ConsumerWidget {
+  const _SyncLine();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    final SyncStanding? standing = ref.watch(syncStandingProvider).valueOrNull;
+    if (standing == null || !standing.paired) return const SizedBox.shrink();
+
+    final bool unhappy = standing.problem != null;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        0,
+        KuboSpacing.lg,
+        KuboSpacing.lg,
+      ),
+      padding: const EdgeInsets.all(KuboSpacing.md),
+      decoration: BoxDecoration(
+        color: unhappy
+            ? theme.colorScheme.errorContainer
+            : theme.colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(KuboRadius.md),
+      ),
+      child: Row(
+        children: <Widget>[
+          Icon(
+            unhappy ? Icons.sync_problem : Icons.sync,
+            size: 20,
+            color: unhappy ? theme.colorScheme.onErrorContainer : null,
+          ),
+          const SizedBox(width: KuboSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  standing.problem ??
+                      (standing.lastAt == null
+                          ? 'Not synced yet'
+                          : 'Synced ${_ago(standing.lastAt!)}'),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: unhappy
+                        ? theme.colorScheme.onErrorContainer
+                        : null,
+                  ),
+                ),
+                Text(
+                  standing.waiting == 0
+                      ? 'Everything here has been passed on'
+                      : '${standing.waiting} '
+                            '${standing.waiting == 1 ? 'thing' : 'things'} '
+                            'waiting to go',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: unhappy
+                        ? theme.colorScheme.onErrorContainer
+                        : null,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await ref.read(syncRunnerProvider).runNow();
+              ref.invalidate(syncStandingProvider);
+            },
+            child: const Text('NOW'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String _ago(DateTime at) {
+    final int minutes = DateTime.now().difference(at.toLocal()).inMinutes;
+    if (minutes < 1) return 'just now';
+    if (minutes == 1) return 'a minute ago';
+    if (minutes < 60) return '$minutes minutes ago';
+    final int hours = minutes ~/ 60;
+    if (hours < 24) return hours == 1 ? 'an hour ago' : '$hours hours ago';
+    final int days = hours ~/ 24;
+    return days == 1 ? 'yesterday' : '$days days ago';
   }
 }

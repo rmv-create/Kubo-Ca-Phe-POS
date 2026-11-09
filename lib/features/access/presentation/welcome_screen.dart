@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
+import '../../../data/db/sync/cloud_sync_service.dart';
 import '../../../domain/services/shop_access_service.dart';
 import '../../../shared/widgets/kubo_mark.dart';
 
@@ -291,6 +292,8 @@ class _JoinFormState extends ConsumerState<_JoinForm> {
   final TextEditingController _code = TextEditingController();
   final TextEditingController _name = TextEditingController();
   bool _busy = false;
+  bool _pulling = false;
+  int _pulled = 0;
   String? _problem;
 
   @override
@@ -303,6 +306,30 @@ class _JoinFormState extends ConsumerState<_JoinForm> {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
+
+    if (_pulling) {
+      return Column(
+        children: <Widget>[
+          const CircularProgressIndicator(),
+          const SizedBox(height: KuboSpacing.lg),
+          Text(
+            'You are in. Fetching the shop\u2026',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: KuboSpacing.xs),
+          Text(
+            _pulled == 0
+                ? 'The menu, the prices, the recipes and the history. This '
+                      'only happens once.'
+                : '$_pulled things so far\u2026',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall,
+          ),
+        ],
+      );
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
@@ -379,6 +406,21 @@ class _JoinFormState extends ConsumerState<_JoinForm> {
 
     if (!mounted) return;
     if (outcome.succeeded) {
+      // Being let in is not the same as having the shop. Everything the
+      // owner's till has ever done is waiting in the log; without this the
+      // barista is admitted to an empty POS, which looks like a broken app
+      // rather than an unfinished one.
+      setState(() => _pulling = true);
+      ref.invalidate(syncTransportProvider);
+      ref.invalidate(cloudSyncProvider);
+      final CloudSyncService sync = await ref.read(cloudSyncProvider.future);
+      await sync.catchUp(
+        label: _name.text.trim().isEmpty ? 'Barista' : _name.text.trim(),
+        onProgress: (int applied) {
+          if (mounted) setState(() => _pulled = applied);
+        },
+      );
+      if (!mounted) return;
       ref.invalidate(shopStandingProvider);
       return;
     }

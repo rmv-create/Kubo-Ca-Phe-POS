@@ -88,6 +88,10 @@ class ShopAccessService {
     return id == null || id.isEmpty ? null : id;
   }
 
+  /// What this phone is called in the owner's list of tills.
+  Future<String> deviceLabel() async =>
+      await _settings.readRaw(SettingKeys.syncDeviceLabel) ?? 'A till';
+
   Future<String> role() async =>
       await _settings.readRaw(SettingKeys.syncRole) ?? 'owner';
 

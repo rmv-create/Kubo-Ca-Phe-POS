@@ -13,7 +13,10 @@ import '../data/cloud/shop_directory.dart';
 import '../data/db/app_database.dart';
 import '../data/db/backup_service.dart';
 import '../data/db/database_archive.dart';
+import '../data/db/sync/cloud_sync_service.dart';
+import '../data/db/sync/firestore_transport.dart';
 import '../data/db/sync/sync_engine.dart';
+import '../data/db/sync/sync_transport.dart';
 import '../data/export/excel_export_service.dart';
 import '../data/repositories/customer_repository_impl.dart';
 import '../data/repositories/inventory_repository_impl.dart';
@@ -47,6 +50,7 @@ import '../domain/services/sales_service.dart';
 import '../domain/services/shop_access_service.dart';
 import '../domain/services/sign_in_service.dart';
 import '../domain/services/who_is_working.dart';
+import 'sync_runner.dart';
 
 /// Infrastructure providers.
 ///
@@ -313,7 +317,15 @@ class SalesRevision extends Notifier<int> {
   @override
   int build() => 0;
 
-  void bump() => state = state + 1;
+  /// Something was sold, voided, refunded or paid for.
+  ///
+  /// Also the cue to tell the other till, shortly — every caller that
+  /// changes the day's takings already calls this, so hanging the nudge
+  /// here means no screen has to remember to.
+  void bump() {
+    state = state + 1;
+    ref.read(syncRunnerProvider).somethingHappened();
+  }
 }
 
 /// Bumped after a customer is created or edited.
@@ -780,3 +792,73 @@ final FutureProvider<PeopleGate> peopleGateProvider =
           .hasAnyUser();
       return anybody ? PeopleGate.locked : PeopleGate.needsPins;
     });
+
+
+// ──────────────────────── telling the other till ────────────────────────
+
+/// The postbox, once this till knows which shop it belongs to.
+///
+/// Null until then: a transport without a shop has nowhere to post, and a
+/// service holding one would quietly fail every round instead of saying
+/// "this phone is not in a shop yet".
+final FutureProvider<SyncTransport?> syncTransportProvider =
+    FutureProvider<SyncTransport?>((Ref ref) async {
+      final String? shop = await ref
+          .watch(shopAccessServiceProvider)
+          .shopId();
+      if (shop == null) return null;
+      return FirestoreSyncTransport(
+        shopId: shop,
+        deviceId: await ref.watch(syncEngineProvider).deviceId(),
+      );
+    });
+
+final FutureProvider<CloudSyncService> cloudSyncProvider =
+    FutureProvider<CloudSyncService>((Ref ref) async {
+      return CloudSyncService(
+        engine: ref.watch(syncEngineProvider),
+        settings: ref.watch(settingsRepositoryProvider),
+        clock: ref.watch(clockProvider),
+        transport: await ref.watch(syncTransportProvider.future),
+      );
+    });
+
+/// Where this till stands: when it last synced, what is waiting, what went
+/// wrong last time.
+final FutureProvider<SyncStanding> syncStandingProvider =
+    FutureProvider<SyncStanding>((Ref ref) async {
+      ref.watch(syncTickProvider);
+      final CloudSyncService sync = await ref.watch(cloudSyncProvider.future);
+      return SyncStanding(
+        paired: await sync.isPaired(),
+        lastAt: await sync.lastSyncAt(),
+        waiting: await sync.waitingToGoUp(),
+        problem: await sync.lastError(),
+      );
+    });
+
+/// Bumped after every round, so the status line refreshes.
+final NotifierProvider<SyncTick, int> syncTickProvider =
+    NotifierProvider<SyncTick, int>(SyncTick.new);
+
+class SyncTick extends Notifier<int> {
+  @override
+  int build() => 0;
+  void bump() => state++;
+}
+
+class SyncStanding {
+  const SyncStanding({
+    required this.paired,
+    required this.waiting,
+    this.lastAt,
+    this.problem,
+  });
+
+  final bool paired;
+  final DateTime? lastAt;
+
+  /// Changes this till has made that the others have not heard yet.
+  final int waiting;
+  final String? problem;
+}

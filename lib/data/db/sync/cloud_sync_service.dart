@@ -96,6 +96,51 @@ class CloudSyncService {
     }
   }
 
+  /// Rounds until there is nothing left to hear.
+  ///
+  /// One round takes a page of changes. A till joining an established shop
+  /// has a year of them waiting, so asking once would leave it holding the
+  /// first five hundred and nothing else — a shop with half its orders in
+  /// it, which is worse than an empty one because it looks finished.
+  ///
+  /// Stops when a round brings nothing new, or at [rounds] — a bound
+  /// rather than a `while (true)`, so a transport that keeps handing back
+  /// the same cursor cannot spin here for ever.
+  Future<SyncReport> catchUp({
+    String label = 'Till',
+    int rounds = 200,
+    void Function(int applied)? onProgress,
+  }) async {
+    int sent = 0;
+    int applied = 0;
+    SyncReport last = const SyncReport(sent: 0, applied: null);
+
+    for (int round = 0; round < rounds; round++) {
+      last = await syncNow(label: label);
+      if (!last.isPaired || last.error != null) return last;
+
+      sent += last.sent;
+      final int tookIn = last.applied?.applied ?? 0;
+      applied += tookIn;
+      onProgress?.call(applied);
+
+      // Nothing sent, nothing taken in, nothing waiting: we are level.
+      if (last.sent == 0 && tookIn == 0 && (last.applied?.waitingForParent ?? 0) == 0) {
+        break;
+      }
+    }
+
+    return SyncReport(
+      sent: sent,
+      applied: SyncApplied(
+        applied: applied,
+        alreadyKnown: last.applied?.alreadyKnown ?? 0,
+        waitingForParent: last.applied?.waitingForParent ?? 0,
+        ignoredAsOlder: last.applied?.ignoredAsOlder ?? 0,
+      ),
+    );
+  }
+
   Future<SyncReport> _fail(String message) async {
     await _settings.writeRaw(SettingKeys.syncLastError, message);
     return SyncReport.failed(message);

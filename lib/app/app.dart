@@ -13,6 +13,7 @@ import '../features/settings/presentation/first_pins_screen.dart';
 import '../features/settings/presentation/lock_screen.dart';
 import 'providers.dart';
 import 'router.dart';
+import 'sync_runner.dart';
 import 'theme/app_theme.dart';
 import 'theme/kubo_tokens.dart';
 
@@ -43,6 +44,15 @@ class _KuboAppState extends ConsumerState<KuboApp>
     WidgetsBinding.instance.addObserver(this);
   }
 
+  bool _syncStarted = false;
+
+  /// Starts the rounds once, and only once this phone is in a shop.
+  void _keepTillsLevel() {
+    if (_syncStarted) return;
+    _syncStarted = true;
+    ref.read(syncRunnerProvider).start();
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -59,6 +69,9 @@ class _KuboAppState extends ConsumerState<KuboApp>
           ref.read(signedInUserProvider) != null) {
         ref.read(signedInUserProvider.notifier).signOut();
       }
+      // Whatever the other till did while this one was in a pocket is what
+      // she most needs to see on picking it up.
+      if (_syncStarted) unawaited(ref.read(syncRunnerProvider).runNow());
       return;
     }
     if (state == AppLifecycleState.paused ||
@@ -129,6 +142,7 @@ class _KuboAppState extends ConsumerState<KuboApp>
     }
 
     _backUpIfTodayHasNotGone();
+    _keepTillsLevel();
 
     // Behind the shop gate, a second one: who is holding the phone. The
     // POS used to be open to anybody who picked it up, which is fine for a
