@@ -12,6 +12,7 @@ import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../menu/state/menu_actions.dart';
+import 'lapsed_screen.dart';
 import 'statement_screen.dart';
 
 /// Who comes in, what they order, and what they are worth.
@@ -49,7 +50,20 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
     final DateTime now = ref.watch(clockProvider).now();
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Customers')),
+      appBar: AppBar(
+        title: const Text('Customers'),
+        actions: <Widget>[
+          IconButton(
+            icon: const Icon(Icons.person_search_outlined),
+            tooltip: 'Who stopped coming',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => const LapsedScreen(),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: Column(
         children: <Widget>[
           Padding(

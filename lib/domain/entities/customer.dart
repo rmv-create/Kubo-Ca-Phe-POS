@@ -222,3 +222,38 @@ class UsualOrder {
   String get title => '$sizeName $productName';
   String get subtitle => optionNames.join(' · ');
 }
+
+
+/// A regular who has stopped coming.
+///
+/// "Stopped" is judged against their own rhythm rather than one rule for
+/// everybody: somebody who came every Tuesday for a year is missed after a
+/// fortnight, and somebody who comes once a month is not. The gap that
+/// counts is their own average gap, doubled — and never less than a week,
+/// because a shop is allowed a quiet Monday.
+class LapsedCustomer {
+  const LapsedCustomer({
+    required this.customer,
+    required this.daysAway,
+    this.usualGapDays,
+  });
+
+  final Customer customer;
+
+  /// Days since their last order.
+  final int daysAway;
+
+  /// How many days they used to leave between visits. Null when they have
+  /// only ever come once, and so have no rhythm to have broken.
+  final int? usualGapDays;
+
+  String get rhythm {
+    final int? gap = usualGapDays;
+    if (gap == null) return 'No pattern yet';
+    if (gap <= 2) return 'Came almost daily';
+    if (gap <= 9) return 'Came about weekly';
+    if (gap <= 18) return 'Came about fortnightly';
+    if (gap <= 45) return 'Came about monthly';
+    return 'Came every $gap days or so';
+  }
+}

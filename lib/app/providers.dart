@@ -325,6 +325,21 @@ final FutureProvider<List<Customer>> recentCustomersProvider =
     });
 
 /// Customer search. An empty query returns recent visitors.
+/// The last thing this customer actually ordered.
+final FutureProviderFamily<UsualOrder?, int> lastOrderedProvider =
+    FutureProvider.family<UsualOrder?, int>((Ref ref, int id) {
+      ref.watch(customerRevisionProvider);
+      return ref.watch(customerRepositoryProvider).lastOrderedFor(id);
+    });
+
+/// Regulars who have stopped coming, worth most first.
+final FutureProvider<List<LapsedCustomer>> lapsedCustomersProvider =
+    FutureProvider<List<LapsedCustomer>>((Ref ref) {
+      ref.watch(customerRevisionProvider);
+      ref.watch(salesRevisionProvider);
+      return ref.watch(customerRepositoryProvider).lapsed();
+    });
+
 /// One customer, as they stand right now.
 final FutureProviderFamily<Customer?, int> customerByIdProvider =
     FutureProvider.family<Customer?, int>((Ref ref, int id) {

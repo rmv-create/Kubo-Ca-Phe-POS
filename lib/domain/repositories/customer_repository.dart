@@ -19,6 +19,18 @@ abstract class CustomerRepository {
   /// to say — a single past order is not a usual.
   Future<UsualOrder?> usualFor(int customerId);
 
+  /// The last thing they actually ordered, however many times.
+  ///
+  /// Different from the usual on purpose. The usual is what they order
+  /// *most*, and it needs a repeat before it exists at all — so a customer
+  /// on their second visit, or one who orders something different every
+  /// time, has none. "What did you have last time?" is a question she can
+  /// always answer, and it is the one people are asked across a counter.
+  Future<UsualOrder?> lastOrderedFor(int customerId);
+
+  /// Regulars who have stopped coming.
+  Future<List<LapsedCustomer>> lapsed({int minimumOrders = 2, int limit = 50});
+
   Future<List<CustomerOrderPattern>> patternsFor(int customerId);
 
   /// Pins one pattern as the customer's usual. Always an explicit act.

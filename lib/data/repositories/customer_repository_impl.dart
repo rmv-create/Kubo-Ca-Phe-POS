@@ -169,6 +169,61 @@ class CustomerRepositoryImpl implements CustomerRepository {
   }
 
   @override
+  Future<UsualOrder?> lastOrderedFor(int customerId) async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'customer_order_patterns',
+      where: 'customer_id = ?',
+      whereArgs: <Object?>[customerId],
+      orderBy: 'last_ordered_at DESC, id DESC',
+      limit: 1,
+    );
+    if (rows.isEmpty) return null;
+    return _describe(_pattern(rows.first), isSaved: false);
+  }
+
+  @override
+  Future<List<LapsedCustomer>> lapsed({
+    int minimumOrders = 2,
+    int limit = 50,
+  }) async {
+    final DateTime now = _clock.now();
+
+    // Their own rhythm, not one rule for everybody. Somebody who came in
+    // every Tuesday for a year is missed after a fortnight; somebody who
+    // comes once a month is not. The gap that matters is the gap between
+    // their first visit and their last, divided by the visits in between.
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
+      SELECT *,
+             CAST(julianday(?) - julianday(last_visit_at) AS INTEGER)
+               AS days_away,
+             CASE WHEN order_count > 1
+                  THEN (julianday(last_visit_at) - julianday(first_visit_at))
+                       / (order_count - 1)
+                  ELSE NULL END AS usual_gap
+      FROM customers
+      WHERE is_active = 1
+        AND order_count >= ?
+        AND last_visit_at IS NOT NULL
+        AND days_away >= 7
+        AND (usual_gap IS NULL OR days_away > usual_gap * 2)
+      ORDER BY total_spend_centavos DESC, days_away DESC
+      LIMIT ?
+      ''',
+      <Object?>[now.toUtc().toIso8601String(), minimumOrders, limit],
+    );
+
+    return <LapsedCustomer>[
+      for (final Map<String, Object?> r in rows)
+        LapsedCustomer(
+          customer: _customer(r),
+          daysAway: (r['days_away'] as num?)?.toInt() ?? 0,
+          usualGapDays: (r['usual_gap'] as num?)?.round(),
+        ),
+    ];
+  }
+
+  @override
   Future<void> saveUsual({
     required int customerId,
     required int patternId,

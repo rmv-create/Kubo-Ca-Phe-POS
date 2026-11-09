@@ -260,17 +260,31 @@ class _UsualPanel extends ConsumerWidget {
     );
     final ThemeData theme = Theme.of(context);
 
+    final AsyncValue<UsualOrder?> last = ref.watch(
+      lastOrderedProvider(customer.id),
+    );
+
     return usual.maybeWhen(
       orElse: () => const SizedBox.shrink(),
       data: (UsualOrder? data) {
         if (data == null) {
+          // No usual yet — but "what did you have last time?" is a question
+          // she can answer from the first repeat visit, and it is the one
+          // people are actually asked across a counter.
+          final UsualOrder? previous = last.valueOrNull;
+          if (previous != null) {
+            return _Repeat(
+              eyebrow: 'LAST TIME \u00b7 ${_ago(customer.lastVisitAt)}',
+              order: previous,
+              label: 'SAME AGAIN',
+            );
+          }
           return Padding(
             padding: const EdgeInsets.all(KuboSpacing.lg),
             child: Text(
               customer.orderCount == 0
                   ? '${customer.name} has not ordered before.'
-                  : 'No usual yet — the same drink has to come up more than '
-                        'once before it counts as one.',
+                  : 'Nothing to repeat yet.',
               style: theme.textTheme.bodySmall,
             ),
           );
@@ -329,70 +343,142 @@ class _UsualPanel extends ConsumerWidget {
     WidgetRef ref,
     UsualOrder usual, {
     bool modify = false,
-  }) async {
-    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-    final NavigatorState navigator = Navigator.of(context);
-    final Product? product = await ref
-        .read(menuRepositoryProvider)
-        .productById(usual.pattern.productId);
-    final ProductSize? size = product?.sizes
-        .where((ProductSize s) => s.size.id == usual.pattern.sizeId)
-        .firstOrNull;
+  }) => repeatOrder(context, ref, usual, modify: modify);
+}
 
-    if (product == null || size == null) {
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(
-          const SnackBar(content: Text('That drink is no longer on the menu.')),
-        );
-      return;
-    }
+/// How long ago, in the words somebody would use at a counter.
+String _ago(DateTime? at) {
+  if (at == null) return 'a while back';
+  final int days = DateTime.now().difference(at.toLocal()).inDays;
+  if (days <= 0) return 'today';
+  if (days == 1) return 'yesterday';
+  if (days < 7) return '$days days ago';
+  if (days < 14) return 'last week';
+  if (days < 60) return '${(days / 7).round()} weeks ago';
+  return '${(days / 30).round()} months ago';
+}
 
-    if (modify) {
-      navigator.pop();
-      if (!context.mounted) return;
-      await ProductConfigSheet.show(
-        context,
-        product: product,
-        initialSize: size,
-        initialOptionIds: usual.pattern.optionIds.toSet(),
-      );
-      return;
-    }
+/// The same card as the usual, for an order she is repeating rather than
+/// one the app worked out.
+class _Repeat extends ConsumerWidget {
+  const _Repeat({
+    required this.eyebrow,
+    required this.order,
+    required this.label,
+  });
 
-    final List<DraftOption> options = await _resolveOptions(
-      ref,
-      productId: product.id,
-      sizeId: size.size.id,
-      optionIds: usual.pattern.optionIds,
-    );
-    ref
-        .read(cartProvider.notifier)
-        .addItem(product: product, size: size, options: options);
-    navigator.pop();
-  }
+  final String eyebrow;
+  final UsualOrder order;
+  final String label;
 
-  Future<List<DraftOption>> _resolveOptions(
-    WidgetRef ref, {
-    required int productId,
-    required int sizeId,
-    required List<int> optionIds,
-  }) async {
-    if (optionIds.isEmpty) return <DraftOption>[];
-    final List<ResolvedCustomizationGroup> groups = await ref
-        .read(menuRepositoryProvider)
-        .resolvedGroupsFor(productId, sizeId: sizeId);
-    return <DraftOption>[
-      for (final ResolvedCustomizationGroup g in groups)
-        for (final CustomizationOption o in g.group.activeOptions)
-          if (optionIds.contains(o.id))
-            DraftOption(
-              group: g.group,
-              option: o,
-              isDefault: g.defaultOptionIds.contains(o.id),
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ThemeData theme = Theme.of(context);
+    return Container(
+      margin: const EdgeInsets.all(KuboSpacing.lg),
+      padding: const EdgeInsets.all(KuboSpacing.lg),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(KuboRadius.lg),
+        border: Border.all(color: theme.colorScheme.primary, width: 2),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(eyebrow, style: theme.textTheme.labelSmall),
+          const SizedBox(height: KuboSpacing.xs),
+          Text(order.title.toUpperCase(), style: theme.textTheme.titleMedium),
+          if (order.subtitle.isNotEmpty)
+            Text(order.subtitle, style: theme.textTheme.bodySmall),
+          const SizedBox(height: KuboSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => repeatOrder(context, ref, order),
+              child: Text(label),
             ),
-    ];
+          ),
+          const SizedBox(height: KuboSpacing.sm),
+          OutlinedButton(
+            onPressed: () => repeatOrder(context, ref, order, modify: true),
+            child: const Text('SAME AGAIN + MODIFY'),
+          ),
+        ],
+      ),
+    );
   }
+}
+
+/// Copies a past order into the cart.
+Future<void> repeatOrder(
+  BuildContext context,
+  WidgetRef ref,
+  UsualOrder usual, {
+  bool modify = false,
+}) async {
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  final NavigatorState navigator = Navigator.of(context);
+  final Product? product = await ref
+      .read(menuRepositoryProvider)
+      .productById(usual.pattern.productId);
+  final ProductSize? size = product?.sizes
+      .where((ProductSize s) => s.size.id == usual.pattern.sizeId)
+      .firstOrNull;
+
+  if (product == null || size == null) {
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        const SnackBar(content: Text('That drink is no longer on the menu.')),
+      );
+    return;
+  }
+
+  if (modify) {
+    navigator.pop();
+    if (!context.mounted) return;
+    await ProductConfigSheet.show(
+      context,
+      product: product,
+      initialSize: size,
+      initialOptionIds: usual.pattern.optionIds.toSet(),
+    );
+    return;
+  }
+
+  final List<DraftOption> options = await _resolveOptions(
+    ref,
+    productId: product.id,
+    sizeId: size.size.id,
+    optionIds: usual.pattern.optionIds,
+  );
+  ref
+      .read(cartProvider.notifier)
+      .addItem(product: product, size: size, options: options);
+  navigator.pop();
+}
+
+/// The saved option ids, turned back into real options on today's menu.
+Future<List<DraftOption>> _resolveOptions(
+  WidgetRef ref, {
+  required int productId,
+  required int sizeId,
+  required List<int> optionIds,
+}) async {
+  if (optionIds.isEmpty) return <DraftOption>[];
+  final List<ResolvedCustomizationGroup> groups = await ref
+      .read(menuRepositoryProvider)
+      .resolvedGroupsFor(productId, sizeId: sizeId);
+  return <DraftOption>[
+    for (final ResolvedCustomizationGroup g in groups)
+      for (final CustomizationOption o in g.group.activeOptions)
+        if (optionIds.contains(o.id))
+          DraftOption(
+            group: g.group,
+            option: o,
+            isDefault: g.defaultOptionIds.contains(o.id),
+          ),
+  ];
 }
 
 class _Footer extends ConsumerWidget {
