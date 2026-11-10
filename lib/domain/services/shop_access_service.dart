@@ -294,7 +294,13 @@ class ShopAccessService {
   /// any of this was written — she gets the menu and the pantry from the
   /// setup worksheet rather than an empty app, which is the one thing that
   /// reads as broken rather than new.
-  Future<void> fillIfStillEmpty() async => _fillWithTheMenu();
+  Future<void> fillIfStillEmpty() async {
+    await _fillWithTheMenu();
+    // And when the shop did come down, but came down in pieces — the owner's
+    // till had pushed four drinks of six when this phone asked — the gaps are
+    // filled rather than left, because nothing would ever have filled them.
+    if (await isOwner) await MenuSeeder(_db, _clock).repairMissing();
+  }
 
   // ───────────────────────────── joining ─────────────────────────────
 

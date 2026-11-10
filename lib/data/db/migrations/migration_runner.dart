@@ -15,6 +15,7 @@ import 'm012_sync_foundations.dart';
 import 'm013_local_only_settings.dart';
 import 'm014_moving_average_cost.dart';
 import 'm015_customer_birthday.dart';
+import 'm016_no_milk_on_specialty.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -37,6 +38,7 @@ const List<Migration> appMigrations = <Migration>[
   M013LocalOnlySettings(),
   M014MovingAverageCost(),
   M015CustomerBirthday(),
+  M016NoMilkOnSpecialty(),
 ];
 
 /// The schema version a freshly built app expects.

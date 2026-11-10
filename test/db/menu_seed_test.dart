@@ -280,11 +280,12 @@ void main() {
     });
 
     test('the milk drinks offer milk, pre-set to Full Cream', () async {
+      // The Vietnamese coffees are deliberately not here: all three are
+      // made with condensed milk as part of the recipe, so there is no milk
+      // to choose. See the Specialty Coffee case below.
       const List<String> milkDrinks = <String>[
         'Spanish Latte',
         'Caramel Macchiato',
-        'Ca Phe Muoi',
-        'Ca Phe Trung',
       ];
       for (final String name in milkDrinks) {
         final Product product = (await menu.products()).firstWhere(
@@ -298,6 +299,29 @@ void main() {
         expect(milk.defaults.map((CustomizationOption o) => o.name), <String>[
           'Full Cream',
         ], reason: name);
+      }
+    });
+
+    test('no Specialty Coffee asks which milk', () async {
+      // Ca Phe Sua Da never did; Ca Phe Muoi and Ca Phe Trung used to, which
+      // was a question with no answer at the counter.
+      for (final String name in <String>[
+        'Ca Phe Sua Da',
+        'Ca Phe Muoi',
+        'Ca Phe Trung',
+      ]) {
+        final Product product = (await menu.products()).firstWhere(
+          (Product p) => p.name == name,
+        );
+        final Iterable<ResolvedCustomizationGroup> groups = await menu
+            .resolvedGroupsFor(product.id);
+        expect(
+          groups.where(
+            (ResolvedCustomizationGroup g) => g.group.code == 'milk',
+          ),
+          isEmpty,
+          reason: name,
+        );
       }
     });
 

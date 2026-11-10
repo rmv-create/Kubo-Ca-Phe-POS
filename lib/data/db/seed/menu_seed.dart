@@ -111,6 +111,9 @@ abstract final class MenuSeed {
       smallPrice: 12900,
       largePrice: 14900,
       defaultSizeCode: 'large',
+      // A Vietnamese coffee is made with condensed milk, in the recipe.
+      // Offering a milk to change asks a question that has no answer.
+      showsMilk: false,
     ),
     SeedProduct(
       category: specialty,
@@ -121,6 +124,9 @@ abstract final class MenuSeed {
       smallPrice: 14900,
       largePrice: 16900,
       defaultSizeCode: 'large',
+      // A Vietnamese coffee is made with condensed milk, in the recipe.
+      // Offering a milk to change asks a question that has no answer.
+      showsMilk: false,
     ),
   ];
 

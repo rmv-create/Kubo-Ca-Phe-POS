@@ -138,6 +138,31 @@ Future<void> _seedIfThisPhoneHasAShop(AppDatabase db, Clock clock) async {
 
   await MenuSeeder(db, clock).seedIfEmpty();
   await PantrySeeder(db, clock).seedIfEmpty();
+
+  // A phone can hold a menu that is real but incomplete: it signed in while
+  // the owner's till had pushed only part of the shop, and a half-arrived
+  // menu looks exactly like a finished one to a seeder that only asks
+  // whether the table is empty. Only the owner's phone repairs itself this
+  // way — a barista's till takes the shop from the owner, and inventing
+  // drinks of its own would give the two phones different ones.
+  if (await _isOwner(db)) {
+    await MenuSeeder(db, clock).repairMissing();
+  }
+}
+
+/// Whether this phone is the owner's, rather than a barista's till.
+Future<bool> _isOwner(AppDatabase db) async {
+  final List<Map<String, Object?>> rows = await db.db.query(
+    'app_settings',
+    columns: <String>['value'],
+    where: 'key = ?',
+    whereArgs: <Object?>[SettingKeys.syncRole],
+    limit: 1,
+  );
+  // A phone that was trading before any of the sync existed has no role at
+  // all, and it is hers: there was only ever one.
+  if (rows.isEmpty) return true;
+  return (rows.first['value'] as String?) != 'barista';
 }
 
 /// Takes at most one automatic backup per business day, then prunes.
