@@ -8,7 +8,21 @@
 
   <!-- Full screen when added to the iPad or iPhone home screen. -->
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <!--
+    Deliberately "default" rather than "black-translucent".
+
+    Translucent lets the page run underneath the status bar, and on an
+    iPhone opened from the home screen iOS then reports a page that is
+    taller than the part of it you can actually touch. Flutter lays the
+    screen out to the height it was given and hit-tests against the other
+    one, so every tap lands a little low, and further down the screen the
+    gap is wide enough that SIGN IN presses the button under it. Rotating
+    the phone and back fixed it only because rotating forces a re-measure.
+
+    The till gains nothing from drawing under the clock, so it no longer
+    tries. The strip at the top takes the theme colour instead.
+  -->
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Kubo Cà Phê">
   <link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon-180.png">
   <link rel="icon" type="image/png" href="favicon.png">
@@ -83,8 +97,52 @@
   </script>
   <script src="flutter_bootstrap.js" async></script>
   <script>
+    // Makes Flutter measure the screen again.
+    //
+    // This is the rotate-and-rotate-back trick, done automatically. On an
+    // iPhone opened from the home screen the viewport iOS reports at
+    // startup is not always the one the finger is touching, and Flutter
+    // only finds out when something changes size — which is why turning the
+    // phone sideways and back used to be the cure. Nudging the page by a
+    // hair's breadth and putting it straight back makes that happen without
+    // her having to know the trick, and is invisible on screen.
+    //
+    // It is cheap, so it runs at every moment the mismatch can appear:
+    // after the first frame, when the app is returned to from the
+    // background, and whenever iOS changes the visible area itself.
+    var nudging = false;
+    function remeasure() {
+      if (nudging) return;
+      nudging = true;
+      var root = document.documentElement;
+      var was = root.style.height;
+      root.style.height = 'calc(100% - 1px)';
+      requestAnimationFrame(function () {
+        root.style.height = was;
+        requestAnimationFrame(function () {
+          window.dispatchEvent(new Event('resize'));
+          nudging = false;
+        });
+      });
+    }
+
+    window.addEventListener('pageshow', function () { setTimeout(remeasure, 60); });
+    window.addEventListener('orientationchange', function () {
+      setTimeout(remeasure, 120);
+    });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', function () {
+        setTimeout(remeasure, 60);
+      });
+    }
+
     // Take the splash down as soon as there is a real frame behind it.
     window.addEventListener('flutter-first-frame', function () {
+      // Before anything else: the first frame is exactly where the wrong
+      // viewport shows up, and a till whose buttons press the wrong thing
+      // is worse than a slow one.
+      remeasure();
+      setTimeout(remeasure, 300);
       var boot = document.getElementById('boot');
       if (!boot) return;
       boot.classList.add('done');
