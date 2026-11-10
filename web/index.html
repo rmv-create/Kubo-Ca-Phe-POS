@@ -15,6 +15,13 @@
   <meta name="viewport"
         content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 
+  <!-- Signing in talks to these. Starting the handshakes now means they are
+       already warm by the time she types her password, rather than adding a
+       round trip each to the slowest moment in the app. -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+
   <meta name="theme-color" content="#F6F6F7" media="(prefers-color-scheme: light)">
   <meta name="theme-color" content="#0B0B0C" media="(prefers-color-scheme: dark)">
   <title>Kubo Cà Phê</title>
@@ -26,32 +33,101 @@
     @media (prefers-color-scheme: dark) {
       html, body { background: #0B0B0C; }
     }
+
+    /* The app is several megabytes of renderer and code, and until it has
+       parsed there is nothing on screen at all. A plain coloured page for
+       that long reads as a phone that has stopped responding, so the name
+       goes up in the browser's first paint — no image to fetch, no font to
+       wait for. It is removed the moment Flutter draws its first frame. */
+    #boot {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: #0B0B0C;
+      transition: opacity 180ms ease-out;
+    }
+    #boot .name { font-size: 20px; font-weight: 600; letter-spacing: 0.01em; }
+    #boot .what { font-size: 13px; opacity: 0.6; }
+    #boot svg { width: 56px; height: auto; }
+    #boot.done { opacity: 0; pointer-events: none; }
+    @media (prefers-color-scheme: dark) {
+      #boot { color: #F6F6F7; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #boot { transition: none; }
+    }
   </style>
 </head>
 <body>
-  <!--
-    Receipt previews need pdf.js. The printing package will fetch it from a
-    CDN on demand, which breaks the one promise this app makes — that it works
-    without internet — so the library is served from this build instead, and
-    loaded here rather than left to the package: the package only injects it
-    when it is missing, and that injection was failing silently, leaving the
-    preview reading "Unable to display the document" with nothing in the
-    console. Loading it up front is one line and cannot half-happen.
-    See web/pdfjs/README.md.
-  -->
-  <script src="pdfjs/pdf.min.js"></script>
-  <script>
-    window.dartPdfJsBaseUrl = 'pdfjs/';
-    if (window.pdfjsLib) {
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'pdfjs/pdf.worker.min.js';
-    }
-  </script>
+  <div id="boot">
+    <svg viewBox="0 0 120 60" aria-hidden="true" fill="none"
+         stroke="currentColor" stroke-width="7" stroke-linecap="round">
+      <path d="M14 52 L60 12 L106 52"></path>
+      <path d="M48 8 L72 30"></path>
+    </svg>
+    <div class="name">Kubo Cà Phê</div>
+    <div class="what">Opening the till…</div>
+  </div>
+
   <script>
     // Serve the renderer from this build rather than from Google's CDN.
     // The whole point of the app is that it works without internet, and a
     // renderer fetched at runtime would break that.
     window.flutterConfiguration = { canvasKitBaseUrl: 'canvaskit/' };
+    window.dartPdfJsBaseUrl = 'pdfjs/';
   </script>
   <script src="flutter_bootstrap.js" async></script>
+  <script>
+    // Take the splash down as soon as there is a real frame behind it.
+    window.addEventListener('flutter-first-frame', function () {
+      var boot = document.getElementById('boot');
+      if (!boot) return;
+      boot.classList.add('done');
+      setTimeout(function () { boot.remove(); }, 250);
+
+      // Receipt previews need pdf.js, and it used to load before the app did
+      // — a third of a megabyte in front of the one thing she opens the
+      // phone for. It is wanted minutes later, if at all, so it follows the
+      // first frame instead of racing it. See web/pdfjs/README.md for why it
+      // is served from this build rather than fetched from a CDN on demand.
+      var pdf = document.createElement('script');
+      pdf.src = 'pdfjs/pdf.min.js';
+      pdf.onload = function () {
+        if (window.pdfjsLib) {
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+              'pdfjs/pdf.worker.min.js';
+        }
+      };
+      document.body.appendChild(pdf);
+
+      // Tell the cache what this launch actually needed, so that the next
+      // one — and the first one with no signal — has all of it.
+      setTimeout(function () {
+        var worker = navigator.serviceWorker && navigator.serviceWorker.controller;
+        if (!worker) return;
+        try {
+          var urls = performance.getEntriesByType('resource')
+            .map(function (e) { return e.name; })
+            .filter(function (u) { return u.indexOf(location.origin) === 0; });
+          worker.postMessage({ kind: 'keep', urls: urls });
+        } catch (e) { /* not worth breaking the app over */ }
+      }, 2000);
+    });
+
+    // Kubo's own cache. Without it every launch re-downloaded the whole app
+    // and it could not start without internet at all.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function (e) {
+          console.warn('Kubo is running without its cache:', e);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
