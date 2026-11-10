@@ -766,4 +766,85 @@ class SalesService {
       });
     });
   }
+
+  // ─────────────────────────────── deleting ───────────────────────────────
+
+  /// Takes an order off the books altogether.
+  ///
+  /// Voiding is the honest way to undo a sale: it stops counting, says why,
+  /// and stays on the record. This is for the other thing — the rows that
+  /// were never a sale at all. An evening of pressing buttons to learn the
+  /// app leaves a list of orders that did not happen, and carrying them for
+  /// ever makes every report say something untrue.
+  ///
+  /// It is deliberately narrow.
+  ///
+  /// An order that was refunded cannot be deleted. Money was handed back,
+  /// and what happened to money stays written down; she can void the rest
+  /// instead.
+  ///
+  /// The stock goes back before the record goes. An order that was not
+  /// already voided is voided first, in full, so the ingredients it ate
+  /// return to the shelf with the cost they left at. Deleting without that
+  /// would leave the pantry short for a sale that no longer exists, which
+  /// is the one way this could quietly corrupt her counts.
+  ///
+  /// What survives is the stock movements — the coffee really did leave the
+  /// jar and really did go back — and the line in the activity log saying
+  /// the order was deleted and by whom. The movements keep their rows with
+  /// the order forgotten, because the schema was built to let an order go
+  /// without taking the inventory's history with it.
+  Future<void> deleteOrder({
+    required int orderId,
+    required String reason,
+  }) async {
+    if (reason.trim().isEmpty) {
+      throw const ValidationException('Say why this is being deleted.');
+    }
+    final OrderRecord? order = await orderById(orderId);
+    if (order == null) throw const NotFoundException('That order is gone.');
+    if (order.isRefunded) {
+      throw const BusinessRuleException(
+        'Money was given back for this order, and that has to stay on the '
+        'record. Void it instead of deleting it.',
+      );
+    }
+
+    // Puts the ingredients back, exactly as voiding by hand would.
+    if (!order.isVoided) {
+      await voidOrder(orderId: orderId, reason: reason.trim());
+    }
+
+    final DateTime now = _clock.now();
+    final String at = now.toUtc().toIso8601String();
+    final String date = _businessDateOf(now);
+
+    await _db.transaction((Transaction txn) async {
+      // The void row holds the order open — it is the one child the schema
+      // refuses to lose silently — so it is removed deliberately here. The
+      // lines, their customisations and the payments go with the order.
+      await txn.delete(
+        'order_voids',
+        where: 'order_id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+      await txn.delete(
+        'orders',
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+
+      await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
+        'at': at,
+        'business_date': date,
+        'action': 'order_deleted',
+        'entity_type': 'order',
+        'entity_id': orderId,
+        'summary':
+            '${order.orderNo} · ${order.total.format()} deleted · '
+            '${reason.trim()}',
+      });
+    });
+  }
 }

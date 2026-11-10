@@ -70,7 +70,11 @@ class _OrdersScreenState extends ConsumerState<OrdersScreen> {
                   _OrderTile(order: order),
                 const Divider(height: 1),
               ],
-              for (final OrderRecord order in data) ...<Widget>[
+              // Pinned above and listed again below is the same order twice,
+              // which reads as two people owing for the same drinks.
+              for (final OrderRecord order in data.where(
+                (OrderRecord o) => !unpaid.any((OrderRecord u) => u.id == o.id),
+              )) ...<Widget>[
                 _OrderTile(order: order),
                 const Divider(height: 1),
               ],
@@ -351,6 +355,29 @@ class OrderDetailScreen extends ConsumerWidget {
                       : () => _voidOrder(context, ref, order),
                 ),
               ],
+              // Deleting is for the rows that were never a sale — an evening
+              // of pressing buttons to learn the app. Offered on a voided
+              // order too, because that is what most of them will be by the
+              // time she decides they should not be there at all.
+              if (!order.isRefunded) ...<Widget>[
+                const SectionHeader('Remove it'),
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_outline,
+                    color: theme.colorScheme.error,
+                  ),
+                  title: const Text('Delete this order'),
+                  subtitle: Text(
+                    order.isVoided
+                        ? 'Takes it off the list for good. The ingredients '
+                              'already went back when it was voided.'
+                        : 'For an order that never happened — a practice run. '
+                              'The ingredients go back on the shelf and it '
+                              'stops counting anywhere. This cannot be undone.',
+                  ),
+                  onTap: () => _deleteOrder(context, ref, order),
+                ),
+              ],
             ],
           ),
         );
@@ -505,6 +532,77 @@ class OrderDetailScreen extends ConsumerWidget {
       messenger
         ..clearSnackBars()
         ..showSnackBar(const SnackBar(content: Text('Voided')));
+      navigator.pop();
+    } on AppException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  /// Removes an order that should never have been on the books.
+  ///
+  /// Asked twice on purpose. Everything else on this screen can be walked
+  /// back; this one cannot, and the number it is about to take out of the
+  /// day's sales is on the question so she can see what she is removing.
+  Future<void> _deleteOrder(
+    BuildContext context,
+    WidgetRef ref,
+    OrderRecord order,
+  ) async {
+    final bool sure =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: Text('Delete ${order.orderNo}?'),
+            content: Text(
+              order.isVoided
+                  ? 'It is already voided, so nothing changes in the books. '
+                        'It simply stops being on the list.\n\n'
+                        'This cannot be undone.'
+                  : '${order.total.format()} comes out of the day\u2019s '
+                        'sales, and the ingredients go back on the shelf.'
+                        '\n\nThis cannot be undone.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Keep it'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!sure || !context.mounted) return;
+
+    final String? reason = await promptForText(
+      context,
+      title: 'Delete ${order.orderNo}',
+      label: 'Why?',
+      helper: 'Kept in the activity log, which is all that will be left',
+      confirmLabel: 'Delete it',
+    );
+    if (reason == null || reason.trim().isEmpty || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+    try {
+      await ref
+          .read(salesServiceProvider)
+          .deleteOrder(orderId: order.id, reason: reason);
+      ref.read(salesRevisionProvider.notifier).bump();
+      ref.read(stockRevisionProvider.notifier).bump();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('${order.orderNo} deleted')));
       navigator.pop();
     } on AppException catch (error) {
       messenger
