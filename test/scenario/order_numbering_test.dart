@@ -1,9 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kubo_pos/core/money/money.dart';
-import 'package:kubo_pos/domain/entities/business_settings.dart';
 import 'package:kubo_pos/domain/entities/ingredient.dart';
 import 'package:kubo_pos/domain/entities/order_draft.dart';
-import 'package:kubo_pos/domain/entities/reporting.dart';
 
 import '../support/pos_fixture.dart';
 
