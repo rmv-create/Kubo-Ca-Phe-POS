@@ -37,18 +37,11 @@ class PaymentBlock extends ConsumerStatefulWidget {
 }
 
 class _PaymentBlockState extends ConsumerState<PaymentBlock> {
-  bool _completing = false;
-
   @override
   Widget build(BuildContext context) {
     final OrderDraft draft = ref.watch(cartProvider);
     final BusinessSettings settings = ref.watch(settingsControllerProvider);
-    final CartController cart = ref.read(cartProvider.notifier);
-
-    final DiscountBreakdown discount = draft.discountWith(settings);
     final Money total = draft.totalWith(settings);
-    final List<PaymentMethod> methods =
-        ref.watch(paymentMethodsProvider).valueOrNull ?? PaymentMethod.builtIn;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -76,53 +69,114 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
             total: total,
           ),
 
-        // Everything below here is for paying, and there is nothing to pay
-        // for until a drink is in the order. Until then the block is one
-        // line, so the drinks keep the screen — which is what she is
-        // looking at while she takes the order.
         if (!draft.isEmpty) ...<Widget>[
-          // Only shown once there is something to take off, so the fast path
-          // stays two taps.
-          if (!discount.isEmpty || draft.deliveryFee.isPositive)
-            _Adjustments(discount: discount, deliveryFee: draft.deliveryFee),
-
           const SizedBox(height: KuboSpacing.sm),
-          _DiscountAndDeliveryBar(draft: draft, settings: settings),
-          const SizedBox(height: KuboSpacing.md),
 
-          if (draft.paymentMethod?.needsConfirmation ?? false)
-            _PaymentConfirmation(draft: draft, total: total),
-
-          _PayButtons(
-            methods: methods,
-            selected: draft.paymentMethod,
-            enabled: true,
-            onTap: (PaymentMethod method) => cart.setPaymentMethod(
-              draft.paymentMethod == method ? null : method,
-            ),
-          ),
-          const SizedBox(height: KuboSpacing.sm),
-          _UnpaidToggle(draft: draft),
-          const SizedBox(height: KuboSpacing.sm),
-          SizedBox(
-            height: KuboTouch.primaryAction,
-            child: FilledButton(
-              onPressed: draft.canComplete && !_completing ? _complete : null,
-              child: _completing
-                  ? const SizedBox(
-                      width: 22,
-                      height: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : Text(
-                      draft.whyNotComplete() ??
-                          (draft.unpaid
-                              ? 'COMPLETE · NOT PAID YET'
-                              : 'COMPLETE ORDER'),
-                    ),
-            ),
-          ),
+          // On a phone, paying waits behind one button.
+          //
+          // Everything it takes to settle an order — the discount and
+          // delivery bar, five payment buttons, the not-paid-yet toggle and
+          // COMPLETE ORDER — came to well over half the screen, and it was
+          // on screen from the first drink onwards. While she is still
+          // taking the order none of it is any use to her, and all of it is
+          // in the way of the thing she is actually looking at, which is
+          // the drinks.
+          //
+          // So it opens when she is ready to take the money, and until then
+          // the bottom of the screen is the total and one button. The taps
+          // to a finished sale do not change: CHARGE, then how they paid.
+          //
+          // On iPad the order pane has room for all of it at once, and a
+          // sheet there would be ceremony for nothing.
+          if (widget.showOrderButton)
+            SizedBox(
+              height: KuboTouch.primaryAction,
+              child: FilledButton(
+                onPressed: () => PaymentSheet.show(context),
+                child: Text('CHARGE ${total.format()}'),
+              ),
+            )
+          else
+            const PaymentChoices(),
         ],
+      ],
+    );
+  }
+}
+
+/// Everything it takes to settle an order: what is being taken off, how it
+/// was paid, and the button that commits it.
+///
+/// Shown inline in the iPad order pane, and inside [PaymentSheet] on a phone.
+class PaymentChoices extends ConsumerStatefulWidget {
+  const PaymentChoices({this.onCompleted, super.key});
+
+  /// Called once the sale is committed, so a sheet can close itself.
+  final VoidCallback? onCompleted;
+
+  @override
+  ConsumerState<PaymentChoices> createState() => _PaymentChoicesState();
+}
+
+class _PaymentChoicesState extends ConsumerState<PaymentChoices> {
+  bool _completing = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final OrderDraft draft = ref.watch(cartProvider);
+    final BusinessSettings settings = ref.watch(settingsControllerProvider);
+    final CartController cart = ref.read(cartProvider.notifier);
+
+    final DiscountBreakdown discount = draft.discountWith(settings);
+    final Money total = draft.totalWith(settings);
+    final List<PaymentMethod> methods =
+        ref.watch(paymentMethodsProvider).valueOrNull ?? PaymentMethod.builtIn;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        // Only shown once there is something to take off, so the fast path
+        // stays two taps.
+        if (!discount.isEmpty || draft.deliveryFee.isPositive)
+          _Adjustments(discount: discount, deliveryFee: draft.deliveryFee),
+
+        const SizedBox(height: KuboSpacing.sm),
+        _DiscountAndDeliveryBar(draft: draft, settings: settings),
+        const SizedBox(height: KuboSpacing.md),
+
+        if (draft.paymentMethod?.needsConfirmation ?? false)
+          _PaymentConfirmation(draft: draft, total: total),
+
+        _PayButtons(
+          methods: methods,
+          selected: draft.paymentMethod,
+          enabled: true,
+          onTap: (PaymentMethod method) => cart.setPaymentMethod(
+            draft.paymentMethod == method ? null : method,
+          ),
+        ),
+        const SizedBox(height: KuboSpacing.sm),
+        _UnpaidToggle(draft: draft),
+        const SizedBox(height: KuboSpacing.sm),
+        SizedBox(
+          height: KuboTouch.primaryAction,
+          child: FilledButton(
+            onPressed: draft.canComplete && !_completing ? _complete : null,
+            child: _completing
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  )
+                : Text(
+                    draft.whyNotComplete() ??
+                        (draft.unpaid
+                            ? 'COMPLETE · NOT PAID YET'
+                            : 'COMPLETE ORDER'),
+                  ),
+          ),
+        ),
       ],
     );
   }
@@ -143,6 +197,7 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
           );
       ref.read(cartProvider.notifier).clear();
       ref.read(salesRevisionProvider.notifier).bump();
+      widget.onCompleted?.call();
       messenger
         ..clearSnackBars()
         ..showSnackBar(
@@ -170,6 +225,68 @@ class _PaymentBlockState extends ConsumerState<PaymentBlock> {
     } finally {
       if (mounted) setState(() => _completing = false);
     }
+  }
+}
+
+/// Taking the money, on a phone.
+///
+/// Closes itself the moment the sale is committed, and also if the order is
+/// emptied underneath it — there is nothing to pay for then.
+class PaymentSheet extends ConsumerWidget {
+  const PaymentSheet({super.key});
+
+  static Future<void> show(BuildContext context) => showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    builder: (BuildContext context) => const PaymentSheet(),
+  );
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final OrderDraft draft = ref.watch(cartProvider);
+    final ThemeData theme = Theme.of(context);
+    final Money total = draft.totalWith(ref.watch(settingsControllerProvider));
+
+    if (draft.isEmpty) {
+      // The order was cleared from the review sheet behind this one.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (context.mounted) Navigator.of(context).maybePop();
+      });
+      return const SizedBox.shrink();
+    }
+
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          KuboSpacing.lg,
+          0,
+          KuboSpacing.lg,
+          KuboSpacing.lg + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '${draft.drinkCount} '
+                    'drink${draft.drinkCount == 1 ? '' : 's'}',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                ),
+                MoneyText(total, emphasised: true),
+              ],
+            ),
+            const SizedBox(height: KuboSpacing.md),
+            PaymentChoices(onCompleted: () => Navigator.of(context).maybePop()),
+          ],
+        ),
+      ),
+    );
   }
 }
 

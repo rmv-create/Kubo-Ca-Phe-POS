@@ -62,6 +62,12 @@ void main() {
     await settle(tester);
   }
 
+  /// On a phone, paying lives behind the CHARGE button.
+  Future<void> openPayment(WidgetTester tester) async {
+    await tester.tap(find.textContaining('CHARGE '));
+    await settle(tester);
+  }
+
   group('iPhone', () {
     testWidgets('shows the real menu, with prices', (
       WidgetTester tester,
@@ -124,7 +130,20 @@ void main() {
       await tester.tap(find.textContaining('ADD TO ORDER'));
       await settle(tester);
 
-      // Still two taps to a finished sale: a method, then complete.
+      // Adding a drink must NOT put the payment panel on screen: while she
+      // is still taking the order it is in the way of the drinks.
+      expect(find.text('CASH'), findsNothing);
+      expect(find.text('GCASH'), findsNothing);
+      expect(find.text('Delivery'), findsNothing);
+      expect(find.textContaining('Not paid yet'), findsNothing);
+      expect(find.textContaining('COMPLETE'), findsNothing);
+
+      // What she gets is the total and one button.
+      expect(find.textContaining('1 drink'), findsOneWidget);
+      expect(find.text('CHARGE ₱139.00'), findsOneWidget);
+
+      await openPayment(tester);
+
       expect(find.text('CASH'), findsOneWidget);
       expect(find.text('GCASH'), findsOneWidget);
       expect(find.text('Delivery'), findsOneWidget);
@@ -134,6 +153,21 @@ void main() {
       );
       expect(button.onPressed, isNull);
       expect(find.text('Choose how it was paid.'), findsOneWidget);
+    });
+
+    testWidgets('the drinks keep the screen while the order is built', (
+      WidgetTester tester,
+    ) async {
+      await pumpPos(tester, iPhone16Plus);
+      await tester.tap(find.text('SPANISH LATTE'));
+      await settle(tester);
+      await tester.tap(find.textContaining('ADD TO ORDER'));
+      await settle(tester);
+
+      // The bottom bar is the total line and the one button, and it sits
+      // inside the thumb arc rather than halfway up the screen.
+      final double bar = tester.getTopLeft(find.text('CHARGE ₱139.00')).dy;
+      expect(bar, greaterThan(iPhone16Plus.height * 0.8));
     });
 
     testWidgets('switching category swaps the drinks shown', (
@@ -173,6 +207,7 @@ void main() {
       expect(find.text('₱139.00'), findsWidgets);
       expect(find.textContaining('1 drink'), findsOneWidget);
 
+      await openPayment(tester);
       await tester.tap(find.text('CASH'));
       await settle(tester);
 
@@ -193,6 +228,7 @@ void main() {
       await tester.tap(find.textContaining('ADD TO ORDER'));
       await settle(tester);
 
+      await openPayment(tester);
       await tester.tap(find.text('GCASH'));
       await settle(tester);
 
