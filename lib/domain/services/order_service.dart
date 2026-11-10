@@ -286,7 +286,7 @@ class OrderService {
   /// owner has asked for a daily reset, because her worksheet said numbers run
   /// `K-0001` onwards and do not restart.
   Future<_OrderNumber> _nextOrderNumber(
-    Transaction txn, {
+    DatabaseExecutor txn, {
     required BusinessSettings settings,
     required String businessDate,
   }) async {
@@ -305,9 +305,14 @@ class OrderService {
     final int start = settings.orderNumberStart < 1
         ? 1
         : settings.orderNumberStart;
-    final int next = (last == 0 && !settings.orderNumberResetDaily)
-        ? start
-        : last + 1;
+    // The first order of the shop's life takes the number she chose, and
+    // every one after it follows the last — unless she has since set the
+    // counter higher, which is how she moves it on without clearing the
+    // books. It can only ever go forward: a start below what has already
+    // been rung up would hand a second receipt a number that is taken.
+    final int next = settings.orderNumberResetDaily
+        ? last + 1
+        : (start > last ? start : last + 1);
     final String digits = next.toString().padLeft(4, '0');
     final String prefix = settings.orderNumberPrefix.trim();
 
@@ -322,6 +327,28 @@ class OrderService {
       sequence: next,
       formatted: prefix.isEmpty ? body : '$prefix-$body',
     );
+  }
+
+  /// The number the next order will be given, without taking it.
+  ///
+  /// Shown on the POS while she is ringing one up, so that the receipt in
+  /// her hand and the screen agree before she has committed anything. It
+  /// reads the same counter the sale will, so it cannot disagree with it
+  /// unless another till takes the number first — which is exactly what the
+  /// number is for.
+  Future<String> nextOrderNumber({
+    required BusinessSettings settings,
+    DateTime? now,
+  }) async {
+    final DateTime at = now ?? _clock.now();
+    final _OrderNumber number = await _nextOrderNumber(
+      _db.db,
+      settings: settings,
+      businessDate: BusinessDay(
+        cutoffHour: settings.businessDayCutoffHour,
+      ).dateOf(at),
+    );
+    return number.formatted;
   }
 
   Future<void> _updateCustomer(

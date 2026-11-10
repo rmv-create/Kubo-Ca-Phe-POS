@@ -767,6 +767,18 @@ class SalesService {
     });
   }
 
+  /// The highest order number the shop has ever given out.
+  ///
+  /// Zero on a shop that has not sold anything. Settings asks so that it can
+  /// let her move the counter on without ever letting it fall back onto a
+  /// number that is already on a receipt.
+  Future<int> highestOrderSequence() async {
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      'SELECT MAX(sequence_no) AS m FROM orders',
+    );
+    return (rows.first['m'] as int?) ?? 0;
+  }
+
   // ─────────────────────────────── deleting ───────────────────────────────
 
   /// Takes an order off the books altogether.

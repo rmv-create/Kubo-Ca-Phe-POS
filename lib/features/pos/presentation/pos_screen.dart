@@ -181,6 +181,10 @@ class _PosHeader extends ConsumerWidget {
         .watch(settingsControllerProvider)
         .businessName;
     final bool compact = context.formFactor.isCompact;
+    // Which order she is on, before she has committed it. Falls back to the
+    // old wording while the number is being read, rather than flashing an
+    // empty line where a number is about to be.
+    final String? nextNumber = ref.watch(nextOrderNumberProvider).valueOrNull;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -194,7 +198,9 @@ class _PosHeader extends ConsumerWidget {
           Expanded(
             child: KuboWordmark(
               businessName: businessName,
-              subtitle: 'New order',
+              subtitle: nextNumber == null
+                  ? 'New order'
+                  : 'New order · $nextNumber',
             ),
           ),
           // Handing the phone to somebody, or putting it down: one tap

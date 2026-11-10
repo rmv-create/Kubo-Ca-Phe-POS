@@ -310,6 +310,22 @@ final Provider<OrderService> orderServiceProvider = Provider<OrderService>(
 );
 
 /// Bumped after every completed order, so customer lists and usuals refresh.
+/// The number the next order will be given.
+///
+/// On the POS header while she is ringing one up, so she can see which
+/// order she is on without finishing it first — and, at the start of a day,
+/// how many the shop has taken altogether.
+///
+/// Re-read after every sale, and whenever the numbering settings change.
+final FutureProvider<String> nextOrderNumberProvider = FutureProvider<String>((
+  Ref ref,
+) {
+  ref.watch(salesRevisionProvider);
+  return ref
+      .read(orderServiceProvider)
+      .nextOrderNumber(settings: ref.watch(settingsControllerProvider));
+});
+
 final NotifierProvider<SalesRevision, int> salesRevisionProvider =
     NotifierProvider<SalesRevision, int>(SalesRevision.new);
 

@@ -20,14 +20,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final TextEditingController _prefixController;
   late final TextEditingController _startController;
 
-  /// The first number can only be chosen before the first sale: changing it
-  /// afterwards would give two receipts the same number.
-  bool _hasSold = true;
+  /// The highest order number already rung up, or zero on a shop that has
+  /// not sold anything.
+  ///
+  /// The counter can be moved on at any time, but never back: a start at or
+  /// below this would hand a second receipt a number that is already taken.
+  /// It used to be locked outright after the first sale, which left her
+  /// unable to set it at all — and unable to tidy it up after an evening of
+  /// practice orders.
+  int _highestSoFar = 0;
 
-  Future<void> _checkIfSold() async {
-    final bool sold =
-        (await ref.read(salesServiceProvider).orders(limit: 1)).isNotEmpty;
-    if (mounted) setState(() => _hasSold = sold);
+  Future<void> _checkHighest() async {
+    final int highest = await ref
+        .read(salesServiceProvider)
+        .highestOrderSequence();
+    if (mounted) setState(() => _highestSoFar = highest);
   }
 
   @override
@@ -39,7 +46,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _startController = TextEditingController(
       text: '${settings.orderNumberStart}',
     );
-    unawaited(_checkIfSold());
+    unawaited(_checkHighest());
   }
 
   @override
@@ -48,6 +55,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _prefixController.dispose();
     _startController.dispose();
     super.dispose();
+  }
+
+  /// Tells her why something was not saved, in the same place a save is
+  /// confirmed.
+  void _say(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _save(BusinessSettings next) async {
@@ -145,18 +161,30 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             child: TextField(
               controller: _startController,
               keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'First order number',
-                helperText:
-                    'Where the counter starts. Fixed once you have '
-                    'rung something up.',
+              decoration: InputDecoration(
+                labelText: 'Next order number',
+                helperText: _highestSoFar == 0
+                    ? 'Where the counter starts.'
+                    : 'Where the counter goes next. It can be moved on, '
+                          'never back \u2014 ${_highestSoFar + 1} or higher, '
+                          'so no two receipts share a number.',
               ),
-              enabled: !_hasSold,
               textInputAction: TextInputAction.done,
-              onSubmitted: (String value) {
+              onSubmitted: (String value) async {
                 final int? start = int.tryParse(value.trim());
-                if (start == null || start < 1) return;
-                _save(settings.copyWith(orderNumberStart: start));
+                if (start == null || start < 1) {
+                  _say('That is not a number the counter can start at.');
+                  return;
+                }
+                if (start <= _highestSoFar) {
+                  _say(
+                    'KUBO-$_highestSoFar has already been used. The counter '
+                    'can go to ${_highestSoFar + 1} or higher.',
+                  );
+                  _startController.text = '${settings.orderNumberStart}';
+                  return;
+                }
+                await _save(settings.copyWith(orderNumberStart: start));
               },
             ),
           ),
