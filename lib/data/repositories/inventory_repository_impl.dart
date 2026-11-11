@@ -147,10 +147,34 @@ class InventoryRepositoryImpl implements InventoryRepository {
 
   @override
   Future<void> updateIngredient(Ingredient ingredient) async {
+    final String trimmed = ingredient.name.trim();
+    if (trimmed.isEmpty) {
+      throw const ValidationException(
+        'An ingredient needs a name.',
+        field: 'name',
+      );
+    }
+    try {
+      await _updateIngredient(ingredient, trimmed);
+    } on DatabaseException catch (e) {
+      // Renaming one onto another's name used to come back as a raw
+      // database error, which says nothing she can act on.
+      if (e.isUniqueConstraintError()) {
+        throw ValidationException(
+          'There is already an ingredient called "$trimmed".',
+          field: 'name',
+          cause: e,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _updateIngredient(Ingredient ingredient, String trimmed) async {
     await _db.db.update(
       'ingredients',
       <String, Object?>{
-        'name': ingredient.name.trim(),
+        'name': trimmed,
         'category': ingredient.category?.trim(),
         'base_unit': ingredient.baseUnit.code,
         'purchase_unit_code': ingredient.purchaseUnitCode,

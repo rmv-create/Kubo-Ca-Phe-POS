@@ -47,6 +47,7 @@ class SalesService {
     String? businessDate,
     int? customerId,
     int limit = 100,
+    bool includeVoided = true,
   }) async {
     final List<String> where = <String>[];
     final List<Object?> args = <Object?>[];
@@ -57,6 +58,13 @@ class SalesService {
     if (customerId != null) {
       where.add('o.customer_id = ?');
       args.add(customerId);
+    }
+    // The day's list keeps its voided orders, because she has to be able to
+    // see what was undone. A customer's own history does not: a void says
+    // the drink was never handed over, and a statement that bills someone
+    // for it is simply wrong.
+    if (!includeVoided) {
+      where.add("o.status != 'voided'");
     }
 
     final List<Map<String, Object?>> rows = await _db.db.rawQuery(
@@ -131,7 +139,11 @@ class SalesService {
     for (final Map<String, Object?> line in lineRows) {
       final List<Map<String, Object?>> optionRows = await _db.db.query(
         'order_item_customizations',
-        columns: <String>['option_name_snapshot', 'price_delta_centavos'],
+        columns: <String>[
+          'option_name_snapshot',
+          'group_name_snapshot',
+          'price_delta_centavos',
+        ],
         where: 'order_item_id = ?',
         whereArgs: <Object?>[line['id']],
         orderBy: 'display_order',
@@ -152,6 +164,7 @@ class SalesService {
               .map(
                 (Map<String, Object?> o) => OrderLineOption(
                   name: o['option_name_snapshot']! as String,
+                  groupName: (o['group_name_snapshot'] as String?) ?? '',
                   priceDelta: Money(o['price_delta_centavos']! as int),
                 ),
               )
@@ -510,6 +523,61 @@ class SalesService {
     }
   }
 
+  /// Takes a voided order's drinks back out of what this customer usually
+  /// orders.
+  ///
+  /// Without this, ringing the wrong drink up against a regular's name and
+  /// voiding it still taught the app that it was their usual — and the next
+  /// time she picked them, "same again" offered the drink they never had.
+  /// A pattern that falls to nothing is removed rather than left at zero.
+  Future<void> _forgetPatterns(
+    Transaction txn, {
+    required int orderId,
+    required int customerId,
+  }) async {
+    final List<Map<String, Object?>> items = await txn.query(
+      'order_items',
+      columns: <String>['id', 'product_id', 'size_id', 'quantity'],
+      where: 'order_id = ?',
+      whereArgs: <Object?>[orderId],
+    );
+
+    for (final Map<String, Object?> item in items) {
+      final int? productId = item['product_id'] as int?;
+      final int? sizeId = item['size_id'] as int?;
+      if (productId == null || sizeId == null) continue;
+
+      final List<Map<String, Object?>> optionRows = await txn.query(
+        'order_item_customizations',
+        columns: <String>['option_id'],
+        where: 'order_item_id = ? AND option_id IS NOT NULL',
+        whereArgs: <Object?>[item['id']],
+        orderBy: 'display_order',
+      );
+      final List<int> optionIds = optionRows
+          .map((Map<String, Object?> o) => o['option_id']! as int)
+          .toList();
+
+      final String signature = orderSignature(
+        productId: productId,
+        sizeId: sizeId,
+        optionIds: optionIds,
+      );
+      await txn.rawUpdate(
+        'UPDATE customer_order_patterns '
+        'SET occurrence_count = MAX(0, occurrence_count - ?) '
+        'WHERE customer_id = ? AND signature = ?',
+        <Object?>[item['quantity']! as int, customerId, signature],
+      );
+    }
+
+    await txn.delete(
+      'customer_order_patterns',
+      where: 'customer_id = ? AND occurrence_count <= 0',
+      whereArgs: <Object?>[customerId],
+    );
+  }
+
   // ─────────────────────────────── refunds ───────────────────────────────
 
   /// Gives money back for part or all of an order.
@@ -751,6 +819,7 @@ class SalesService {
           'updated_at = ? WHERE id = ?',
           <Object?>[order.itemCount, order.total.centavos, at, customerId],
         );
+        await _forgetPatterns(txn, orderId: orderId, customerId: customerId);
       }
 
       await txn.insert('audit_log', <String, Object?>{

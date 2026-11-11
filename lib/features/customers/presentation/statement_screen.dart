@@ -57,7 +57,7 @@ class StatementScreen extends ConsumerWidget {
       if (who == null) return;
       final List<OrderRecord> orders = await ref
           .read(salesServiceProvider)
-          .orders(customerId: customerId, limit: 1000);
+          .orders(customerId: customerId, limit: 1000, includeVoided: false);
       final String shop = ref.read(settingsControllerProvider).businessName;
 
       await saveBinary(
@@ -109,7 +109,7 @@ class _Body extends ConsumerWidget {
     return FutureBuilder<List<OrderRecord>>(
       future: ref
           .watch(salesServiceProvider)
-          .orders(customerId: customer.id, limit: 1000),
+          .orders(customerId: customer.id, limit: 1000, includeVoided: false),
       builder:
           (BuildContext context, AsyncSnapshot<List<OrderRecord>> snapshot) {
             if (!snapshot.hasData) {

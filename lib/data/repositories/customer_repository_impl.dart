@@ -46,6 +46,21 @@ class CustomerRepositoryImpl implements CustomerRepository {
     return rows.map(_customer).toList();
   }
 
+  /// The ones she has taken off the list, so that she can put one back.
+  ///
+  /// Kept out of [search] and [recent] on purpose: the point of archiving is
+  /// that they stop coming up while she is serving.
+  @override
+  Future<List<Customer>> archived({int limit = 200}) async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'customers',
+      where: 'is_active = 0',
+      orderBy: 'name COLLATE NOCASE',
+      limit: limit,
+    );
+    return rows.map(_customer).toList();
+  }
+
   @override
   Future<List<Customer>> recent({int limit = 8}) async {
     final List<Map<String, Object?>> rows = await _db.db.query(
@@ -69,7 +84,11 @@ class CustomerRepositoryImpl implements CustomerRepository {
   }
 
   @override
-  Future<int> create({required String name, String? mobile}) async {
+  Future<int> create({
+    required String name,
+    String? mobile,
+    String? notes,
+  }) async {
     final String trimmed = name.trim();
     if (trimmed.isEmpty) {
       throw const ValidationException(
@@ -77,10 +96,14 @@ class CustomerRepositoryImpl implements CustomerRepository {
         field: 'name',
       );
     }
+    final String? note = _tidy(notes);
+    await _refuseIfTaken(name: trimmed, notes: note);
+
     final String now = _clock.nowIso();
     return _db.db.insert('customers', <String, Object?>{
       'name': trimmed,
-      'mobile': mobile?.trim().isEmpty ?? true ? null : mobile!.trim(),
+      'mobile': _tidy(mobile),
+      'notes': note,
       'created_at': now,
       'updated_at': now,
       'visit_count': 0,
@@ -92,6 +115,100 @@ class CustomerRepositoryImpl implements CustomerRepository {
     });
   }
 
+  static String? _tidy(String? value) {
+    final String trimmed = (value ?? '').trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  /// Two people called James are fine. Two people called James with nothing
+  /// to tell them apart are not.
+  ///
+  /// The note is what separates them — "office", "classmate" — so a repeated
+  /// name is allowed as long as the note differs. A repeated name with the
+  /// same note, or with no note on either, is refused: picking the wrong one
+  /// at the counter puts a drink on a stranger's tab, and there would have
+  /// been no way to tell which was which.
+  Future<void> _refuseIfTaken({
+    required String name,
+    required String? notes,
+    int? exceptId,
+  }) async {
+    final List<Map<String, Object?>> clashes = await _db.db.rawQuery(
+      'SELECT id, notes, is_active FROM customers '
+      'WHERE LOWER(TRIM(name)) = ?${exceptId == null ? '' : ' AND id != ?'}',
+      <Object?>[name.toLowerCase(), if (exceptId != null) exceptId],
+    );
+    if (clashes.isEmpty) return;
+
+    final String mine = (notes ?? '').toLowerCase();
+    for (final Map<String, Object?> row in clashes) {
+      final String theirs = ((row['notes'] as String?) ?? '').toLowerCase();
+      if (theirs != mine) continue;
+
+      final bool archived = row['is_active'] != 1;
+      if (mine.isEmpty) {
+        throw ValidationException(
+          archived
+              ? 'There is already an archived customer called $name. Restore '
+                    'that one, or add a note to tell this one apart.'
+              : 'There is already a customer called $name. Add a note to '
+                    'tell them apart \u2014 "office", "classmate".',
+          field: 'name',
+        );
+      }
+      throw ValidationException(
+        'There is already a $name with that same note. Make the note '
+        'different so you can tell them apart at the counter.',
+        field: 'notes',
+      );
+    }
+  }
+
+  /// Takes a customer off the list without losing what they bought.
+  ///
+  /// Their orders stay exactly as they are; they simply stop being offered
+  /// when she searches. This is the reversible one.
+  @override
+  Future<void> archive(int id) async => _setActive(id, false);
+
+  /// Puts an archived customer back on the list.
+  @override
+  Future<void> restore(int id) async {
+    final Customer? who = await byId(id);
+    if (who == null) throw const NotFoundException('That customer is gone.');
+    await _refuseIfTaken(name: who.name, notes: who.notes, exceptId: id);
+    await _setActive(id, true);
+  }
+
+  Future<void> _setActive(int id, bool active) async {
+    final int changed = await _db.db.update(
+      'customers',
+      <String, Object?>{
+        'is_active': active ? 1 : 0,
+        'updated_at': _clock.nowIso(),
+      },
+      where: 'id = ?',
+      whereArgs: <Object?>[id],
+    );
+    if (changed == 0) throw const NotFoundException('That customer is gone.');
+  }
+
+  /// Forgets a customer entirely.
+  ///
+  /// What they bought stays on the books \u2014 the money came in and the
+  /// stock went out, and neither becomes untrue because she no longer keeps
+  /// their name. Their past orders simply stop being anybody's, exactly as
+  /// if they had been rung up as a guest.
+  @override
+  Future<void> delete(int id) async {
+    final int changed = await _db.db.delete(
+      'customers',
+      where: 'id = ?',
+      whereArgs: <Object?>[id],
+    );
+    if (changed == 0) throw const NotFoundException('That customer is gone.');
+  }
+
   @override
   Future<void> update(Customer customer) async {
     final String trimmed = customer.name.trim();
@@ -101,6 +218,11 @@ class CustomerRepositoryImpl implements CustomerRepository {
         field: 'name',
       );
     }
+    await _refuseIfTaken(
+      name: trimmed,
+      notes: _tidy(customer.notes),
+      exceptId: customer.id,
+    );
     await _db.db.update(
       'customers',
       <String, Object?>{
@@ -108,7 +230,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
         'mobile': customer.mobile?.trim().isEmpty ?? true
             ? null
             : customer.mobile!.trim(),
-        'notes': customer.notes,
+        'notes': _tidy(customer.notes),
         'birthday': customer.birthday,
         'segment': customer.storedSegment.code,
         'is_active': customer.isActive ? 1 : 0,

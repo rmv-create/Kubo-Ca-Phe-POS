@@ -154,14 +154,46 @@ class OrderLineRecord {
 /// One modification as it was sold, with what it added.
 @immutable
 class OrderLineOption {
-  const OrderLineOption({required this.name, required this.priceDelta});
+  const OrderLineOption({
+    required this.name,
+    required this.priceDelta,
+    this.groupName = '',
+  });
 
   final String name;
+
+  /// What she was choosing between: Sweetness, Strength, Milk, Extras.
+  ///
+  /// Taken from the snapshot written when the drink was sold, so a group
+  /// renamed afterwards does not rewrite an old receipt.
+  final String groupName;
 
   /// What this added to *one* drink. Zero for the many that are free.
   final Money priceDelta;
 
   bool get isCharged => priceDelta.isPositive;
+
+  /// How it reads on a receipt.
+  ///
+  /// A receipt that says "Regular · Regular · Regular" answers nothing —
+  /// regular what? The choice only means something beside the question it
+  /// answers, so the group comes with it: "Regular sweetness".
+  ///
+  /// An extra is the exception. It is a thing in its own right rather than
+  /// an answer to a question, and "Sea Salt Cold Foam extras" reads like a
+  /// mistake, so those keep their own name. The same goes for any option
+  /// that already contains the group's word — "Oat milk" is not improved by
+  /// being made "Oat milk milk".
+  String get label {
+    final String group = groupName.trim();
+    if (group.isEmpty) return name;
+    if (_isAThingInItself) return name;
+    if (name.toLowerCase().contains(group.toLowerCase())) return name;
+    return '$name ${group.toLowerCase()}';
+  }
+
+  /// Extras are added to a drink; the rest describe how it was made.
+  bool get _isAThingInItself => groupName.trim().toLowerCase() == 'extras';
 
   /// What it added to the whole line.
   Money totalFor(int quantity) => priceDelta * quantity;

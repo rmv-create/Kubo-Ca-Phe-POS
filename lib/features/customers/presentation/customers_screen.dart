@@ -54,6 +54,15 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         title: const Text('Customers'),
         actions: <Widget>[
           IconButton(
+            icon: const Icon(Icons.archive_outlined),
+            tooltip: 'Archived',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => const ArchivedScreen(),
+              ),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.person_search_outlined),
             tooltip: 'Who stopped coming',
             onPressed: () => Navigator.of(context).push(
@@ -63,6 +72,11 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
             ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _addCustomer(context, ref),
+        icon: const Icon(Icons.person_add_alt),
+        label: const Text('Add a customer'),
       ),
       body: Column(
         children: <Widget>[
@@ -86,8 +100,8 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                     icon: Icons.people_outline,
                     title: 'No customers yet',
                     message:
-                        'Customers are added from the POS while you take '
-                        'an order.',
+                        'Add one here, or from the POS while you take an '
+                        'order.',
                   );
                 }
                 return ListView.separated(
@@ -105,7 +119,12 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
                           style: Theme.of(context).textTheme.labelMedium,
                         ),
                       ),
-                      title: Text(c.name),
+                      // The note is how she tells two people called James
+                      // apart, so it belongs beside the name wherever she
+                      // has to choose between them.
+                      title: Text(
+                        c.notes == null ? c.name : '${c.name} · ${c.notes}',
+                      ),
                       subtitle: Text(
                         '${c.orderCount} order${c.orderCount == 1 ? '' : 's'} · '
                         '${c.segmentAt(now).label}',
@@ -126,6 +145,93 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
         ],
       ),
     );
+  }
+}
+
+/// Adds somebody she knows is coming, without waiting for them to order.
+///
+/// The note is offered at the same moment rather than later, because the
+/// moment she needs it is the moment there are two of them: a second James
+/// cannot be saved at all until one of them has a note.
+Future<void> _addCustomer(BuildContext context, WidgetRef ref) async {
+  final TextEditingController name = TextEditingController();
+  final TextEditingController mobile = TextEditingController();
+  final TextEditingController notes = TextEditingController();
+
+  final bool? save = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext context) => AlertDialog(
+      title: const Text('New customer'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            TextField(
+              controller: name,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(labelText: 'Name'),
+            ),
+            const SizedBox(height: KuboSpacing.sm),
+            TextField(
+              controller: mobile,
+              keyboardType: TextInputType.phone,
+              decoration: const InputDecoration(
+                labelText: 'Mobile',
+                helperText: 'Optional',
+              ),
+            ),
+            const SizedBox(height: KuboSpacing.sm),
+            TextField(
+              controller: notes,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Note',
+                helperText:
+                    'Only you see this \u2014 never on a receipt. '
+                    '"Office", "classmate".',
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(true),
+          child: const Text('Add'),
+        ),
+      ],
+    ),
+  );
+
+  if (save != true || !context.mounted) {
+    name.dispose();
+    mobile.dispose();
+    notes.dispose();
+    return;
+  }
+
+  final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+  try {
+    await ref
+        .read(customerRepositoryProvider)
+        .create(name: name.text, mobile: mobile.text, notes: notes.text);
+    ref.read(customerRevisionProvider.notifier).bump();
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text('${name.text.trim()} added')));
+  } on AppException catch (error) {
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(error.message)));
+  } finally {
+    name.dispose();
+    mobile.dispose();
+    notes.dispose();
   }
 }
 
@@ -208,7 +314,8 @@ class CustomerDetailScreen extends ConsumerWidget {
                 subtitle: Text(
                   customer.notes?.trim().isNotEmpty ?? false
                       ? customer.notes!
-                      : 'Allergies, how they like it, where they work',
+                      : 'Never on a receipt. How they like it, or which '
+                            'James this is \u2014 "office", "classmate"',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _editNotes(context, ref, customer),
@@ -234,6 +341,40 @@ class CustomerDetailScreen extends ConsumerWidget {
                   icon: const Icon(Icons.receipt_long_outlined),
                   label: const Text('Statement of account'),
                 ),
+              ),
+              // Archiving is the one she will want almost every time:
+              // somebody who stopped coming, whose spend she still wants in
+              // the books. Deleting is for a row that should not exist.
+              const SectionHeader('Remove them'),
+              ListTile(
+                leading: Icon(
+                  customer.isActive
+                      ? Icons.archive_outlined
+                      : Icons.unarchive_outlined,
+                  color: theme.colorScheme.secondary,
+                ),
+                title: Text(customer.isActive ? 'Archive' : 'Put back'),
+                subtitle: Text(
+                  customer.isActive
+                      ? 'Takes them off the list. Everything they bought '
+                            'stays on the books, and you can put them back.'
+                      : 'They are archived. This puts them back on the list.',
+                ),
+                onTap: () => _archiveOrRestore(context, ref, customer),
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.delete_outline,
+                  color: theme.colorScheme.error,
+                ),
+                title: const Text('Delete'),
+                subtitle: Text(
+                  customer.orderCount == 0
+                      ? 'They have bought nothing, so nothing is lost.'
+                      : 'What they bought stays on the books, but stops '
+                            'being theirs. This cannot be undone.',
+                ),
+                onTap: () => _deleteCustomer(context, ref, customer),
               ),
               const SectionHeader('Their usual'),
               AsyncView<UsualOrder?>(
@@ -432,7 +573,9 @@ class CustomerDetailScreen extends ConsumerWidget {
       title: 'Notes',
       label: 'Anything worth remembering',
       initial: customer.notes ?? '',
-      helper: 'Allergies, how she likes it, where she works',
+      helper:
+          'Never printed on a receipt. Use it to tell two people with the '
+          'same name apart \u2014 "office", "classmate".',
     );
     if (notes == null || !context.mounted) return;
     await _save(
@@ -440,6 +583,93 @@ class CustomerDetailScreen extends ConsumerWidget {
       ref,
       customer.copyWith(notes: notes, clearNotes: notes.trim().isEmpty),
     );
+  }
+
+  Future<void> _archiveOrRestore(
+    BuildContext context,
+    WidgetRef ref,
+    Customer customer,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      if (customer.isActive) {
+        await ref.read(customerRepositoryProvider).archive(customer.id);
+      } else {
+        await ref.read(customerRepositoryProvider).restore(customer.id);
+      }
+      ref.read(customerRevisionProvider.notifier).bump();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              customer.isActive
+                  ? '${customer.name} archived'
+                  : '${customer.name} is back on the list',
+            ),
+          ),
+        );
+    } on AppException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  Future<void> _deleteCustomer(
+    BuildContext context,
+    WidgetRef ref,
+    Customer customer,
+  ) async {
+    final bool sure =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: Text('Delete ${customer.name}?'),
+            content: Text(
+              customer.orderCount == 0
+                  ? 'They have bought nothing, so nothing is lost.\n\n'
+                        'This cannot be undone.'
+                  : 'Their ${customer.orderCount} '
+                        'order${customer.orderCount == 1 ? '' : 's'} stay on '
+                        'the books \u2014 the money came in either way \u2014 '
+                        'but stop being theirs.\n\nArchiving keeps them and '
+                        'their history. This cannot be undone.',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Keep them'),
+              ),
+              FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!sure || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+    try {
+      await ref.read(customerRepositoryProvider).delete(customer.id);
+      ref.read(customerRevisionProvider.notifier).bump();
+      ref.read(salesRevisionProvider.notifier).bump();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text('${customer.name} deleted')));
+      navigator.pop();
+    } on AppException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   Future<void> _toggleVip(
@@ -533,7 +763,7 @@ class _CustomerOrders extends ConsumerWidget {
     return FutureBuilder<List<OrderRecord>>(
       future: ref
           .watch(salesServiceProvider)
-          .orders(customerId: customerId, limit: 20),
+          .orders(customerId: customerId, limit: 20, includeVoided: false),
       builder:
           (BuildContext context, AsyncSnapshot<List<OrderRecord>> snapshot) {
             final List<OrderRecord> orders = snapshot.data ?? <OrderRecord>[];
@@ -618,4 +848,87 @@ String _when(DateTime at) {
     'Dec',
   ];
   return '${local.day} ${months[local.month - 1]} ${local.year}';
+}
+
+/// The customers she has taken off the list.
+///
+/// Its own screen rather than a filter on the main one, because the list she
+/// searches while serving should never offer somebody she archived.
+class ArchivedScreen extends ConsumerWidget {
+  const ArchivedScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<List<Customer>> archived = ref.watch(
+      archivedCustomersProvider,
+    );
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Archived')),
+      body: AsyncView<List<Customer>>(
+        value: archived,
+        builder: (BuildContext context, List<Customer> data) {
+          if (data.isEmpty) {
+            return const EmptyState(
+              icon: Icons.archive_outlined,
+              title: 'Nobody is archived',
+              message:
+                  'Archiving takes somebody off the list without losing '
+                  'what they bought.',
+            );
+          }
+          return ListView.separated(
+            itemCount: data.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (BuildContext context, int index) {
+              final Customer c = data[index];
+              return ListTile(
+                leading: const Icon(Icons.person_outline),
+                title: Text(
+                  c.notes == null ? c.name : '${c.name} · ${c.notes}',
+                ),
+                subtitle: Text(
+                  '${c.orderCount} order${c.orderCount == 1 ? '' : 's'} · '
+                  '${c.totalSpend.format()}',
+                ),
+                trailing: TextButton(
+                  onPressed: () => _putBack(context, ref, c),
+                  child: const Text('Put back'),
+                ),
+                onTap: () => Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (BuildContext context) =>
+                        CustomerDetailScreen(customerId: c.id),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _putBack(
+    BuildContext context,
+    WidgetRef ref,
+    Customer customer,
+  ) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await ref.read(customerRepositoryProvider).restore(customer.id);
+      ref.read(customerRevisionProvider.notifier).bump();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(content: Text('${customer.name} is back on the list')),
+        );
+    } on AppException catch (error) {
+      // Most likely somebody with that name took their place while they
+      // were away, and the note no longer tells them apart.
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
 }

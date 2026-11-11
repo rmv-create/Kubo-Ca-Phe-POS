@@ -248,9 +248,9 @@ class OrderDetailScreen extends ConsumerWidget {
                     <String>[
                       for (final OrderLineOption option in line.options)
                         option.isCharged
-                            ? '${option.name} '
+                            ? '${option.label} '
                                   '+${option.totalFor(line.quantity).format()}'
-                            : option.name,
+                            : option.label,
                       if (line.refundedQuantity > 0)
                         '${line.refundedQuantity} refunded',
                     ].join(' · '),

@@ -185,7 +185,7 @@ class ReceiptDocument {
           padding: const pw.EdgeInsets.only(left: 18, top: 1),
           child: pw.Row(
             children: <pw.Widget>[
-              pw.Expanded(child: _text('· ${option.name}', size: 8)),
+              pw.Expanded(child: _text('· ${option.label}', size: 8)),
               if (option.isCharged)
                 _text('+${option.totalFor(line.quantity).format()}', size: 8),
             ],

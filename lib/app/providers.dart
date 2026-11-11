@@ -386,6 +386,13 @@ final FutureProviderFamily<Customer?, int> customerByIdProvider =
       return ref.watch(customerRepositoryProvider).byId(id);
     });
 
+/// The customers she has archived, for putting one back.
+final FutureProvider<List<Customer>> archivedCustomersProvider =
+    FutureProvider<List<Customer>>((Ref ref) {
+      ref.watch(customerRevisionProvider);
+      return ref.watch(customerRepositoryProvider).archived();
+    });
+
 final FutureProviderFamily<List<Customer>, String> customerSearchProvider =
     FutureProvider.family<List<Customer>, String>((Ref ref, String query) {
       ref.watch(salesRevisionProvider);

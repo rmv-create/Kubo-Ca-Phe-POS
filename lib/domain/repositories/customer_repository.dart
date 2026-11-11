@@ -10,9 +10,25 @@ abstract class CustomerRepository {
 
   Future<Customer?> byId(int id);
 
-  Future<int> create({required String name, String? mobile});
+  /// Adds somebody. [notes] is hers alone — it tells two people with the
+  /// same name apart and never reaches a receipt.
+  ///
+  /// Refuses a name that is already taken unless the notes differ.
+  Future<int> create({required String name, String? mobile, String? notes});
 
   Future<void> update(Customer customer);
+
+  /// Takes a customer off the list, keeping everything they bought.
+  Future<void> archive(int id);
+
+  /// The ones taken off the list.
+  Future<List<Customer>> archived({int limit});
+
+  /// Puts an archived customer back on it.
+  Future<void> restore(int id);
+
+  /// Forgets a customer. Their past orders stay on the books, unattributed.
+  Future<void> delete(int id);
 
   /// The customer's usual: the one saved by hand if there is one, otherwise
   /// the configuration they order most. Null when there is not enough history

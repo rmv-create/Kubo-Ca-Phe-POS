@@ -37,6 +37,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     if (mounted) setState(() => _highestSoFar = highest);
   }
 
+  /// Typed settings used to save only when she pressed the keyboard's done
+  /// key. Typing 1111 and tapping away looked as though it had been taken,
+  /// and then the screen came back saying 1001, because nothing had been
+  /// written at all. Leaving a field now saves it, the same as finishing it.
+  late final FocusNode _nameFocus;
+  late final FocusNode _prefixFocus;
+  late final FocusNode _startFocus;
+
   @override
   void initState() {
     super.initState();
@@ -46,11 +54,75 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     _startController = TextEditingController(
       text: '${settings.orderNumberStart}',
     );
+    _nameFocus = FocusNode()..addListener(_onNameLeft);
+    _prefixFocus = FocusNode()..addListener(_onPrefixLeft);
+    _startFocus = FocusNode()..addListener(_onStartLeft);
     unawaited(_checkHighest());
+  }
+
+  void _onNameLeft() {
+    if (_nameFocus.hasFocus) return;
+    _saveName(_nameController.text);
+  }
+
+  void _onPrefixLeft() {
+    if (_prefixFocus.hasFocus) return;
+    _savePrefix(_prefixController.text);
+  }
+
+  void _onStartLeft() {
+    if (_startFocus.hasFocus) return;
+    unawaited(_saveStart(_startController.text));
+  }
+
+  void _saveName(String value) {
+    final BusinessSettings settings = ref.read(settingsControllerProvider);
+    final String name = value.trim();
+    if (name.isEmpty || name == settings.businessName) return;
+    unawaited(_save(settings.copyWith(businessName: name)));
+  }
+
+  void _savePrefix(String value) {
+    final BusinessSettings settings = ref.read(settingsControllerProvider);
+    final String prefix = value.trim();
+    if (prefix == settings.orderNumberPrefix) return;
+    unawaited(_save(settings.copyWith(orderNumberPrefix: prefix)));
+  }
+
+  /// The counter can be moved on at any time, but never back onto a number
+  /// that is already on a receipt.
+  Future<void> _saveStart(String value) async {
+    final BusinessSettings settings = ref.read(settingsControllerProvider);
+    final int? start = int.tryParse(value.trim());
+    if (start == settings.orderNumberStart) return;
+    if (start == null || start < 1) {
+      _say('That is not a number the counter can start at.');
+      _startController.text = '${settings.orderNumberStart}';
+      return;
+    }
+    if (start <= _highestSoFar) {
+      _say(
+        'Order $_highestSoFar has already been used. The counter can go to '
+        '${_highestSoFar + 1} or higher.',
+      );
+      _startController.text = '${settings.orderNumberStart}';
+      return;
+    }
+    await _save(settings.copyWith(orderNumberStart: start));
   }
 
   @override
   void dispose() {
+    // The listeners read the controllers, so they go first.
+    _nameFocus
+      ..removeListener(_onNameLeft)
+      ..dispose();
+    _prefixFocus
+      ..removeListener(_onPrefixLeft)
+      ..dispose();
+    _startFocus
+      ..removeListener(_onStartLeft)
+      ..dispose();
     _nameController.dispose();
     _prefixController.dispose();
     _startController.dispose();
@@ -93,9 +165,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 labelText: 'Business name',
                 helperText: 'Shown in the app and on every report and export',
               ),
+              focusNode: _nameFocus,
               textInputAction: TextInputAction.done,
-              onSubmitted: (String value) =>
-                  _save(settings.copyWith(businessName: value.trim())),
+              onSubmitted: _saveName,
             ),
           ),
           const SizedBox(height: KuboSpacing.md),
@@ -146,9 +218,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 helperText:
                     'Optional, e.g. KUBO — order numbers become KUBO-1001',
               ),
+              focusNode: _prefixFocus,
               textInputAction: TextInputAction.done,
-              onSubmitted: (String value) =>
-                  _save(settings.copyWith(orderNumberPrefix: value.trim())),
+              onSubmitted: _savePrefix,
             ),
           ),
           Padding(
@@ -169,23 +241,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           'never back \u2014 ${_highestSoFar + 1} or higher, '
                           'so no two receipts share a number.',
               ),
+              focusNode: _startFocus,
               textInputAction: TextInputAction.done,
-              onSubmitted: (String value) async {
-                final int? start = int.tryParse(value.trim());
-                if (start == null || start < 1) {
-                  _say('That is not a number the counter can start at.');
-                  return;
-                }
-                if (start <= _highestSoFar) {
-                  _say(
-                    'KUBO-$_highestSoFar has already been used. The counter '
-                    'can go to ${_highestSoFar + 1} or higher.',
-                  );
-                  _startController.text = '${settings.orderNumberStart}';
-                  return;
-                }
-                await _save(settings.copyWith(orderNumberStart: start));
-              },
+              onSubmitted: (String value) => unawaited(_saveStart(value)),
             ),
           ),
           const SectionHeader('Costing'),
