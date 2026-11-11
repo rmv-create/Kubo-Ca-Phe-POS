@@ -5,6 +5,7 @@ import '../../core/quantity/measurement_unit.dart';
 import '../../core/quantity/quantity.dart';
 import '../../core/time/clock.dart';
 import '../../domain/entities/ingredient.dart';
+import '../../domain/entities/menu.dart';
 import '../../domain/entities/recipe.dart';
 import '../../domain/repositories/inventory_repository.dart';
 import '../../domain/repositories/recipe_repository.dart';
@@ -23,6 +24,137 @@ class RecipeRepositoryImpl implements RecipeRepository {
   final Clock _clock;
   final InventoryRepository _inventory;
   final WhoIsWorking _who;
+
+  // ───────────────────── what a customisation takes ─────────────────────
+
+  /// The ingredient lines behind one customisation.
+  ///
+  /// Add-ons had recipes from the start — Sea Salt Cold Foam is 20 g of
+  /// cream, 30 g of fresh milk, 10 g of condensed and 0.6 g of salt — but
+  /// no screen ever showed them, so she could not check one or change one.
+  @override
+  Future<List<OptionEffect>> effectsForOption(int optionId) async {
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      '''
+      SELECT e.*, i.name AS ingredient_name, i.base_unit AS base_unit,
+             p.name AS product_name, z.name AS size_name
+      FROM option_ingredient_effects e
+      JOIN ingredients i ON i.id = e.ingredient_id
+      LEFT JOIN products p ON p.id = e.product_id
+      LEFT JOIN sizes z ON z.id = e.size_id
+      WHERE e.option_id = ?
+      ORDER BY p.name IS NOT NULL, p.name, z.name, i.name
+      ''',
+      <Object?>[optionId],
+    );
+
+    final Map<int, Ingredient> byId = <int, Ingredient>{
+      for (final Ingredient i in await _inventory.ingredients(
+        includeInactive: true,
+      ))
+        i.id: i,
+    };
+
+    final List<OptionEffect> effects = <OptionEffect>[];
+    for (final Map<String, Object?> r in rows) {
+      final BaseUnit unit = BaseUnit.fromCode(r['base_unit']! as String);
+      final int ingredientId = r['ingredient_id']! as int;
+      effects.add(
+        OptionEffect(
+          id: r['id']! as int,
+          optionId: optionId,
+          ingredientId: ingredientId,
+          ingredientName: r['ingredient_name']! as String,
+          delta: Quantity(r['qty_milli_delta']! as int, unit),
+          unitCost: byId[ingredientId]?.currentCost,
+          productId: r['product_id'] as int?,
+          productName: r['product_name'] as String?,
+          sizeId: r['size_id'] as int?,
+          sizeName: r['size_name'] as String?,
+        ),
+      );
+    }
+    return effects;
+  }
+
+  /// Writes one line of a customisation's recipe.
+  ///
+  /// An amount of zero removes the line: a customisation that takes nothing
+  /// is a customisation with nothing to say about stock, and a row saying
+  /// "zero grams" would only be something else to read.
+  @override
+  Future<void> saveEffect({
+    required int optionId,
+    required int ingredientId,
+    required Quantity delta,
+    int? productId,
+    int? sizeId,
+  }) async {
+    final String now = _clock.nowIso();
+
+    if (delta.isZero) {
+      await removeEffect(
+        optionId: optionId,
+        ingredientId: ingredientId,
+        productId: productId,
+        sizeId: sizeId,
+      );
+      return;
+    }
+
+    // The unique index spans the nulls through COALESCE, so an upsert has to
+    // find the row the same way rather than leaning on ON CONFLICT.
+    final List<Map<String, Object?>> existing = await _db.db.rawQuery(
+      'SELECT id FROM option_ingredient_effects '
+      'WHERE option_id = ? AND ingredient_id = ? '
+      'AND COALESCE(product_id, -1) = ? AND COALESCE(size_id, -1) = ?',
+      <Object?>[optionId, ingredientId, productId ?? -1, sizeId ?? -1],
+    );
+
+    if (existing.isEmpty) {
+      await _db.db.insert('option_ingredient_effects', <String, Object?>{
+        'option_id': optionId,
+        'ingredient_id': ingredientId,
+        'qty_milli_delta': delta.milli,
+        'product_id': productId,
+        'size_id': sizeId,
+        'created_at': now,
+        'updated_at': now,
+      });
+    } else {
+      await _db.db.update(
+        'option_ingredient_effects',
+        <String, Object?>{'qty_milli_delta': delta.milli, 'updated_at': now},
+        where: 'id = ?',
+        whereArgs: <Object?>[existing.first['id']],
+      );
+    }
+
+    await _db.db.insert('audit_log', <String, Object?>{
+      'actor': _who(),
+      'at': now,
+      'business_date': now.substring(0, 10),
+      'action': 'option_effect_saved',
+      'entity_type': 'customization_option',
+      'entity_id': optionId,
+      'summary': '${delta.format()} of ingredient $ingredientId',
+    });
+  }
+
+  @override
+  Future<void> removeEffect({
+    required int optionId,
+    required int ingredientId,
+    int? productId,
+    int? sizeId,
+  }) async {
+    await _db.db.rawDelete(
+      'DELETE FROM option_ingredient_effects '
+      'WHERE option_id = ? AND ingredient_id = ? '
+      'AND COALESCE(product_id, -1) = ? AND COALESCE(size_id, -1) = ?',
+      <Object?>[optionId, ingredientId, productId ?? -1, sizeId ?? -1],
+    );
+  }
 
   @override
   Future<List<Recipe>> recipes({bool withCosts = true}) async {

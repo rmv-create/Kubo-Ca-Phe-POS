@@ -1,4 +1,5 @@
 import '../../core/quantity/quantity.dart';
+import '../entities/menu.dart';
 import '../entities/recipe.dart';
 
 /// One recipe per drink per size, each with its own version history.
@@ -25,4 +26,23 @@ abstract class RecipeRepository {
   });
 
   Future<void> retireVersion(int versionId);
+
+  /// What a customisation takes out of stock, line by line.
+  Future<List<OptionEffect>> effectsForOption(int optionId);
+
+  /// Writes one line of it. A zero amount removes the line.
+  Future<void> saveEffect({
+    required int optionId,
+    required int ingredientId,
+    required Quantity delta,
+    int? productId,
+    int? sizeId,
+  });
+
+  Future<void> removeEffect({
+    required int optionId,
+    required int ingredientId,
+    int? productId,
+    int? sizeId,
+  });
 }

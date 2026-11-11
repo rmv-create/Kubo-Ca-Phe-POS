@@ -254,6 +254,8 @@ class WasteEntry {
     required this.reason,
     required this.value,
     this.notes,
+    this.voidedAt,
+    this.voidReason,
   });
 
   final int id;
@@ -265,6 +267,13 @@ class WasteEntry {
   final WasteReason reason;
   final Money value;
   final String? notes;
+
+  /// When she took this entry back, if she did.
+  final DateTime? voidedAt;
+  final String? voidReason;
+
+  /// A voided entry stays in the list but counts for nothing.
+  bool get isVoided => voidedAt != null;
 }
 
 /// What a physical count found, before it is applied.

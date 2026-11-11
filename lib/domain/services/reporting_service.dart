@@ -96,8 +96,10 @@ class ReportingService {
       ''', args);
 
     final List<Map<String, Object?>> wasteRows = await _db.db.rawQuery(
+      // A waste entry she took back counts for nothing: the stock went
+      // back on the shelf, so the month must not still be carrying it.
       'SELECT IFNULL(SUM(value_centavos), 0) AS total FROM waste '
-      'WHERE ${where('')}',
+      'WHERE voided_at IS NULL AND ${where('')}',
       args,
     );
     final List<Map<String, Object?>> voidRows = await _db.db.rawQuery(

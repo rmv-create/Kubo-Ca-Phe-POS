@@ -370,6 +370,197 @@ class InventoryRepositoryImpl implements InventoryRepository {
   }
 
   @override
+  /// Takes a waste entry back, and puts the stock with it.
+  ///
+  /// The entry stays in the list, struck through, with the reason beside
+  /// it: something did happen — she wrote it down — and the honest record
+  /// is that it was written down and then undone.
+  ///
+  /// The ingredients return at the cost they left at, not at today's. The
+  /// stock going out and coming back must net to nothing, and revaluing the
+  /// return would leave the shelf holding a different amount of money than
+  /// before a mistake she has just corrected.
+  @override
+  Future<void> voidWaste({required int id, required String reason}) async {
+    if (reason.trim().isEmpty) {
+      throw const ValidationException(
+        'Say why this is being taken back.',
+        field: 'reason',
+      );
+    }
+    final String at = _clock.nowIso();
+    final String date = _businessDate;
+
+    await _db.transaction((Transaction txn) async {
+      final _StoredWaste entry = await _storedWaste(txn, id);
+      if (entry.voidedAt != null) {
+        throw const BusinessRuleException(
+          'That waste entry has already been taken back.',
+        );
+      }
+
+      await txn.update(
+        'waste',
+        <String, Object?>{'voided_at': at, 'void_reason': reason.trim()},
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+      );
+
+      await _engine.post(
+        txn,
+        <PendingMovement>[
+          PendingMovement(
+            ingredientId: entry.ingredientId,
+            delta: entry.quantity,
+            // 'correction' rather than a type of its own: the movement
+            // table's allowed types are fixed by a CHECK, and what this is
+            // — a correction — is exactly what that one says. The reason
+            // beside it carries the detail.
+            type: MovementType.correction,
+            reason: 'Waste taken back \u00b7 ${reason.trim()}',
+            wasteId: id,
+            unitCost: entry.unitCost,
+          ),
+        ],
+        at: at,
+        businessDate: date,
+      );
+
+      await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
+        'at': at,
+        'business_date': date,
+        'action': 'waste_voided',
+        'entity_type': 'waste',
+        'entity_id': id,
+        'summary':
+            '${entry.quantity.format()} \u00b7 ${entry.value.format()} '
+            'put back \u00b7 ${reason.trim()}',
+      });
+    });
+  }
+
+  /// Corrects a waste entry she has already written down.
+  ///
+  /// Only the difference moves: writing 500 g when she meant 50 g puts
+  /// 450 g back, and nothing else about the shelf changes. The correction
+  /// is valued at the cost the waste was recorded at, so an entry she fixes
+  /// is worth exactly what it would have been worth had she typed it right
+  /// the first time, whatever has happened to the price since.
+  @override
+  Future<void> updateWaste({
+    required int id,
+    Quantity? quantity,
+    WasteReason? reason,
+    String? notes,
+    bool clearNotes = false,
+  }) async {
+    if (quantity != null && !quantity.isPositive) {
+      throw const ValidationException(
+        'How much was wasted?',
+        field: 'quantity',
+      );
+    }
+    final String at = _clock.nowIso();
+    final String date = _businessDate;
+
+    await _db.transaction((Transaction txn) async {
+      final _StoredWaste entry = await _storedWaste(txn, id);
+      if (entry.voidedAt != null) {
+        throw const BusinessRuleException(
+          'That waste entry was taken back. Record a new one instead.',
+        );
+      }
+
+      final Quantity wanted = quantity ?? entry.quantity;
+      final UnitCost? cost = entry.unitCost;
+      final Money value = cost == null
+          ? entry.value
+          : moneyFromMicroCentavos(cost.costMicroCentavos(wanted));
+
+      await txn.update(
+        'waste',
+        <String, Object?>{
+          'qty_milli': wanted.milli,
+          'reason': (reason ?? entry.reason).code,
+          'value_centavos': value.centavos,
+          if (clearNotes) 'notes': null else if (notes != null) 'notes': notes,
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[id],
+      );
+
+      // Only what changed moves. More waste takes more off the shelf; less
+      // puts the difference back.
+      final int difference = entry.quantity.milli - wanted.milli;
+      if (difference != 0) {
+        await _engine.post(
+          txn,
+          <PendingMovement>[
+            PendingMovement(
+              ingredientId: entry.ingredientId,
+              delta: Quantity(difference, entry.quantity.unit),
+              type: difference > 0
+                  ? MovementType.correction
+                  : MovementType.waste,
+              reason: 'Waste corrected',
+              wasteId: id,
+              unitCost: cost,
+            ),
+          ],
+          at: at,
+          businessDate: date,
+        );
+      }
+
+      await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
+        'at': at,
+        'business_date': date,
+        'action': 'waste_corrected',
+        'entity_type': 'waste',
+        'entity_id': id,
+        'summary':
+            '${entry.quantity.format()} \u2192 ${wanted.format()} \u00b7 '
+            '${value.format()}',
+      });
+    });
+  }
+
+  /// A waste entry as it stands, with the unit cost it was written down at.
+  Future<_StoredWaste> _storedWaste(Transaction txn, int id) async {
+    final List<Map<String, Object?>> rows = await txn.rawQuery(
+      'SELECT w.*, i.base_unit AS base_unit FROM waste w '
+      'JOIN ingredients i ON i.id = w.ingredient_id WHERE w.id = ?',
+      <Object?>[id],
+    );
+    if (rows.isEmpty) {
+      throw const NotFoundException('That waste entry is gone.');
+    }
+    final Map<String, Object?> r = rows.first;
+    final Quantity quantity = Quantity(
+      r['qty_milli']! as int,
+      BaseUnit.fromCode(r['base_unit']! as String),
+    );
+    final Money value = Money(r['value_centavos']! as int);
+
+    // Back out the cost it was valued at, so corrections and reversals use
+    // the price of the day rather than today's.
+    final UnitCost? unitCost = quantity.milli == 0 || value.centavos == 0
+        ? null
+        : UnitCost((value.centavos * 1000000) ~/ quantity.milli, quantity.unit);
+
+    return _StoredWaste(
+      ingredientId: r['ingredient_id']! as int,
+      quantity: quantity,
+      reason: WasteReason.fromCode(r['reason']! as String),
+      value: value,
+      unitCost: unitCost,
+      voidedAt: r['voided_at'] as String?,
+    );
+  }
+
+  @override
   Future<List<WasteEntry>> waste({
     String? businessDate,
     int limit = 100,
@@ -400,6 +591,10 @@ class InventoryRepositoryImpl implements InventoryRepository {
             reason: WasteReason.fromCode(r['reason']! as String),
             value: Money(r['value_centavos']! as int),
             notes: r['notes'] as String?,
+            voidedAt: r['voided_at'] == null
+                ? null
+                : DateTime.parse(r['voided_at']! as String),
+            voidReason: r['void_reason'] as String?,
           ),
         )
         .toList();
@@ -611,4 +806,23 @@ class InventoryRepositoryImpl implements InventoryRepository {
       note: r['note'] as String?,
     );
   }
+}
+
+/// A waste entry read back from the table, with the cost it was written at.
+class _StoredWaste {
+  const _StoredWaste({
+    required this.ingredientId,
+    required this.quantity,
+    required this.reason,
+    required this.value,
+    required this.unitCost,
+    required this.voidedAt,
+  });
+
+  final int ingredientId;
+  final Quantity quantity;
+  final WasteReason reason;
+  final Money value;
+  final UnitCost? unitCost;
+  final String? voidedAt;
 }

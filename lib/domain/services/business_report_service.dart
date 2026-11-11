@@ -77,7 +77,7 @@ class BusinessReportService {
     final int wasted = _one(
       await _db.db.rawQuery(
         'SELECT IFNULL(SUM(value_centavos), 0) AS v FROM waste '
-        'WHERE business_date LIKE ?',
+        'WHERE voided_at IS NULL AND business_date LIKE ?',
         <Object?>[like],
       ),
     );
@@ -225,7 +225,7 @@ class BusinessReportService {
       '''
       SELECT reason, COUNT(*) AS times,
              IFNULL(SUM(value_centavos), 0) AS total
-      FROM waste WHERE business_date LIKE ?
+      FROM waste WHERE voided_at IS NULL AND business_date LIKE ?
       GROUP BY reason ORDER BY total DESC
       ''',
       <Object?>['$month-%'],

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
+import '../../../core/errors/app_exception.dart';
+import '../../../core/money/money.dart';
 import '../../../core/quantity/quantity.dart';
 import '../../../domain/entities/ingredient.dart';
 import '../../../shared/widgets/async_view.dart';
@@ -420,19 +422,223 @@ class WasteScreen extends ConsumerWidget {
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (BuildContext context, int index) {
               final WasteEntry w = data[index];
+              final ThemeData theme = Theme.of(context);
               return ListTile(
-                title: Text('${w.ingredientName} · ${w.quantity.format()}'),
-                subtitle: Text(
-                  '${w.reason.label} · ${w.businessDate}'
-                  '${w.notes == null || w.notes!.isEmpty ? '' : ' · ${w.notes}'}',
+                leading: w.isVoided
+                    ? Icon(Icons.block, color: theme.colorScheme.error)
+                    : null,
+                title: Text(
+                  '${w.ingredientName} · ${w.quantity.format()}',
+                  style: w.isVoided
+                      ? TextStyle(
+                          decoration: TextDecoration.lineThrough,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        )
+                      : null,
                 ),
-                trailing: MoneyText(w.value),
+                subtitle: Text(
+                  w.isVoided
+                      ? 'Taken back · ${w.voidReason ?? ''}'
+                      : '${w.reason.label} · ${w.businessDate}'
+                            '${w.notes == null || w.notes!.isEmpty ? '' : ' · ${w.notes}'}',
+                ),
+                trailing: MoneyText(w.isVoided ? Money.zero : w.value),
+                // A slip of the finger here takes stock off the shelf and
+                // money off the month, so it has to be correctable.
+                onTap: w.isVoided ? null : () => _amend(context, ref, w),
               );
             },
           );
         },
       ),
     );
+  }
+
+  /// Correcting or taking back something already written down.
+  Future<void> _amend(
+    BuildContext context,
+    WidgetRef ref,
+    WasteEntry entry,
+  ) async {
+    final String? choice = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SectionHeader(
+              '${entry.ingredientName} · ${entry.quantity.format()}',
+            ),
+            ListTile(
+              leading: const Icon(Icons.edit_outlined),
+              title: const Text('Change how much'),
+              subtitle: const Text(
+                'Only the difference moves on the shelf, at the cost it was '
+                'written down at.',
+              ),
+              onTap: () => Navigator.of(context).pop('amount'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.notes_outlined),
+              title: const Text('Change the reason or note'),
+              onTap: () => Navigator.of(context).pop('reason'),
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.undo,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              title: const Text('Take it back'),
+              subtitle: const Text(
+                'It never happened: the stock goes back on the shelf and it '
+                'stops counting.',
+              ),
+              onTap: () => Navigator.of(context).pop('void'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (choice == null || !context.mounted) return;
+
+    switch (choice) {
+      case 'amount':
+        await _changeAmount(context, ref, entry);
+      case 'reason':
+        await _changeReason(context, ref, entry);
+      case 'void':
+        await _takeBack(context, ref, entry);
+    }
+  }
+
+  Future<void> _changeAmount(
+    BuildContext context,
+    WidgetRef ref,
+    WasteEntry entry,
+  ) async {
+    final String? typed = await promptForText(
+      context,
+      title: 'How much was wasted?',
+      label: 'Amount in ${entry.quantity.unit.code}',
+      initial: '${entry.quantity.milli / 1000}',
+      helper: 'It was written down as ${entry.quantity.format()}',
+    );
+    if (typed == null || !context.mounted) return;
+
+    final double? amount = double.tryParse(typed.trim());
+    if (amount == null || amount <= 0) {
+      _complain(context, 'That is not an amount.');
+      return;
+    }
+
+    await _apply(
+      context,
+      ref,
+      () => ref
+          .read(inventoryRepositoryProvider)
+          .updateWaste(
+            id: entry.id,
+            quantity: Quantity.fromBase(amount, entry.quantity.unit),
+          ),
+      said: 'Corrected',
+    );
+  }
+
+  Future<void> _changeReason(
+    BuildContext context,
+    WidgetRef ref,
+    WasteEntry entry,
+  ) async {
+    final WasteReason? reason = await showModalBottomSheet<WasteReason>(
+      context: context,
+      useSafeArea: true,
+      builder: (BuildContext context) => ListView(
+        children: <Widget>[
+          const SectionHeader('What happened?'),
+          for (final WasteReason r in WasteReason.values)
+            ListTile(
+              title: Text(r.label),
+              selected: r == entry.reason,
+              onTap: () => Navigator.of(context).pop(r),
+            ),
+        ],
+      ),
+    );
+    if (reason == null || !context.mounted) return;
+
+    final String? note = await promptForText(
+      context,
+      title: 'Note',
+      label: 'Anything worth remembering',
+      initial: entry.notes ?? '',
+      helper: 'Optional',
+    );
+    if (note == null || !context.mounted) return;
+
+    await _apply(
+      context,
+      ref,
+      () => ref
+          .read(inventoryRepositoryProvider)
+          .updateWaste(
+            id: entry.id,
+            reason: reason,
+            notes: note.trim(),
+            clearNotes: note.trim().isEmpty,
+          ),
+      said: 'Changed',
+    );
+  }
+
+  Future<void> _takeBack(
+    BuildContext context,
+    WidgetRef ref,
+    WasteEntry entry,
+  ) async {
+    final String? why = await promptForText(
+      context,
+      title: 'Take back ${entry.quantity.format()}?',
+      label: 'Why?',
+      helper: 'The stock goes back on the shelf',
+      confirmLabel: 'Take it back',
+    );
+    if (why == null || why.trim().isEmpty || !context.mounted) return;
+
+    await _apply(
+      context,
+      ref,
+      () => ref
+          .read(inventoryRepositoryProvider)
+          .voidWaste(id: entry.id, reason: why),
+      said: 'Put back',
+    );
+  }
+
+  Future<void> _apply(
+    BuildContext context,
+    WidgetRef ref,
+    Future<void> Function() change, {
+    required String said,
+  }) async {
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    try {
+      await change();
+      ref.read(stockRevisionProvider.notifier).bump();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(said)));
+    } on AppException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
+  }
+
+  void _complain(BuildContext context, String message) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   Future<void> _record(BuildContext context, WidgetRef ref) async {

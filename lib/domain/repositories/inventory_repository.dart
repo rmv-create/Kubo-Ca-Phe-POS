@@ -52,6 +52,18 @@ abstract class InventoryRepository {
     String? notes,
   });
 
+  /// Takes a waste entry back and returns the stock it took off the shelf.
+  Future<void> voidWaste({required int id, required String reason});
+
+  /// Corrects a waste entry already written down. Only the difference moves.
+  Future<void> updateWaste({
+    required int id,
+    Quantity? quantity,
+    WasteReason? reason,
+    String? notes,
+    bool clearNotes,
+  });
+
   Future<List<WasteEntry>> waste({String? businessDate, int limit = 100});
 
   // ── physical counts ──

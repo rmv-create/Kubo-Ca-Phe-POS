@@ -1,6 +1,8 @@
 import 'package:meta/meta.dart';
 
 import '../../core/money/money.dart';
+import '../../core/money/unit_cost.dart';
+import '../../core/quantity/quantity.dart';
 
 /// A section of the menu. Fully editable by the owner — add, rename, reorder,
 /// switch off — without a code change.
@@ -395,4 +397,58 @@ class MenuSnapshot {
       (productsByCategory[categoryId] ?? const <Product>[])
           .where((Product p) => p.isSellable)
           .toList();
+}
+
+/// What one customisation takes out of stock, as a line she can read.
+///
+/// Sea Salt Cold Foam is 20 g of cream, 30 g of fresh milk, 10 g of
+/// condensed and 0.6 g of salt. A negative amount is a swap rather than an
+/// addition: choosing oat takes the dairy out and puts oat in.
+@immutable
+class OptionEffect {
+  const OptionEffect({
+    required this.id,
+    required this.optionId,
+    required this.ingredientId,
+    required this.ingredientName,
+    required this.delta,
+    required this.unitCost,
+    this.productId,
+    this.productName,
+    this.sizeId,
+    this.sizeName,
+  });
+
+  final int id;
+  final int optionId;
+  final int ingredientId;
+  final String ingredientName;
+
+  /// Positive adds to the drink; negative takes out of it.
+  final Quantity delta;
+
+  /// What the ingredient costs now, for showing what the line is worth.
+  final UnitCost? unitCost;
+
+  /// Null means every drink. Set means only this drink, and only this size.
+  final int? productId;
+  final String? productName;
+  final int? sizeId;
+  final String? sizeName;
+
+  bool get isForEveryDrink => productId == null;
+  bool get takesOut => delta.isNegative;
+
+  /// What this line costs her, or null when the ingredient has no price yet.
+  Money? get cost {
+    final UnitCost? rate = unitCost;
+    if (rate == null) return null;
+    final Quantity amount = delta.isNegative ? -delta : delta;
+    final Money money = moneyFromMicroCentavos(rate.costMicroCentavos(amount));
+    return delta.isNegative ? -money : money;
+  }
+
+  String get where => productName == null
+      ? 'Every drink'
+      : '$productName${sizeName == null ? '' : ' · $sizeName'}';
 }

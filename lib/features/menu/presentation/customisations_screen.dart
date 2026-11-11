@@ -9,6 +9,7 @@ import '../../../core/money/money.dart';
 import '../../../domain/entities/menu.dart';
 import '../../../domain/repositories/menu_repository.dart';
 import '../../../shared/widgets/async_view.dart';
+import '../../stock/presentation/addon_recipe_screen.dart';
 import '../state/menu_actions.dart';
 
 class CustomisationsScreen extends ConsumerWidget {
@@ -223,7 +224,7 @@ class CustomizationGroupScreen extends ConsumerWidget {
                 ),
               ),
               for (final CustomizationOption option in group.options)
-                _OptionTile(option: option),
+                _OptionTile(option: option, groupName: group.name),
             ],
           ),
         );
@@ -277,9 +278,10 @@ class CustomizationGroupScreen extends ConsumerWidget {
 }
 
 class _OptionTile extends ConsumerWidget {
-  const _OptionTile({required this.option});
+  const _OptionTile({required this.option, required this.groupName});
 
   final CustomizationOption option;
+  final String groupName;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -302,14 +304,35 @@ class _OptionTile extends ConsumerWidget {
               )
             : null,
       ),
-      trailing: Switch(
-        value: option.isActive,
-        onChanged: (bool value) => runMenuEdit(
-          context,
-          ref,
-          () =>
-              repo.updateCustomizationOption(option.copyWith(isActive: value)),
-        ),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          // What it is made of, and what that costs her. Add-ons had
+          // recipes from the start and nothing ever showed them.
+          IconButton(
+            icon: const Icon(Icons.science_outlined),
+            tooltip: 'What it is made of',
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (BuildContext context) => AddonRecipeScreen(
+                  optionId: option.id,
+                  optionName: option.name,
+                  groupName: groupName,
+                ),
+              ),
+            ),
+          ),
+          Switch(
+            value: option.isActive,
+            onChanged: (bool value) => runMenuEdit(
+              context,
+              ref,
+              () => repo.updateCustomizationOption(
+                option.copyWith(isActive: value),
+              ),
+            ),
+          ),
+        ],
       ),
       onTap: () async {
         final String? raw = await promptForText(

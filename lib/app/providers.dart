@@ -234,6 +234,14 @@ final FutureProvider<List<Product>> productsProvider =
       return ref.watch(menuRepositoryProvider).products(includeArchived: true);
     });
 
+/// What one customisation takes out of stock.
+final FutureProviderFamily<List<OptionEffect>, int> optionEffectsProvider =
+    FutureProvider.family<List<OptionEffect>, int>((Ref ref, int optionId) {
+      ref.watch(menuRevisionProvider);
+      ref.watch(stockRevisionProvider);
+      return ref.watch(recipeRepositoryProvider).effectsForOption(optionId);
+    });
+
 final FutureProvider<List<CustomizationGroup>> customizationGroupsProvider =
     FutureProvider<List<CustomizationGroup>>((Ref ref) {
       ref.watch(menuRevisionProvider);
