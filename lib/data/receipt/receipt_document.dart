@@ -180,7 +180,12 @@ class ReceiptDocument {
       // Every modification, spelled out — "less sweet" and "extra shot" are
       // the whole reason a customer reads a receipt — and the ones that cost
       // something say so.
-      for (final OrderLineOption option in line.options)
+      // Only what was different about this drink. "Regular sweetness" on a
+      // drink that always comes that way is a line the customer reads for
+      // nothing.
+      for (final OrderLineOption option in line.options.where(
+        (OrderLineOption o) => o.isWorthPrinting,
+      ))
         pw.Padding(
           padding: const pw.EdgeInsets.only(left: 18, top: 1),
           child: pw.Row(

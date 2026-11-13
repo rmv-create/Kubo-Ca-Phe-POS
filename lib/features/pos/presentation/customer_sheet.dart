@@ -44,10 +44,20 @@ class _CustomerSheetState extends ConsumerState<CustomerSheet> {
   String _query = '';
   Customer? _selected;
 
+  /// Whether the list of everybody is on screen.
+  ///
+  /// Once she has picked somebody the list is in the way: their usual is
+  /// what she wants next, and she was scrolling the rest of the shop's
+  /// customers out of the way by hand to reach it. Typing in the search
+  /// box brings the list straight back, because that only ever means she
+  /// is looking for somebody else.
+  bool _browsing = true;
+
   @override
   void initState() {
     super.initState();
     _selected = ref.read(cartProvider).customer;
+    _browsing = _selected == null;
   }
 
   @override
@@ -60,13 +70,21 @@ class _CustomerSheetState extends ConsumerState<CustomerSheet> {
   void _onQueryChanged(String value) {
     _debounce?.cancel();
     _debounce = Timer(const Duration(milliseconds: 180), () {
-      if (mounted) setState(() => _query = value);
+      if (mounted) {
+        setState(() {
+          _query = value;
+          _browsing = true;
+        });
+      }
     });
   }
 
   void _choose(Customer customer) {
     ref.read(cartProvider.notifier).setCustomer(customer);
-    setState(() => _selected = customer);
+    setState(() {
+      _selected = customer;
+      _browsing = false;
+    });
   }
 
   @override
@@ -109,13 +127,27 @@ class _CustomerSheetState extends ConsumerState<CustomerSheet> {
           ),
         ),
         if (selected != null) _UsualPanel(customer: selected),
-        Expanded(
-          child: _Results(
-            query: _query,
-            selectedId: selected?.id,
-            onChoose: _choose,
+        if (_browsing || selected == null)
+          Expanded(
+            child: _Results(
+              query: _query,
+              selectedId: selected?.id,
+              onChoose: _choose,
+            ),
+          )
+        else
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(KuboSpacing.lg),
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _browsing = true),
+                  icon: const Icon(Icons.search),
+                  label: const Text('Somebody else'),
+                ),
+              ),
+            ),
           ),
-        ),
         _Footer(
           query: _search.text,
           onGuest: () {

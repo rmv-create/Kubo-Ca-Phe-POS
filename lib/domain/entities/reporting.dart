@@ -158,6 +158,7 @@ class OrderLineOption {
     required this.name,
     required this.priceDelta,
     this.groupName = '',
+    this.wasDefault = false,
   });
 
   final String name;
@@ -172,6 +173,21 @@ class OrderLineOption {
   final Money priceDelta;
 
   bool get isCharged => priceDelta.isPositive;
+
+  /// Whether this is simply what the drink comes with.
+  ///
+  /// Recorded when the drink was sold, so changing a default later does not
+  /// rewrite what an old receipt says.
+  final bool wasDefault;
+
+  /// Whether it is worth printing.
+  ///
+  /// A receipt that lists "Regular sweetness · Regular strength · Regular
+  /// ice · Full Cream milk" under every drink says nothing: that is what
+  /// the drink is. What the customer checks the cup against is what was
+  /// different about theirs. Anything she was charged for stays, default or
+  /// not, because a line on the bill must always be explainable.
+  bool get isWorthPrinting => !wasDefault || isCharged;
 
   /// How it reads on a receipt.
   ///

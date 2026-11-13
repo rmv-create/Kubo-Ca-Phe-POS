@@ -45,7 +45,7 @@ class _CustomersScreenState extends ConsumerState<CustomersScreen> {
   @override
   Widget build(BuildContext context) {
     final AsyncValue<List<Customer>> results = ref.watch(
-      customerSearchProvider(_query),
+      customerDirectoryProvider(_query),
     );
     final DateTime now = ref.watch(clockProvider).now();
 

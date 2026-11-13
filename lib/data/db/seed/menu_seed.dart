@@ -177,7 +177,9 @@ abstract final class MenuSeed {
       // Free, and it does not change the recipe — a lighter cup still costs
       // what the recipe says until she writes a recipe that says otherwise.
       options: <SeedOption>[
-        SeedOption(name: 'Regular', price: 0),
+        // Regular is what the cup is unless she is asked for something
+        // else, and saying so is what lets the receipt leave it out.
+        SeedOption(name: 'Regular', price: 0, isDefault: true),
         SeedOption(name: 'Less Strong', price: 0),
         SeedOption(name: 'Extra Strong', price: 0),
       ],
@@ -189,7 +191,7 @@ abstract final class MenuSeed {
       isRequired: false,
       isProactive: false,
       options: <SeedOption>[
-        SeedOption(name: 'Regular', price: 0),
+        SeedOption(name: 'Regular', price: 0, isDefault: true),
         SeedOption(name: 'Less Sweet', price: 0),
         SeedOption(name: 'No Sugar', price: 0),
         // "Additional Sweetener FREE" on the card.

@@ -401,6 +401,15 @@ final FutureProvider<List<Customer>> archivedCustomersProvider =
       return ref.watch(customerRepositoryProvider).archived();
     });
 
+/// The customers page's own list: A to Z, not most recent first.
+final FutureProviderFamily<List<Customer>, String> customerDirectoryProvider =
+    FutureProvider.family<List<Customer>, String>((Ref ref, String query) {
+      ref.watch(customerRevisionProvider);
+      return ref
+          .watch(customerRepositoryProvider)
+          .search(query, limit: 500, alphabetical: true);
+    });
+
 final FutureProviderFamily<List<Customer>, String> customerSearchProvider =
     FutureProvider.family<List<Customer>, String>((Ref ref, String query) {
       ref.watch(salesRevisionProvider);

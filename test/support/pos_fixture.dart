@@ -213,19 +213,42 @@ class PosFixture {
   }
 
   /// One drink, ready to drop into a draft.
+  ///
+  /// Each chosen option is marked as a default or not, exactly as the POS
+  /// marks it while she is taking the order — defaults belong to the drink,
+  /// not to the group, so this is the first place that can know. The
+  /// receipt leans on it to print only what was different about the drink.
   Future<DraftItem> item(
     String productName,
     String sizeName, {
     List<DraftOption> options = const <DraftOption>[],
     int quantity = 1,
     String lineId = 'line-1',
-  }) async => DraftItem(
-    lineId: lineId,
-    product: await product(productName),
-    size: await size(productName, sizeName),
-    quantity: quantity,
-    options: options,
-  );
+  }) async {
+    final Product p = await product(productName);
+    final ProductSize s = await size(productName, sizeName);
+    final List<ResolvedCustomizationGroup> groups = await menu
+        .resolvedGroupsFor(p.id, sizeId: s.size.id);
+
+    final Set<int> defaults = <int>{
+      for (final ResolvedCustomizationGroup g in groups) ...g.defaultOptionIds,
+    };
+
+    return DraftItem(
+      lineId: lineId,
+      product: p,
+      size: s,
+      quantity: quantity,
+      options: <DraftOption>[
+        for (final DraftOption o in options)
+          DraftOption(
+            group: o.group,
+            option: o.option,
+            isDefault: defaults.contains(o.option.id),
+          ),
+      ],
+    );
+  }
 
   Future<CompletedOrder> sell(OrderDraft draft, {BusinessSettings? using}) =>
       orders.complete(draft, settings: using ?? settings);

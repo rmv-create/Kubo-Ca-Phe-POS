@@ -143,6 +143,7 @@ class SalesService {
           'option_name_snapshot',
           'group_name_snapshot',
           'price_delta_centavos',
+          'was_default_snapshot',
         ],
         where: 'order_item_id = ?',
         whereArgs: <Object?>[line['id']],
@@ -165,6 +166,10 @@ class SalesService {
                 (Map<String, Object?> o) => OrderLineOption(
                   name: o['option_name_snapshot']! as String,
                   groupName: (o['group_name_snapshot'] as String?) ?? '',
+                  // Null on an order sold before this was recorded: those
+                  // receipts keep printing every choice, as they did when
+                  // they were issued.
+                  wasDefault: o['was_default_snapshot'] == 1,
                   priceDelta: Money(o['price_delta_centavos']! as int),
                 ),
               )

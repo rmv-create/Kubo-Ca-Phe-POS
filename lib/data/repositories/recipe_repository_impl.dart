@@ -172,7 +172,7 @@ class RecipeRepositoryImpl implements RecipeRepository {
       LEFT JOIN recipes r
              ON r.product_id = ps.product_id AND r.size_id = ps.size_id
       WHERE p.is_archived = 0
-      ORDER BY p.display_order, p.name COLLATE NOCASE, s.display_order
+      ORDER BY p.name COLLATE NOCASE, s.display_order
     ''');
 
     final Map<int, Ingredient> byId = withCosts

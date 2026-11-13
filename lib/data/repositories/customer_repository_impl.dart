@@ -16,9 +16,19 @@ class CustomerRepositoryImpl implements CustomerRepository {
   static const int usualMinimumOccurrences = 2;
 
   @override
-  Future<List<Customer>> search(String query, {int limit = 20}) async {
+  Future<List<Customer>> search(
+    String query, {
+    int limit = 20,
+    bool alphabetical = false,
+  }) async {
     final String trimmed = query.trim();
-    if (trimmed.isEmpty) return recent(limit: limit);
+    if (trimmed.isEmpty) {
+      // Two different questions. At the counter it is "who is standing in
+      // front of me", and the answer is almost always somebody who was in
+      // recently, so the till lists them that way. On the customers page it
+      // is "where is James in this list", and the answer is A to Z.
+      return alphabetical ? byName(limit: limit) : recent(limit: limit);
+    }
 
     // Match a mobile whether or not she typed the spaces or dashes.
     final String digits = trimmed.replaceAll(RegExp(r'[^0-9]'), '');
@@ -32,7 +42,7 @@ class CustomerRepositoryImpl implements CustomerRepository {
              ${digits.isEmpty ? '' : "OR REPLACE(REPLACE(REPLACE(IFNULL(mobile, ''), ' ', ''), '-', ''), '+', '') LIKE ?"})
       ORDER BY
         CASE WHEN name LIKE ? ESCAPE '\\' COLLATE NOCASE THEN 0 ELSE 1 END,
-        last_visit_at DESC,
+        ${alphabetical ? '' : 'last_visit_at DESC,'}
         name COLLATE NOCASE
       LIMIT ?
       ''',
@@ -42,6 +52,18 @@ class CustomerRepositoryImpl implements CustomerRepository {
         '${_escape(trimmed)}%',
         limit,
       ],
+    );
+    return rows.map(_customer).toList();
+  }
+
+  /// Everybody, A to Z.
+  @override
+  Future<List<Customer>> byName({int limit = 500}) async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'customers',
+      where: 'is_active = 1',
+      orderBy: 'name COLLATE NOCASE, id',
+      limit: limit,
     );
     return rows.map(_customer).toList();
   }

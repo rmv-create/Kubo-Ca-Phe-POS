@@ -49,7 +49,10 @@ class InventoryRepositoryImpl implements InventoryRepository {
     final List<Map<String, Object?>> rows = await _db.db.query(
       'ingredients',
       where: includeInactive ? null : 'is_active = 1',
-      orderBy: 'category, name COLLATE NOCASE',
+      // Straight A to Z. Grouping by category put Alaska Fresh Milk and
+      // Coffee beans in different places on the screen, so finding one
+      // meant knowing which heading she had filed it under.
+      orderBy: 'name COLLATE NOCASE',
     );
     if (rows.isEmpty) return <Ingredient>[];
 

@@ -52,27 +52,14 @@ class IngredientsScreen extends ConsumerWidget {
               ),
             );
           }
-          final Map<String, List<Ingredient>> byCategory =
-              <String, List<Ingredient>>{};
-          for (final Ingredient i in data) {
-            byCategory
-                .putIfAbsent(
-                  i.category ?? 'Uncategorised',
-                  () => <Ingredient>[],
-                )
-                .add(i);
-          }
-          return ListView(
+          // One list, A to Z. She looks an ingredient up by its name, not
+          // by remembering which category she filed it under.
+          return ListView.separated(
             padding: const EdgeInsets.only(bottom: KuboSpacing.xxxl),
-            children: <Widget>[
-              for (final MapEntry<String, List<Ingredient>> entry
-                  in byCategory.entries) ...<Widget>[
-                SectionHeader(entry.key),
-                ...entry.value.map(
-                  (Ingredient i) => _IngredientTile(ingredient: i),
-                ),
-              ],
-            ],
+            itemCount: data.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (BuildContext context, int index) =>
+                _IngredientTile(ingredient: data[index]),
           );
         },
       ),

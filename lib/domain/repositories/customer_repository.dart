@@ -3,7 +3,12 @@ import '../entities/customer.dart';
 abstract class CustomerRepository {
   /// Partial match on name or mobile. Must stay fast — the owner types this
   /// with a customer standing in front of her.
-  Future<List<Customer>> search(String query, {int limit = 20});
+  /// Finds customers. [alphabetical] lists A to Z instead of most recent
+  /// first, which is what the customers page wants and the till does not.
+  Future<List<Customer>> search(String query, {int limit, bool alphabetical});
+
+  /// Everybody, A to Z.
+  Future<List<Customer>> byName({int limit});
 
   /// Most recent visitors, shown before she has typed anything.
   Future<List<Customer>> recent({int limit = 8});

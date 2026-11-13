@@ -17,6 +17,9 @@ import 'm014_moving_average_cost.dart';
 import 'm015_customer_birthday.dart';
 import 'm016_no_milk_on_specialty.dart';
 import 'm017_waste_can_be_undone.dart';
+import 'm018_receipt_shows_changes.dart';
+import 'm019_forget_deleted_orders.dart';
+import 'm020_regular_is_the_default.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -41,6 +44,9 @@ const List<Migration> appMigrations = <Migration>[
   M015CustomerBirthday(),
   M016NoMilkOnSpecialty(),
   M017WasteCanBeUndone(),
+  M018ReceiptShowsChanges(),
+  M019ForgetDeletedOrders(),
+  M020RegularIsTheDefault(),
 ];
 
 /// The schema version a freshly built app expects.

@@ -157,6 +157,9 @@ class OrderService {
             'option_id': option.option.id,
             'option_name_snapshot': option.option.name,
             'price_delta_centavos': option.priceDelta.centavos,
+            // Whether this is simply what the drink comes with. The receipt
+            // prints what was different, not what was never chosen.
+            'was_default_snapshot': option.isDefault ? 1 : 0,
             'display_order': optionOrder++,
           });
         }
