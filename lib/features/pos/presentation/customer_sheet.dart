@@ -239,7 +239,13 @@ class _CustomerTile extends StatelessWidget {
           ),
         ),
       ),
-      title: Text(customer.name),
+      // The note is what tells two people called James apart, so it goes
+      // beside the name in the one place she has to choose between them.
+      title: Text(
+        customer.notes == null
+            ? customer.name
+            : '${customer.name} · ${customer.notes}',
+      ),
       subtitle: Text(
         <String>[
           if (customer.mobile != null) customer.maskedMobile,
@@ -561,30 +567,46 @@ class _Footer extends ConsumerWidget {
       text: initialName.trim(),
     );
     final TextEditingController mobile = TextEditingController();
+    final TextEditingController notes = TextEditingController();
 
     final bool? save = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('New customer'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            TextField(
-              controller: name,
-              autofocus: true,
-              textCapitalization: TextCapitalization.words,
-              decoration: const InputDecoration(labelText: 'Name'),
-            ),
-            const SizedBox(height: KuboSpacing.md),
-            TextField(
-              controller: mobile,
-              keyboardType: TextInputType.phone,
-              decoration: const InputDecoration(
-                labelText: 'Mobile',
-                helperText: 'Optional',
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextField(
+                controller: name,
+                autofocus: true,
+                textCapitalization: TextCapitalization.words,
+                decoration: const InputDecoration(labelText: 'Name'),
               ),
-            ),
-          ],
+              const SizedBox(height: KuboSpacing.md),
+              TextField(
+                controller: mobile,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Mobile',
+                  helperText: 'Optional',
+                ),
+              ),
+              const SizedBox(height: KuboSpacing.md),
+              // Asked for here, at the counter, rather than only in
+              // Management: the moment a second James appears is the moment
+              // she is standing in front of one of them, and without a note
+              // he cannot be saved at all.
+              TextField(
+                controller: notes,
+                textCapitalization: TextCapitalization.sentences,
+                decoration: const InputDecoration(
+                  labelText: 'Note',
+                  helperText: 'Never on a receipt \u2014 "office", "classmate"',
+                ),
+              ),
+            ],
+          ),
         ),
         actions: <Widget>[
           TextButton(
@@ -601,8 +623,10 @@ class _Footer extends ConsumerWidget {
 
     final String finalName = name.text;
     final String finalMobile = mobile.text;
+    final String finalNotes = notes.text;
     name.dispose();
     mobile.dispose();
+    notes.dispose();
     if (save != true || !context.mounted) return;
 
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
@@ -610,7 +634,7 @@ class _Footer extends ConsumerWidget {
     try {
       final int id = await ref
           .read(customerRepositoryProvider)
-          .create(name: finalName, mobile: finalMobile);
+          .create(name: finalName, mobile: finalMobile, notes: finalNotes);
       final Customer? created = await ref
           .read(customerRepositoryProvider)
           .byId(id);

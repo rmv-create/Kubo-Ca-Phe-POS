@@ -280,9 +280,17 @@ class _CustomerStrip extends ConsumerWidget {
                   Text(
                     customer == null
                         ? 'Search or add a customer'
-                        : '${customer.visitCount} '
-                              'visit${customer.visitCount == 1 ? '' : 's'} · '
-                              'tap to change',
+                        : <String>[
+                            // Her note comes first, because this line is
+                            // how she checks she picked the right James
+                            // before the drink is made. It is never on a
+                            // receipt — the customer sees their name
+                            // and nothing she wrote about them.
+                            if (customer.notes != null) customer.notes!,
+                            '${customer.visitCount} '
+                                'visit${customer.visitCount == 1 ? '' : 's'}',
+                            'tap to change',
+                          ].join(' · '),
                     style: theme.textTheme.bodySmall,
                   ),
                 ],
