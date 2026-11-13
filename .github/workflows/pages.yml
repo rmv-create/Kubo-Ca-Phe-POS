@@ -33,6 +33,18 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          # Pinned, not "whatever stable is today".
+          #
+          # CI went red without a line of this app changing: a Flutter
+          # release deprecated package:flutter/material.dart in favour of
+          # material_ui, and because `flutter analyze` fails on infos,
+          # every file in the app became an error at once. An upstream
+          # release should not be able to break a shop's build overnight.
+          #
+          # This is the version the app is developed and tested against.
+          # Moving it is a deliberate change made together with the
+          # migration it needs, not something that happens unattended.
+          flutter-version: '3.47.9'
           channel: stable
           cache: true
 
