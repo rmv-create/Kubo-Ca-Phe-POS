@@ -18,16 +18,16 @@ class ReportsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final String today = ref.watch(todayBusinessDateProvider);
-    final String month = today.substring(0, 7);
-    final AsyncValue<SalesSummary> day = ref.watch(dailySummaryProvider(today));
-    final AsyncValue<SalesSummary> monthly = ref.watch(
-      monthlySummaryProvider(month),
+    final ReportPeriod period = ref.watch(reportWindowProvider);
+
+    final AsyncValue<SalesSummary> summary = ref.watch(
+      periodSummaryProvider(period),
     );
     final AsyncValue<List<ProductPerformance>> sellers = ref.watch(
-      productPerformanceProvider(month),
+      periodBestSellersProvider(period),
     );
     final AsyncValue<List<ProductPerformance>> profitable = ref.watch(
-      mostProfitableProvider(month),
+      periodMostProfitableProvider(period),
     );
 
     return Scaffold(
@@ -44,15 +44,10 @@ class ReportsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.only(bottom: KuboSpacing.xxxl),
         children: <Widget>[
-          SectionHeader('Today · $today'),
+          _PeriodPicker(today: today),
+          SectionHeader(period.label),
           AsyncView<SalesSummary>(
-            value: day,
-            builder: (BuildContext context, SalesSummary s) =>
-                SummaryCard(summary: s),
-          ),
-          SectionHeader('This month · $month'),
-          AsyncView<SalesSummary>(
-            value: monthly,
+            value: summary,
             builder: (BuildContext context, SalesSummary s) => Column(
               children: <Widget>[
                 SummaryCard(summary: s),
@@ -70,7 +65,7 @@ class ReportsScreen extends ConsumerWidget {
             builder: (BuildContext context, List<ProductPerformance> list) =>
                 _PerformanceList(
                   products: list,
-                  emptyMessage: 'Nothing sold this month yet.',
+                  emptyMessage: 'Nothing sold in this stretch.',
                 ),
           ),
           const SectionHeader('Most profitable'),
@@ -83,7 +78,7 @@ class ReportsScreen extends ConsumerWidget {
             ),
             child: Text(
               'Ranked by what each one actually earns. This is rarely the same '
-              'order as best sellers — that is the point of showing both.',
+              'order as best sellers \u2014 that is the point of showing both.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ),
@@ -94,8 +89,9 @@ class ReportsScreen extends ConsumerWidget {
                   products: list,
                   showProfit: true,
                   emptyMessage:
-                      'Nothing can be ranked by profit yet — the drinks sold so '
-                      'far have no recipe or an ingredient with no price.',
+                      'Nothing can be ranked by profit yet \u2014 the drinks '
+                      'sold so far have no recipe or an ingredient with no '
+                      'price.',
                 ),
           ),
         ],
@@ -301,3 +297,94 @@ String _methodName(String code) => switch (code) {
   'bpi' => 'BPI',
   _ => code,
 };
+
+/// Which stretch of trading the figures below cover.
+///
+/// Always on screen, because the question "how did today go" and the
+/// question "how is the month going" get asked at different moments and
+/// neither should need hunting for. The four she asked for: the day she is
+/// in, the month she is in, a stretch she picks, and everything.
+class _PeriodPicker extends ConsumerWidget {
+  const _PeriodPicker({required this.today});
+
+  final String today;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final ReportPeriod period = ref.watch(reportWindowProvider);
+    final ReportWindow window = ref.read(reportWindowProvider.notifier);
+    final String month = today.substring(0, 7);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        KuboSpacing.md,
+        KuboSpacing.lg,
+        0,
+      ),
+      child: Wrap(
+        spacing: KuboSpacing.sm,
+        runSpacing: KuboSpacing.sm,
+        children: <Widget>[
+          ChoiceChip(
+            label: const Text('Today'),
+            selected: period == ReportPeriod.day(today),
+            onSelected: (_) => window.show(ReportPeriod.day(today)),
+          ),
+          ChoiceChip(
+            label: const Text('This month'),
+            selected: period == ReportPeriod.month(month),
+            onSelected: (_) => window.show(ReportPeriod.month(month)),
+          ),
+          ChoiceChip(
+            label: Text(
+              period.kind == ReportPeriodKind.between
+                  ? period.label
+                  : 'Choose dates',
+            ),
+            avatar: const Icon(Icons.date_range, size: 18),
+            selected: period.kind == ReportPeriodKind.between,
+            onSelected: (_) => _pickDates(context, ref),
+          ),
+          ChoiceChip(
+            label: const Text('All time'),
+            selected: period.kind == ReportPeriodKind.everything,
+            onSelected: (_) => window.show(ReportPeriod.everything),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// A stretch she chooses herself — last week, a quarter, the days of a
+  /// fiesta.
+  Future<void> _pickDates(BuildContext context, WidgetRef ref) async {
+    final DateTime now = ref.read(clockProvider).now();
+    final ReportPeriod current = ref.read(reportWindowProvider);
+
+    final DateTimeRange? picked = await showDateRangePicker(
+      context: context,
+      // The shop cannot have sold anything before it existed, and a date in
+      // the future would only ever be a mistyped year.
+      firstDate: DateTime(2024),
+      lastDate: now,
+      initialDateRange: current.kind == ReportPeriodKind.between
+          ? DateTimeRange(
+              start: DateTime.parse(current.from!),
+              end: DateTime.parse(current.to!),
+            )
+          : null,
+      helpText: 'Which days?',
+    );
+    if (picked == null) return;
+
+    ref
+        .read(reportWindowProvider.notifier)
+        .show(ReportPeriod.between(_asDate(picked.start), _asDate(picked.end)));
+  }
+
+  static String _asDate(DateTime at) =>
+      '${at.year.toString().padLeft(4, '0')}-'
+      '${at.month.toString().padLeft(2, '0')}-'
+      '${at.day.toString().padLeft(2, '0')}';
+}

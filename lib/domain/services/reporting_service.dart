@@ -35,20 +35,19 @@ class ReportingService {
 
   String get thisMonth => today.substring(0, 7);
 
-  Future<SalesSummary> forDay(String businessDate) => _summarise(
-    // The clause is built per table, because some of these queries read
-    // `orders` directly and others join to it as `o`.
-    where: (String prefix) => '${prefix}business_date = ?',
-    args: <Object?>[businessDate],
-    label: businessDate,
-  );
+  /// The same figures over whichever stretch of trading she picked.
+  ///
+  /// The clause is built per table, because some of these queries read
+  /// `orders` directly and others join to it as `o`.
+  Future<SalesSummary> forPeriod(ReportPeriod period) =>
+      _summarise(where: period.clause, args: period.args, label: period.label);
+
+  Future<SalesSummary> forDay(String businessDate) =>
+      forPeriod(ReportPeriod.day(businessDate));
 
   /// [month] is `YYYY-MM`.
-  Future<SalesSummary> forMonth(String month) => _summarise(
-    where: (String prefix) => 'substr(${prefix}business_date, 1, 7) = ?',
-    args: <Object?>[month],
-    label: month,
-  );
+  Future<SalesSummary> forMonth(String month) =>
+      forPeriod(ReportPeriod.month(month));
 
   Future<SalesSummary> _summarise({
     required String Function(String prefix) where,
@@ -139,16 +138,18 @@ class ReportingService {
   Future<List<ProductPerformance>> productPerformance({
     String? businessDate,
     String? month,
+    ReportPeriod? period,
     int limit = 100,
   }) async {
-    final String where = businessDate != null
-        ? 'o.business_date = ?'
-        : month != null
-        ? 'substr(o.business_date, 1, 7) = ?'
-        : '1 = 1';
-    final List<Object?> args = <Object?>[
-      if (businessDate != null) businessDate else if (month != null) month,
-    ];
+    final ReportPeriod window =
+        period ??
+        (businessDate != null
+            ? ReportPeriod.day(businessDate)
+            : month != null
+            ? ReportPeriod.month(month)
+            : ReportPeriod.everything);
+    final String where = window.clause('o.');
+    final List<Object?> args = window.args;
 
     final List<Map<String, Object?>> rows = await _db.db.rawQuery(
       '''
@@ -195,11 +196,13 @@ class ReportingService {
   Future<List<ProductPerformance>> mostProfitable({
     String? businessDate,
     String? month,
+    ReportPeriod? period,
     int limit = 100,
   }) async {
     final List<ProductPerformance> all = await productPerformance(
       businessDate: businessDate,
       month: month,
+      period: period,
       limit: limit,
     );
     return all.where((ProductPerformance p) => p.isCosted).toList()..sort(

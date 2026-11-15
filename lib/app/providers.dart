@@ -608,6 +608,55 @@ final FutureProviderFamily<OrderRecord?, int> orderByIdProvider =
       return ref.watch(salesServiceProvider).orderById(id);
     });
 
+/// Which stretch of trading the Reports screen is showing.
+///
+/// Held here rather than in the screen so that moving between Reports and
+/// anything else does not quietly put her back on today when she was part
+/// way through reading a quarter.
+final NotifierProvider<ReportWindow, ReportPeriod> reportWindowProvider =
+    NotifierProvider<ReportWindow, ReportPeriod>(ReportWindow.new);
+
+class ReportWindow extends Notifier<ReportPeriod> {
+  @override
+  ReportPeriod build() =>
+      ReportPeriod.day(ref.watch(todayBusinessDateProvider));
+
+  void show(ReportPeriod period) => state = period;
+}
+
+/// The figures for whichever stretch she is looking at.
+final FutureProviderFamily<SalesSummary, ReportPeriod> periodSummaryProvider =
+    FutureProvider.family<SalesSummary, ReportPeriod>((
+      Ref ref,
+      ReportPeriod period,
+    ) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(stockRevisionProvider);
+      return ref.watch(reportingServiceProvider).forPeriod(period);
+    });
+
+final FutureProviderFamily<List<ProductPerformance>, ReportPeriod>
+periodBestSellersProvider =
+    FutureProvider.family<List<ProductPerformance>, ReportPeriod>((
+      Ref ref,
+      ReportPeriod period,
+    ) {
+      ref.watch(salesRevisionProvider);
+      return ref
+          .watch(reportingServiceProvider)
+          .productPerformance(period: period);
+    });
+
+final FutureProviderFamily<List<ProductPerformance>, ReportPeriod>
+periodMostProfitableProvider =
+    FutureProvider.family<List<ProductPerformance>, ReportPeriod>((
+      Ref ref,
+      ReportPeriod period,
+    ) {
+      ref.watch(salesRevisionProvider);
+      return ref.watch(reportingServiceProvider).mostProfitable(period: period);
+    });
+
 final FutureProviderFamily<SalesSummary, String> dailySummaryProvider =
     FutureProvider.family<SalesSummary, String>((Ref ref, String day) {
       ref.watch(salesRevisionProvider);

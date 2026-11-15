@@ -373,3 +373,92 @@ class DailyClosing {
   final DateTime closedAt;
   final SalesSummary summary;
 }
+
+/// Which stretch of trading a report covers.
+///
+/// She asked for the same figures over four different windows: the day she
+/// is standing in, the month she is in, a stretch she picks herself, and
+/// everything since the shop opened. Rather than four nearly-identical
+/// queries, a period knows how to narrow any query that has a
+/// `business_date` on it, and the reports are written once.
+///
+/// [prefix] is there because some queries read `orders` directly and others
+/// join to it as `o`; the caller says which.
+@immutable
+class ReportPeriod {
+  const ReportPeriod._({
+    required this.kind,
+    required this.label,
+    this.from,
+    this.to,
+  });
+
+  /// The trading day she is in. Not the calendar day: a sale at one in the
+  /// morning belongs to the night before, and the report has to agree with
+  /// the closing.
+  factory ReportPeriod.day(String businessDate) => ReportPeriod._(
+    kind: ReportPeriodKind.day,
+    label: businessDate,
+    from: businessDate,
+    to: businessDate,
+  );
+
+  /// [month] is `YYYY-MM`.
+  factory ReportPeriod.month(String month) =>
+      ReportPeriod._(kind: ReportPeriodKind.month, label: month, from: month);
+
+  /// Both ends included, so "the first to the seventh" is seven days.
+  factory ReportPeriod.between(String from, String to) {
+    final bool backwards = from.compareTo(to) > 0;
+    final String start = backwards ? to : from;
+    final String end = backwards ? from : to;
+    return ReportPeriod._(
+      kind: ReportPeriodKind.between,
+      label: start == end ? start : '$start to $end',
+      from: start,
+      to: end,
+    );
+  }
+
+  /// Every sale the shop has ever made.
+  static const ReportPeriod everything = ReportPeriod._(
+    kind: ReportPeriodKind.everything,
+    label: 'All time',
+  );
+
+  final ReportPeriodKind kind;
+  final String label;
+  final String? from;
+  final String? to;
+
+  /// The SQL this period narrows a query by.
+  String clause(String prefix) => switch (kind) {
+    ReportPeriodKind.day => '${prefix}business_date = ?',
+    ReportPeriodKind.month => 'substr(${prefix}business_date, 1, 7) = ?',
+    ReportPeriodKind.between => '${prefix}business_date BETWEEN ? AND ?',
+    // Not "no clause": the callers paste this into a WHERE that already has
+    // other conditions, and a blank would leave a dangling AND.
+    ReportPeriodKind.everything => '1 = 1',
+  };
+
+  List<Object?> get args => switch (kind) {
+    ReportPeriodKind.day || ReportPeriodKind.month => <Object?>[from],
+    ReportPeriodKind.between => <Object?>[from, to],
+    ReportPeriodKind.everything => const <Object?>[],
+  };
+
+  @override
+  bool operator ==(Object other) =>
+      other is ReportPeriod &&
+      other.kind == kind &&
+      other.from == from &&
+      other.to == to;
+
+  @override
+  int get hashCode => Object.hash(kind, from, to);
+
+  @override
+  String toString() => 'ReportPeriod($label)';
+}
+
+enum ReportPeriodKind { day, month, between, everything }
