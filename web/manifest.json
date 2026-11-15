@@ -1,12 +1,25 @@
 {
     "name": "Kubo Cà Phê",
     "short_name": "Kubo",
+    "id": "/Kubo-Ca-Phe-POS/",
     "start_url": ".",
+    "scope": ".",
     "display": "standalone",
+    "display_override": [
+        "standalone",
+        "minimal-ui"
+    ],
     "background_color": "#F6F6F7",
     "theme_color": "#F6F6F7",
     "description": "Offline-first point of sale for Kubo Cà Phê.",
+    "lang": "en",
+    "dir": "ltr",
     "orientation": "any",
+    "categories": [
+        "business",
+        "productivity",
+        "food"
+    ],
     "prefer_related_applications": false,
     "icons": [
         {
