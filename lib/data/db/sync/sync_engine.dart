@@ -272,11 +272,24 @@ class SyncEngine {
 
     if (change.op == SyncOp.delete) {
       if (existing.isNotEmpty) {
-        await _db.db.delete(
-          change.table,
-          where: 'uid = ?',
-          whereArgs: <Object?>[change.rowUid],
-        );
+        try {
+          await _db.db.delete(
+            change.table,
+            where: 'uid = ?',
+            whereArgs: <Object?>[change.rowUid],
+          );
+        } on DatabaseException catch (error) {
+          // Something here still points at it, and the row that points is
+          // on its way out too — deleting an order sends the void away
+          // with it, and the two can arrive in either order. The schema
+          // holds the order until its void has gone, which is right; this
+          // just waits for that rather than giving up.
+          //
+          // This is the failure she actually hit: practice orders deleted
+          // on one phone stopped the other phone syncing altogether.
+          if (_isMissingParent(error)) return _Outcome.waiting;
+          rethrow;
+        }
       }
       await _remember(change);
       return _Outcome.applied;
@@ -319,20 +332,149 @@ class SyncEngine {
         // separately, each having made its own "Classics" category. There
         // is nothing to merge — the row is already here — and inventing a
         // second one would be worse than leaving it.
-        if (!error.isUniqueConstraintError()) rethrow;
-        await _remember(change);
-        return _Outcome.alreadyKnown;
+        if (error.isUniqueConstraintError()) {
+          // Saying "already here" is not enough. The row that is already
+          // here is the same *thing* under a different uid — her till and
+          // this one each seeded their own "Iced Black" — and until the two
+          // names are joined up, every row that points at it is stranded:
+          // the recipes, the option effects, and the lines of every order
+          // that sold it. An order would arrive with no drinks in it.
+          //
+          // So the local row takes the incoming uid. Both phones then mean
+          // the same row by the same name, and everything that was waiting
+          // on it goes in on the next pass.
+          final bool joined = await _adopt(change.table, row, change.rowUid);
+          if (!joined) {
+            await _remember(change);
+            return _Outcome.alreadyKnown;
+          }
+          await _db.db.update(
+            change.table,
+            row,
+            where: 'uid = ?',
+            whereArgs: <Object?>[change.rowUid],
+          );
+          await _remember(change);
+          return _Outcome.applied;
+        }
+        // The row points at something that has not landed yet: an order
+        // line ahead of its order, a recipe item ahead of its ingredient.
+        // That is ordinary — the log is a stream of rows, not a tree — and
+        // the loop above exists precisely to come back for it once the
+        // parent is in. Throwing stopped the whole sync instead, so one
+        // early arrival left the barista's phone showing a database error
+        // and the shop not syncing at all.
+        if (_isMissingParent(error)) return _Outcome.waiting;
+        rethrow;
       }
     } else {
-      await _db.db.update(
-        change.table,
-        row,
-        where: 'uid = ?',
-        whereArgs: <Object?>[change.rowUid],
-      );
+      try {
+        await _db.db.update(
+          change.table,
+          row,
+          where: 'uid = ?',
+          whereArgs: <Object?>[change.rowUid],
+        );
+      } on DatabaseException catch (error) {
+        // An edit can point at a new parent just as an insert can.
+        if (_isMissingParent(error)) return _Outcome.waiting;
+        rethrow;
+      }
     }
     await _remember(change);
     return _Outcome.applied;
+  }
+
+  /// Gives the row already here the incoming row's name.
+  ///
+  /// Two tills set up separately each made their own "Classics", their own
+  /// "Iced Black", their own "Alaska Fresh Milk". They are the same things,
+  /// and the database says so by refusing the second one: the names are
+  /// unique. What was missing was joining the two identities, so that a
+  /// recipe or an order line written against her copy finds this one.
+  ///
+  /// The conflicting row is found through the table's own unique indexes
+  /// rather than a list kept by hand, for the same reason the codec reads
+  /// the foreign keys that way: the schema already knows.
+  ///
+  /// Returns false when the clash cannot be pinned to one row, in which
+  /// case nothing is touched.
+  Future<bool> _adopt(
+    String table,
+    Map<String, Object?> row,
+    String uid,
+  ) async {
+    for (final List<String> columns in await _uniqueKeysOf(table)) {
+      if (columns.any((String c) => !row.containsKey(c))) continue;
+
+      final String where = columns
+          .map((String c) => row[c] == null ? '$c IS NULL' : '$c = ?')
+          .join(' AND ');
+      final List<Object?> args = <Object?>[
+        for (final String c in columns)
+          if (row[c] != null) row[c],
+      ];
+
+      // rowid rather than id: not every synced table has an `id` column —
+      // app_settings is keyed by its name — but every one of them has a
+      // rowid, and that is all this needs to point at the row it found.
+      final List<Map<String, Object?>> found = await _db.db.rawQuery(
+        'SELECT rowid AS rid, uid FROM $table WHERE $where LIMIT 2',
+        args,
+      );
+      if (found.length != 1) continue;
+      if (found.first['uid'] == uid) return true;
+
+      await _db.db.rawUpdate(
+        'UPDATE $table SET uid = ? WHERE rowid = ?',
+        <Object?>[uid, found.first['rid']],
+      );
+      return true;
+    }
+    return false;
+  }
+
+  final Map<String, List<List<String>>> _uniqueKeys =
+      <String, List<List<String>>>{};
+
+  /// The columns of each unique index on a table, except the one on `uid`
+  /// itself — which is the identity being joined up, not a way to find it.
+  Future<List<List<String>>> _uniqueKeysOf(String table) async {
+    final List<List<String>>? known = _uniqueKeys[table];
+    if (known != null) return known;
+
+    final List<Map<String, Object?>> indexes = await _db.db.rawQuery(
+      'PRAGMA index_list($table)',
+    );
+    final List<List<String>> keys = <List<String>>[];
+    for (final Map<String, Object?> index in indexes) {
+      if (index['unique'] != 1) continue;
+      final List<Map<String, Object?>> columns = await _db.db.rawQuery(
+        "PRAGMA index_info('${index['name']}')",
+      );
+      final List<String> names = <String>[
+        for (final Map<String, Object?> c in columns)
+          if (c['name'] != null) c['name']! as String,
+      ];
+      // An index over an expression gives a null column name; it cannot be
+      // matched on, so it is no use here.
+      if (names.length != columns.length) continue;
+      if (names.isEmpty || names.contains('uid')) continue;
+      keys.add(names);
+    }
+    return _uniqueKeys[table] = keys;
+  }
+
+  /// Whether this failure is "its parent is not here yet" rather than
+  /// anything wrong with the row.
+  ///
+  /// sqflite has no `isForeignKeyError`, so the code and the message are
+  /// read directly. 1811 is SQLITE_CONSTRAINT_FOREIGNKEY; the text is
+  /// checked too because the ffi and web builds do not always carry the
+  /// extended code through.
+  static bool _isMissingParent(DatabaseException error) {
+    final String said = error.toString().toUpperCase();
+    return said.contains('FOREIGN KEY') || said.contains('1811');
   }
 
   /// Rebuilds stock on hand from the ledger.
