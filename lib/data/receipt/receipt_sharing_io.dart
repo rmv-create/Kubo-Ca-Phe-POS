@@ -8,6 +8,7 @@ import 'receipt_sharing.dart';
 Future<ShareOutcome> shareReceipt(
   ReceiptFile receipt, {
   String? subject,
+  bool shareFirst = true,
 }) async {
   final ShareResult result = await Share.shareXFiles(
     <XFile>[

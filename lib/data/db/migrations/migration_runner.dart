@@ -20,6 +20,7 @@ import 'm017_waste_can_be_undone.dart';
 import 'm018_receipt_shows_changes.dart';
 import 'm019_forget_deleted_orders.dart';
 import 'm020_regular_is_the_default.dart';
+import 'm021_ice_can_be_asked_for.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -47,6 +48,7 @@ const List<Migration> appMigrations = <Migration>[
   M018ReceiptShowsChanges(),
   M019ForgetDeletedOrders(),
   M020RegularIsTheDefault(),
+  M021IceCanBeAskedFor(),
 ];
 
 /// The schema version a freshly built app expects.

@@ -34,10 +34,31 @@ class ReportsScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Reports'),
         actions: <Widget>[
-          IconButton(
+          // Two ways out, named, rather than one that silently does
+          // nothing when the share sheet is waved away — which is what
+          // "exporting is not available" turned out to be.
+          PopupMenuButton<bool>(
             icon: const Icon(Icons.ios_share),
             tooltip: 'Export to Excel',
-            onPressed: () => _export(context, ref),
+            onSelected: (bool share) => _export(context, ref, share: share),
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<bool>>[
+              const PopupMenuItem<bool>(
+                value: true,
+                child: ListTile(
+                  leading: Icon(Icons.ios_share),
+                  title: Text('Share'),
+                  subtitle: Text('To Drive, Sheets, Messenger'),
+                ),
+              ),
+              const PopupMenuItem<bool>(
+                value: false,
+                child: ListTile(
+                  leading: Icon(Icons.download_outlined),
+                  title: Text('Save to this phone'),
+                  subtitle: Text('Into Downloads'),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -99,7 +120,11 @@ class ReportsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _export(BuildContext context, WidgetRef ref) async {
+  Future<void> _export(
+    BuildContext context,
+    WidgetRef ref, {
+    required bool share,
+  }) async {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     messenger
       ..clearSnackBars()
@@ -120,11 +145,20 @@ class ReportsScreen extends ConsumerWidget {
         into: ref.read(backupServiceProvider).backupDirectory,
         mimeType:
             'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        shareFirst: share,
       );
       if (!shared) return;
       messenger
         ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text('${book.name} is ready')));
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              share
+                  ? '${book.name} is ready'
+                  : '${book.name} saved to this phone',
+            ),
+          ),
+        );
     } on Object catch (error) {
       messenger
         ..clearSnackBars()

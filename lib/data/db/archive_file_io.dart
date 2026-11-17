@@ -34,10 +34,14 @@ Future<bool> saveBinary(
   String filename, {
   required Directory into,
   String mimeType = 'application/octet-stream',
+  bool shareFirst = true,
 }) async {
   await into.create(recursive: true);
   final File file = File(p.join(into.path, filename));
   await file.writeAsBytes(bytes, flush: true);
+
+  // Written to disk either way; sharing is only how it leaves the phone.
+  if (!shareFirst) return true;
 
   final ShareResult result = await Share.shareXFiles(<XFile>[
     XFile(file.path, name: filename, mimeType: mimeType),

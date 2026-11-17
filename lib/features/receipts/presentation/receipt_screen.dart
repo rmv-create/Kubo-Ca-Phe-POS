@@ -76,6 +76,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     onPrint: () => _guard(() => _print(record)),
                     onPdf: () => _guard(() => _sharePdf(record)),
                     onJpeg: () => _guard(() => _shareJpeg(record)),
+                    onSave: () => _guard(() => _sharePdf(record, share: false)),
                     onName: () => NameThisOrderSheet.show(context, record),
                   ),
                 ),
@@ -106,7 +107,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
     );
   }
 
-  Future<void> _sharePdf(OrderRecord record) async {
+  Future<void> _sharePdf(OrderRecord record, {bool share = true}) async {
     await _hand(
       ReceiptFile(
         bytes: await _pdf(record),
@@ -114,6 +115,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         mimeType: 'application/pdf',
       ),
       record,
+      share: share,
     );
   }
 
@@ -162,10 +164,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   /// the address bar will be showing a `blob:` URL that exists nowhere but
   /// this tab. Sending that to a customer gets "cannot open", so the app says
   /// so rather than letting her find out from them.
-  Future<void> _hand(ReceiptFile file, OrderRecord record) async {
+  Future<void> _hand(
+    ReceiptFile file,
+    OrderRecord record, {
+    bool share = true,
+  }) async {
     final ShareOutcome outcome = await shareReceipt(
       file,
       subject: 'Receipt ${record.orderNo}',
+      shareFirst: share,
     );
     if (!mounted) return;
 
@@ -225,6 +232,7 @@ class _Actions extends StatelessWidget {
     required this.onPrint,
     required this.onPdf,
     required this.onJpeg,
+    required this.onSave,
     required this.onName,
   });
 
@@ -233,6 +241,7 @@ class _Actions extends StatelessWidget {
   final VoidCallback onPrint;
   final VoidCallback onPdf;
   final VoidCallback onJpeg;
+  final VoidCallback onSave;
   final VoidCallback onName;
 
   @override
@@ -267,6 +276,16 @@ class _Actions extends StatelessWidget {
             ),
           ),
         ],
+      ),
+      const SizedBox(height: KuboSpacing.sm),
+      // PDF and JPEG go through the phone's share sheet, which on Android
+      // offers Photos and messaging apps and no file manager — so a receipt
+      // sent that way lands in her photo roll and nowhere she can find it
+      // again. This puts the file in Downloads instead, where a file keeps.
+      OutlinedButton.icon(
+        onPressed: busy ? null : onSave,
+        icon: const Icon(Icons.download_outlined),
+        label: const Text('SAVE TO THIS PHONE'),
       ),
       const SizedBox(height: KuboSpacing.sm),
       FilledButton.icon(

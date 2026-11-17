@@ -21,6 +21,7 @@ import 'receipt_sharing.dart';
 Future<ShareOutcome> shareReceipt(
   ReceiptFile receipt, {
   String? subject,
+  bool shareFirst = true,
 }) async {
   final web.File file = web.File(
     <JSUint8Array>[receipt.bytes.toJS].toJS,
@@ -37,7 +38,7 @@ Future<ShareOutcome> shareReceipt(
   // check and the call therefore sit inside a catch, because the one outcome
   // that must never happen is the owner tapping PDF and getting nothing.
   try {
-    if (_canShareFiles(file, subject ?? receipt.filename)) {
+    if (shareFirst && _canShareFiles(file, subject ?? receipt.filename)) {
       await web.window.navigator
           .share(
             web.ShareData(

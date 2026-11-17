@@ -361,25 +361,31 @@ void main() {
       expect(oat.priceDelta, Money.of(20));
     });
 
-    test(
-      'ice is never asked, but every drink still defaults to Regular',
-      () async {
-        for (final Product product in await menu.products()) {
-          final ResolvedCustomizationGroup ice =
-              (await menu.resolvedGroupsFor(product.id)).firstWhere(
-                (ResolvedCustomizationGroup g) => g.group.code == 'ice',
-              );
-          expect(
-            ice.isVisible,
-            isFalse,
-            reason: '${product.name}: "Show ice? No"',
-          );
-          expect(ice.defaults.map((CustomizationOption o) => o.name), <String>[
-            'Regular',
-          ], reason: '${product.name}: "always regular for now"');
-        }
-      },
-    );
+    test('ice is never asked for, but can be asked about', () async {
+      // Her worksheet said "Show ice? No", and that was taken as "never
+      // offer it" — which left no way to ring up a no-ice drink at all.
+      // It is offered now, folded away with strength and sweetness: she
+      // is not asked while taking an order, and it is there when a
+      // customer asks her.
+      for (final Product product in await menu.products()) {
+        final ResolvedCustomizationGroup ice = (await menu.resolvedGroupsFor(
+          product.id,
+        )).firstWhere((ResolvedCustomizationGroup g) => g.group.code == 'ice');
+        expect(
+          ice.isVisible,
+          isTrue,
+          reason: '${product.name}: somebody will ask for no ice',
+        );
+        expect(
+          ice.isProactive,
+          isFalse,
+          reason: '${product.name}: but never up front',
+        );
+        expect(ice.defaults.map((CustomizationOption o) => o.name), <String>[
+          'Regular',
+        ], reason: '${product.name}: "always regular for now"');
+      }
+    });
 
     test(
       'nothing is required except milk, so a drink adds in two taps',

@@ -333,29 +333,7 @@ class SyncEngine {
         // is nothing to merge — the row is already here — and inventing a
         // second one would be worse than leaving it.
         if (error.isUniqueConstraintError()) {
-          // Saying "already here" is not enough. The row that is already
-          // here is the same *thing* under a different uid — her till and
-          // this one each seeded their own "Iced Black" — and until the two
-          // names are joined up, every row that points at it is stranded:
-          // the recipes, the option effects, and the lines of every order
-          // that sold it. An order would arrive with no drinks in it.
-          //
-          // So the local row takes the incoming uid. Both phones then mean
-          // the same row by the same name, and everything that was waiting
-          // on it goes in on the next pass.
-          final bool joined = await _adopt(change.table, row, change.rowUid);
-          if (!joined) {
-            await _remember(change);
-            return _Outcome.alreadyKnown;
-          }
-          await _db.db.update(
-            change.table,
-            row,
-            where: 'uid = ?',
-            whereArgs: <Object?>[change.rowUid],
-          );
-          await _remember(change);
-          return _Outcome.applied;
+          return _settleClash(change, row, table);
         }
         // The row points at something that has not landed yet: an order
         // line ahead of its order, a recipe item ahead of its ingredient.
@@ -383,6 +361,120 @@ class SyncEngine {
     }
     await _remember(change);
     return _Outcome.applied;
+  }
+
+  /// What to do when the row will not go in because something already
+  /// here has the same unique key.
+  ///
+  /// It depends entirely on what kind of row it is, and getting that wrong
+  /// is how two separate sales were merged into one.
+  Future<_Outcome> _settleClash(
+    SyncChange change,
+    Map<String, Object?> row,
+    SyncedTable table,
+  ) async {
+    switch (table.kind) {
+      // Two tills set up separately each made their own "Iced Black". They
+      // are the same thing, and joining the two names is exactly right:
+      // otherwise every recipe and order line pointing at hers is stranded
+      // on this phone for good.
+      case SyncKind.reference:
+      case SyncKind.derived:
+        final bool joined = await _adopt(change.table, row, change.rowUid);
+        if (!joined) {
+          await _remember(change);
+          return _Outcome.alreadyKnown;
+        }
+        await _db.db.update(
+          change.table,
+          row,
+          where: 'uid = ?',
+          whereArgs: <Object?>[change.rowUid],
+        );
+        await _remember(change);
+        return _Outcome.applied;
+
+      // Two sales are never the same sale. Two phones serving apart both
+      // reached for 1165 because each counted from what it could see, and
+      // joining those two names together put one customer's drinks inside
+      // another's order — three drinks on an order that said two.
+      //
+      // Both sales happened, so both are kept. The one rung up first keeps
+      // the number it printed; the later one is marked, by a rule both
+      // phones work out the same way from what they can both see, so they
+      // do not end up disagreeing about which is which.
+      case SyncKind.event:
+        if (change.table != 'orders') {
+          // Voiding the same order on both phones, or closing the same day
+          // on both: there really is only one of these, and the first
+          // telling stands.
+          await _remember(change);
+          return _Outcome.alreadyKnown;
+        }
+        return _keepBothOrders(change, row);
+    }
+  }
+
+  /// Keeps two orders that were given the same number on two phones.
+  Future<_Outcome> _keepBothOrders(
+    SyncChange change,
+    Map<String, Object?> row,
+  ) async {
+    final String number = (row['order_no'] as String?) ?? '';
+    if (number.isEmpty) {
+      await _remember(change);
+      return _Outcome.alreadyKnown;
+    }
+
+    final List<Map<String, Object?>> mine = await _db.db.query(
+      'orders',
+      columns: <String>['rowid AS rid', 'uid', 'created_at'],
+      where: 'order_no = ?',
+      whereArgs: <Object?>[number],
+      limit: 1,
+    );
+    if (mine.isEmpty) return _Outcome.waiting;
+
+    final String theirsAt = (row['created_at'] as String?) ?? '';
+    final String mineAt = (mine.first['created_at'] as String?) ?? '';
+    final String mineUid = (mine.first['uid'] as String?) ?? '';
+
+    // Whoever rang up first keeps the clean number. Both phones can see
+    // both orders, so both reach the same answer.
+    final bool theirsIsLater =
+        theirsAt.compareTo(mineAt) > 0 ||
+        (theirsAt == mineAt && change.rowUid.compareTo(mineUid) > 0);
+
+    if (theirsIsLater) {
+      await _db.db.insert('orders', <String, Object?>{
+        ...row,
+        'order_no': _marked(number, change.rowUid),
+        'uid': change.rowUid,
+      });
+    } else {
+      // The order already here is the later one, so it gives the number up.
+      await _db.db.rawUpdate(
+        'UPDATE orders SET order_no = ? WHERE rowid = ?',
+        <Object?>[_marked(number, mineUid), mine.first['rid']],
+      );
+      await _db.db.insert('orders', <String, Object?>{
+        ...row,
+        'uid': change.rowUid,
+      });
+    }
+
+    await _remember(change);
+    return _Outcome.applied;
+  }
+
+  /// The same number, marked so the two can be told apart on a list.
+  ///
+  /// Taken from the order's own name rather than counted, so that every
+  /// phone marks it identically without having to ask the others what they
+  /// have already used.
+  static String _marked(String number, String uid) {
+    final String tail = uid.replaceAll(RegExp('[^0-9a-zA-Z]'), '');
+    return '$number-${tail.substring(0, tail.length < 4 ? tail.length : 4)}';
   }
 
   /// Gives the row already here the incoming row's name.

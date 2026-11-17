@@ -117,18 +117,24 @@ Future<bool> requestPersistentStorage() async {
 /// The same two routes as [saveArchive], and for the same reason: on an
 /// iPhone the share sheet is the only way a file reaches Google Drive or
 /// Sheets in one tap rather than four.
+///
+/// [shareFirst] false goes straight to the download instead. On Android the
+/// share sheet offers Photos and messaging apps and no file manager, so a
+/// receipt saved that way lands in her photo roll and nowhere she can find
+/// it again; a download goes to Downloads, where a file belongs.
 Future<bool> saveBinary(
   List<int> bytes,
   String filename, {
   required Directory into,
   String mimeType = 'application/octet-stream',
+  bool shareFirst = true,
 }) async {
   final web.Blob blob = web.Blob(
     <JSAny>[Uint8List.fromList(bytes).toJS].toJS,
     web.BlobPropertyBag(type: mimeType),
   );
 
-  if (await _shareFile(blob, filename)) return true;
+  if (shareFirst && await _shareFile(blob, filename)) return true;
 
   final String url = web.URL.createObjectURL(blob);
   final web.HTMLAnchorElement anchor =

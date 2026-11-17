@@ -156,9 +156,10 @@ abstract final class MenuSeed {
       selection: SelectionType.single,
       isRequired: false,
       isProactive: false,
-      // "Show ice? No" on every drink, with a default of Regular: the group is
-      // attached and its default applies, but she is never asked.
-      isVisible: false,
+      // Her worksheet said "Show ice? No", so it was hidden outright — and
+      // then there was no way to ring up a no-ice drink at all. Shown now,
+      // but folded away like strength and sweetness: she is never asked,
+      // and it is there under More options when somebody does ask her.
       options: <SeedOption>[
         SeedOption(name: 'Regular', price: 0, isDefault: true),
         SeedOption(name: 'Less Ice', price: 0),
