@@ -14,6 +14,7 @@ import '../../../data/receipt/receipt_sharing.dart';
 import '../../../domain/entities/business_settings.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
+import '../../../shared/widgets/section_header.dart';
 import 'name_this_order_sheet.dart';
 
 /// The receipt for one completed order: preview, print, and save.
@@ -76,7 +77,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
                     onPrint: () => _guard(() => _print(record)),
                     onPdf: () => _guard(() => _sharePdf(record)),
                     onJpeg: () => _guard(() => _shareJpeg(record)),
-                    onSave: () => _guard(() => _sharePdf(record, share: false)),
+                    onSave: () => _saveToPhone(record),
                     onName: () => NameThisOrderSheet.show(context, record),
                   ),
                 ),
@@ -121,7 +122,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
 
   /// The same receipt as a picture, for sending over Messenger or Viber where
   /// a PDF is awkward to open.
-  Future<void> _shareJpeg(OrderRecord record) async {
+  Future<void> _shareJpeg(OrderRecord record, {bool share = true}) async {
     final Uint8List pdf = await _pdf(record);
     final PdfRaster page = await Printing.raster(
       pdf,
@@ -154,6 +155,50 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
         mimeType: 'image/jpeg',
       ),
       record,
+      share: share,
+    );
+  }
+
+  /// Puts the receipt in the phone's own Downloads folder.
+  ///
+  /// The share sheet is how a receipt reaches a customer, and on Android it
+  /// offers Photos and messaging apps and no file manager — so a receipt
+  /// sent that way is in her photo roll or nowhere. This skips it.
+  ///
+  /// A browser cannot write into the Android gallery itself; nothing on the
+  /// web can. What it can do is download, and Downloads is where a gallery
+  /// app looks and where Files opens, which is what she was asking for.
+  Future<void> _saveToPhone(OrderRecord record) async {
+    final bool? asPicture = await showModalBottomSheet<bool>(
+      context: context,
+      useSafeArea: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const SectionHeader('Save to this phone'),
+            ListTile(
+              leading: const Icon(Icons.image_outlined),
+              title: const Text('Picture'),
+              subtitle: const Text('A JPEG, into Downloads'),
+              onTap: () => Navigator.of(context).pop(true),
+            ),
+            ListTile(
+              leading: const Icon(Icons.picture_as_pdf_outlined),
+              title: const Text('PDF'),
+              subtitle: const Text('Into Downloads'),
+              onTap: () => Navigator.of(context).pop(false),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (asPicture == null) return;
+
+    await _guard(
+      () => asPicture
+          ? _shareJpeg(record, share: false)
+          : _sharePdf(record, share: false),
     );
   }
 

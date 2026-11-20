@@ -484,7 +484,7 @@ Future<void> repeatOrder(
     return;
   }
 
-  final List<DraftOption> options = await _resolveOptions(
+  final List<DraftOption> options = await resolveOptions(
     ref,
     productId: product.id,
     sizeId: size.size.id,
@@ -497,7 +497,7 @@ Future<void> repeatOrder(
 }
 
 /// The saved option ids, turned back into real options on today's menu.
-Future<List<DraftOption>> _resolveOptions(
+Future<List<DraftOption>> resolveOptions(
   WidgetRef ref, {
   required int productId,
   required int sizeId,

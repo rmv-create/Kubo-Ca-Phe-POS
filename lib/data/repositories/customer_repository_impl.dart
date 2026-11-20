@@ -407,6 +407,36 @@ class CustomerRepositoryImpl implements CustomerRepository {
 
   /// Turns a pattern into something displayable, pricing it at *today's*
   /// prices rather than what it cost last time.
+  /// What this customer orders, in words rather than row numbers.
+  ///
+  /// The screen used to print the raw ids — "Drink #4, size #2" — which is
+  /// what the rows actually hold and no use at all to somebody trying to
+  /// remember what a regular drinks. The repository already knew how to put
+  /// a pattern into words for "the usual"; this is the same thing for the
+  /// whole list.
+  ///
+  /// A pattern whose drink or size has since been removed from the menu is
+  /// left out: there is no honest way to name it any more.
+  @override
+  Future<List<UsualOrder>> favouritesFor(
+    int customerId, {
+    int limit = 8,
+  }) async {
+    final List<CustomerOrderPattern> patterns = await patternsFor(customerId);
+    final int? saved = (await byId(customerId))?.savedUsualPatternId;
+
+    final List<UsualOrder> described = <UsualOrder>[];
+    for (final CustomerOrderPattern pattern in patterns) {
+      if (described.length >= limit) break;
+      final UsualOrder? one = await _describe(
+        pattern,
+        isSaved: pattern.id == saved,
+      );
+      if (one != null) described.add(one);
+    }
+    return described;
+  }
+
   Future<UsualOrder?> _describe(
     CustomerOrderPattern pattern, {
     required bool isSaved,

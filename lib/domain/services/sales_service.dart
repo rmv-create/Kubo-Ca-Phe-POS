@@ -853,6 +853,51 @@ class SalesService {
     return (rows.first['m'] as int?) ?? 0;
   }
 
+  /// An order's drinks, as the till would need them to ring it up again.
+  ///
+  /// The record keeps the *names* things had when they were sold, which is
+  /// what a receipt needs and no use for putting the order back on screen.
+  /// This reads the ids beside them.
+  ///
+  /// A drink or size since taken off the menu is left out rather than
+  /// guessed at, and the caller is told by the count coming back short.
+  Future<List<RepeatableLine>> drinksToRingAgain(int orderId) async {
+    final List<Map<String, Object?>> items = await _db.db.query(
+      'order_items',
+      columns: <String>['id', 'product_id', 'size_id', 'quantity'],
+      where: 'order_id = ?',
+      whereArgs: <Object?>[orderId],
+      orderBy: 'id',
+    );
+
+    final List<RepeatableLine> lines = <RepeatableLine>[];
+    for (final Map<String, Object?> item in items) {
+      final int? productId = item['product_id'] as int?;
+      final int? sizeId = item['size_id'] as int?;
+      if (productId == null || sizeId == null) continue;
+
+      final List<Map<String, Object?>> chosen = await _db.db.query(
+        'order_item_customizations',
+        columns: <String>['option_id'],
+        where: 'order_item_id = ? AND option_id IS NOT NULL',
+        whereArgs: <Object?>[item['id']],
+        orderBy: 'display_order',
+      );
+
+      lines.add(
+        RepeatableLine(
+          productId: productId,
+          sizeId: sizeId,
+          quantity: item['quantity']! as int,
+          optionIds: <int>[
+            for (final Map<String, Object?> o in chosen) o['option_id']! as int,
+          ],
+        ),
+      );
+    }
+    return lines;
+  }
+
   // ─────────────────────────────── deleting ───────────────────────────────
 
   /// Takes an order off the books altogether.

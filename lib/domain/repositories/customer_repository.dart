@@ -54,6 +54,10 @@ abstract class CustomerRepository {
 
   Future<List<CustomerOrderPattern>> patternsFor(int customerId);
 
+  /// The same patterns in words — the drink, the size, what was in it —
+  /// rather than the row numbers behind them.
+  Future<List<UsualOrder>> favouritesFor(int customerId, {int limit});
+
   /// Pins one pattern as the customer's usual. Always an explicit act.
   Future<void> saveUsual({required int customerId, required int patternId});
 

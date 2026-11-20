@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../app/providers.dart';
+import '../../../app/router.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../domain/entities/menu.dart';
 import '../../../domain/entities/order_draft.dart';
 import '../../../domain/entities/reporting.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/money_text.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../../menu/state/menu_actions.dart';
+import '../../pos/presentation/customer_sheet.dart';
+import '../../pos/state/cart_controller.dart';
 import '../../receipts/presentation/name_this_order_sheet.dart';
 import '../../receipts/presentation/receipt_screen.dart';
 
@@ -359,6 +364,22 @@ class OrderDetailScreen extends ConsumerWidget {
               // of pressing buttons to learn the app. Offered on a voided
               // order too, because that is what most of them will be by the
               // time she decides they should not be there at all.
+              if (!order.isVoided && !order.isRefunded) ...<Widget>[
+                const SectionHeader('Change it'),
+                ListTile(
+                  leading: Icon(
+                    Icons.edit_outlined,
+                    color: theme.colorScheme.secondary,
+                  ),
+                  title: const Text('Change this order'),
+                  subtitle: const Text(
+                    'They changed their mind. The drinks come back onto the '
+                    'order screen to be put right, and this one is voided — '
+                    'so the ingredients go back and it stops counting.',
+                  ),
+                  onTap: () => _changeOrder(context, ref, order),
+                ),
+              ],
               if (!order.isRefunded) ...<Widget>[
                 const SectionHeader('Remove it'),
                 ListTile(
@@ -538,6 +559,148 @@ class OrderDetailScreen extends ConsumerWidget {
         ..clearSnackBars()
         ..showSnackBar(SnackBar(content: Text(error.message)));
     }
+  }
+
+  /// Puts a finished order back on the order screen to be put right.
+  ///
+  /// A sale is a record of something that happened, and the two phones
+  /// agree with each other precisely because those records are written once
+  /// and never altered. Editing one in place would have no answer to the
+  /// obvious question — what if both phones edit the same order — and would
+  /// quietly rewrite a day she has already closed.
+  ///
+  /// So the order is not edited. It is voided, which puts the ingredients
+  /// back and stops it counting, and its drinks are handed to the till for
+  /// her to change and ring up again. That is what a counter does when
+  /// somebody changes their mind after paying, and it leaves both the old
+  /// order and the new one on the record saying what really happened.
+  Future<void> _changeOrder(
+    BuildContext context,
+    WidgetRef ref,
+    OrderRecord order,
+  ) async {
+    final bool sure =
+        await showDialog<bool>(
+          context: context,
+          builder: (BuildContext context) => AlertDialog(
+            title: Text('Change ${order.orderNo}?'),
+            content: Text(
+              'Its ${order.itemCount} '
+              'drink${order.itemCount == 1 ? '' : 's'} go back onto the '
+              'order screen for you to change.\n\n'
+              '${order.orderNo} is voided: the ingredients return to the '
+              'shelf and it stops counting. What you ring up next takes '
+              'its place, with its own number.'
+              '${order.isUnpaid ? '' : '\n\nThis one was paid. Settle any '
+                        'difference with the customer yourself.'}',
+            ),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Leave it'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Change it'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!sure || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final List<RepeatableLine> lines = await ref
+        .read(salesServiceProvider)
+        .drinksToRingAgain(order.id);
+
+    if (lines.isEmpty) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Those drinks are no longer on the menu, so the order cannot '
+              'be put back on screen.',
+            ),
+          ),
+        );
+      return;
+    }
+    if (!context.mounted) return;
+
+    // Everything is put in the cart before anything is voided: if a drink
+    // has gone from the menu since, she is left with the order she had
+    // rather than with neither.
+    final CartController cart = ref.read(cartProvider.notifier);
+    cart.clear();
+    int carried = 0;
+    for (final RepeatableLine line in lines) {
+      final Product? product = await ref
+          .read(menuRepositoryProvider)
+          .productById(line.productId);
+      final ProductSize? size = product?.sizes
+          .where((ProductSize s) => s.size.id == line.sizeId)
+          .firstOrNull;
+      if (product == null || size == null) continue;
+
+      cart.addItem(
+        product: product,
+        size: size,
+        quantity: line.quantity,
+        options: await resolveOptions(
+          ref,
+          productId: product.id,
+          sizeId: size.size.id,
+          optionIds: line.optionIds,
+        ),
+      );
+      carried++;
+    }
+
+    if (carried == 0) {
+      cart.clear();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          const SnackBar(
+            content: Text('None of those drinks are on the menu any more.'),
+          ),
+        );
+      return;
+    }
+
+    if (order.customerId != null) {
+      cart.setCustomer(
+        await ref.read(customerRepositoryProvider).byId(order.customerId!),
+      );
+    }
+
+    try {
+      await ref
+          .read(salesServiceProvider)
+          .voidOrder(orderId: order.id, reason: 'Changed by the owner');
+      ref.read(salesRevisionProvider.notifier).bump();
+      ref.read(stockRevisionProvider.notifier).bump();
+    } on AppException catch (error) {
+      cart.clear();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+      return;
+    }
+
+    if (!context.mounted) return;
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(
+        SnackBar(
+          content: Text(
+            '${order.orderNo} voided \u2014 change the order and complete it',
+          ),
+        ),
+      );
+    context.go(Routes.pos);
   }
 
   /// Removes an order that should never have been on the books.

@@ -394,6 +394,14 @@ final FutureProviderFamily<Customer?, int> customerByIdProvider =
       return ref.watch(customerRepositoryProvider).byId(id);
     });
 
+/// What a customer orders, in words.
+final FutureProviderFamily<List<UsualOrder>, int> favouritesProvider =
+    FutureProvider.family<List<UsualOrder>, int>((Ref ref, int customerId) {
+      ref.watch(salesRevisionProvider);
+      ref.watch(customerRevisionProvider);
+      return ref.watch(customerRepositoryProvider).favouritesFor(customerId);
+    });
+
 /// The customers she has archived, for putting one back.
 final FutureProvider<List<Customer>> archivedCustomersProvider =
     FutureProvider<List<Customer>>((Ref ref) {

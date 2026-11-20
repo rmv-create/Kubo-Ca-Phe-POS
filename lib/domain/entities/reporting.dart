@@ -462,3 +462,22 @@ class ReportPeriod {
 }
 
 enum ReportPeriodKind { day, month, between, everything }
+
+/// One drink of a past order, in the terms the till rings orders up in.
+///
+/// The order itself keeps the names things had when they were sold; this is
+/// the same drink said in ids, so it can be put back on the order screen.
+@immutable
+class RepeatableLine {
+  const RepeatableLine({
+    required this.productId,
+    required this.sizeId,
+    required this.quantity,
+    required this.optionIds,
+  });
+
+  final int productId;
+  final int sizeId;
+  final int quantity;
+  final List<int> optionIds;
+}

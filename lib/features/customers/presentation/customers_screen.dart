@@ -712,42 +712,42 @@ class _Patterns extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(salesRevisionProvider);
-    return FutureBuilder<List<CustomerOrderPattern>>(
-      future: ref.watch(customerRepositoryProvider).patternsFor(customerId),
-      builder:
-          (
-            BuildContext context,
-            AsyncSnapshot<List<CustomerOrderPattern>> snapshot,
-          ) {
-            final List<CustomerOrderPattern> patterns =
-                snapshot.data ?? <CustomerOrderPattern>[];
-            if (patterns.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
-                child: Text(
-                  'Nothing yet.',
-                  style: Theme.of(context).textTheme.bodySmall,
+    return AsyncView<List<UsualOrder>>(
+      value: ref.watch(favouritesProvider(customerId)),
+      builder: (BuildContext context, List<UsualOrder> favourites) {
+        if (favourites.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
+            child: Text(
+              'Nothing yet.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          );
+        }
+        return Column(
+          children: <Widget>[
+            for (final UsualOrder u in favourites)
+              ListTile(
+                dense: true,
+                leading: Text(
+                  '${u.pattern.occurrenceCount}×',
+                  style: Theme.of(context).textTheme.titleSmall,
                 ),
-              );
-            }
-            return Column(
-              children: <Widget>[
-                for (final CustomerOrderPattern p in patterns.take(8))
-                  ListTile(
-                    dense: true,
-                    leading: Text(
-                      '${p.occurrenceCount}×',
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    title: Text('Drink #${p.productId}, size #${p.sizeId}'),
-                    subtitle: Text(
-                      'Last ordered '
-                      '${p.lastOrderedAt.toLocal().toString().substring(0, 10)}',
-                    ),
-                  ),
-              ],
-            );
-          },
+                // The drink and the size, as she would say it over the
+                // counter, with whatever was in it underneath.
+                title: Text(u.title),
+                subtitle: Text(
+                  <String>[
+                    if (u.subtitle.isNotEmpty) u.subtitle,
+                    'Last ordered '
+                        '${u.pattern.lastOrderedAt.toLocal().toString().substring(0, 10)}',
+                  ].join(' · '),
+                ),
+                trailing: MoneyText(u.price),
+              ),
+          ],
+        );
+      },
     );
   }
 }
