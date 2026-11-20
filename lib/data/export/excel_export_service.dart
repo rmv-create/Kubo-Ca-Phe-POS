@@ -466,7 +466,12 @@ class ExcelExportService {
     final List<(String, CellValue)> rows = <(String, CellValue)>[
       ('Orders', IntCellValue(s.orderCount)),
       ('Drinks', IntCellValue(s.drinkCount)),
-      ('Revenue', _money(s.revenue)),
+      // Two lines, never one. The delivery fare goes straight to the rider,
+      // so adding it to the sales would show her earning money that only
+      // passed through her hands.
+      ('Sales', _money(s.salesRevenue)),
+      ('Delivery collected', _money(s.deliveryCollected)),
+      ('Taken altogether', _money(s.revenue)),
       for (final MapEntry<String, Money> m in s.byMethod.entries)
         (_methodName(m.key), _money(m.value)),
       ('Cost of goods sold', _money(s.cogs)),

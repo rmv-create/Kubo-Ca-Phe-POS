@@ -187,11 +187,22 @@ class SummaryCard extends StatelessWidget {
       children: <Widget>[
         _StatRow(label: 'Orders', value: '${summary.orderCount}'),
         _StatRow(label: 'Drinks', value: '${summary.drinkCount}'),
+        // The coffee money and the rider's money are two different things.
+        // She pays the rider directly, so the fare passes through her hands
+        // and does not stop there: showing them added together was telling
+        // her she had earned money that was never hers.
         _StatRow(
-          label: 'Revenue',
-          value: summary.revenue.format(),
+          label: 'Sales',
+          value: summary.salesRevenue.format(),
           emphasise: true,
         ),
+        if (summary.deliveryCollected.isPositive) ...<Widget>[
+          _StatRow(
+            label: 'Delivery collected',
+            value: summary.deliveryCollected.format(),
+          ),
+          _StatRow(label: 'Taken altogether', value: summary.revenue.format()),
+        ],
         for (final MapEntry<String, Money> row
             in summary.byMethod.entries.toList()..sort(
               (MapEntry<String, Money> a, MapEntry<String, Money> b) =>

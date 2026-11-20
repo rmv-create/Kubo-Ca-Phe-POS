@@ -147,7 +147,10 @@ class BusinessReportService {
       '''
       SELECT strftime('%H', o.created_at, 'localtime') AS bucket,
              COUNT(*) AS orders,
-             IFNULL(SUM(o.total_centavos), 0) AS revenue
+             -- The coffee, not the rider's fare: an hour is not busier
+             -- because the drinks in it happened to be delivered.
+             IFNULL(SUM(o.total_centavos - o.delivery_fee_centavos), 0)
+               AS revenue
       FROM orders o
       WHERE o.status = 'completed' AND o.business_date LIKE ?
       GROUP BY bucket ORDER BY bucket
@@ -179,7 +182,10 @@ class BusinessReportService {
       '''
       SELECT strftime('%w', o.business_date) AS bucket,
              COUNT(*) AS orders,
-             IFNULL(SUM(o.total_centavos), 0) AS revenue
+             -- The coffee, not the rider's fare: an hour is not busier
+             -- because the drinks in it happened to be delivered.
+             IFNULL(SUM(o.total_centavos - o.delivery_fee_centavos), 0)
+               AS revenue
       FROM orders o
       WHERE o.status = 'completed' AND o.business_date LIKE ?
       GROUP BY bucket ORDER BY bucket

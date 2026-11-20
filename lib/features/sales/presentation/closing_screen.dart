@@ -359,7 +359,8 @@ class _RecentClosings extends ConsumerWidget {
                     title: Text(c.businessDate),
                     subtitle: Text(
                       '${c.summary.orderCount} orders · '
-                      '${c.summary.revenue.format()} · '
+                      // The coffee, not the rider's fare on top of it.
+                      '${c.summary.salesRevenue.format()} · '
                       'margin ${c.summary.marginLabel}',
                     ),
                   ),

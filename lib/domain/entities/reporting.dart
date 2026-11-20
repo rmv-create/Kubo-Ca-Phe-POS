@@ -303,15 +303,28 @@ class SalesSummary {
       ? cash + gcash
       : byMethod.values.fold(Money.zero, (Money a, Money b) => a + b);
 
-  Money get netRevenue => revenue - refunds;
+  /// What the coffee earned, less what was given back.
+  ///
+  /// Delivery is out of here for the same reason it is out of
+  /// [salesRevenue]: the rider's money passes through her hands and does
+  /// not stop there.
+  Money get netRevenue => salesRevenue - refunds;
 
+  /// What an order was worth to her on average — the coffee in it, not
+  /// the rider's fare on top. Two identical orders, one delivered, should
+  /// not read as the larger sale.
   Money get averageOrderValue =>
-      orderCount == 0 ? Money.zero : Money(revenue.centavos ~/ orderCount);
+      orderCount == 0 ? Money.zero : Money(salesRevenue.centavos ~/ orderCount);
 
   /// Basis points; null when there is nothing to divide by.
+  ///
+  /// Measured against the coffee alone. Gross profit already excludes the
+  /// delivery fee, so dividing by a revenue that includes it was comparing
+  /// two different things and quietly understating every margin in the app
+  /// by whatever the rider charged.
   int? get grossMarginBasisPoints {
-    if (revenue.isZero) return null;
-    return (grossProfit.centavos * 10000) ~/ revenue.centavos;
+    if (salesRevenue.isZero) return null;
+    return (grossProfit.centavos * 10000) ~/ salesRevenue.centavos;
   }
 
   String get marginLabel {
