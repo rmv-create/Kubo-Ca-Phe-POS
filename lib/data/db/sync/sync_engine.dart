@@ -114,10 +114,41 @@ class SyncEngine {
       orderBy: 'id',
       limit: limit,
     );
+    if (queued.isEmpty) return const <SyncChange>[];
 
-    final List<SyncChange> changes = <SyncChange>[];
+    // Which uid each queued row has, one question per table rather than one
+    // per row. Ten orders queue a hundred changes; asking a hundred times
+    // over was most of the time a round took, and on a phone's browser every
+    // question is a message to the database and back.
+    final Map<String, Set<int>> rowIds = <String, Set<int>>{};
+    for (final Map<String, Object?> entry in queued) {
+      if (entry['op'] == 'delete') continue;
+      final int? rowId = entry['row_id'] as int?;
+      if (rowId == null) continue;
+      (rowIds[entry['table_name']! as String] ??= <int>{}).add(rowId);
+    }
+    final Map<String, Map<int, String>> uids = <String, Map<int, String>>{};
+    for (final MapEntry<String, Set<int>> wanted in rowIds.entries) {
+      final Map<int, String> found = <int, String>{};
+      for (final List<int> some in _inHandfuls(wanted.value.toList())) {
+        // rowid rather than id: app_settings is keyed by its name, and has
+        // no id column, but every table has a rowid.
+        final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+          'SELECT rowid AS rid, uid FROM ${wanted.key} '
+          'WHERE rowid IN (${_holes(some.length)})',
+          some,
+        );
+        for (final Map<String, Object?> row in rows) {
+          final String? uid = row['uid'] as String?;
+          if (uid != null) found[row['rid']! as int] = uid;
+        }
+      }
+      uids[wanted.key] = found;
+    }
+
+    // Newest first, so the last word on a row is the one that travels.
+    final List<_Queued> travelling = <_Queued>[];
     final Set<String> seen = <String>{};
-
     for (final Map<String, Object?> entry in queued.reversed) {
       final String table = entry['table_name']! as String;
       final String op = entry['op']! as String;
@@ -125,50 +156,89 @@ class SyncEngine {
 
       final String? uid = op == 'delete'
           ? entry['row_uid'] as String?
-          : await _uidOfRow(table, rowId);
+          : (rowId == null ? null : uids[table]?[rowId]);
       // A row inserted and then deleted before any of this went out has
       // nothing left to send, and nothing anywhere else to delete.
       if (uid == null) continue;
-
-      // Newest first, so the last word on a row is the one that travels.
       if (!seen.add('$table/$uid')) continue;
 
-      if (op == 'delete') {
+      travelling.add(
+        _Queued(
+          id: entry['id']! as int,
+          table: table,
+          uid: uid,
+          at: entry['at']! as String,
+          isDelete: op == 'delete',
+        ),
+      );
+    }
+
+    // And the rows themselves, again one question per table.
+    final Map<String, Set<String>> needed = <String, Set<String>>{};
+    for (final _Queued q in travelling) {
+      if (q.isDelete) continue;
+      (needed[q.table] ??= <String>{}).add(q.uid);
+    }
+    final Map<String, Map<String, Map<String, Object?>>> bodies =
+        <String, Map<String, Map<String, Object?>>>{};
+    for (final MapEntry<String, Set<String>> wanted in needed.entries) {
+      final Map<String, Map<String, Object?>> found =
+          <String, Map<String, Object?>>{};
+      for (final List<String> some in _inHandfuls(wanted.value.toList())) {
+        final List<Map<String, Object?>> rows = await _db.db.query(
+          wanted.key,
+          where: 'uid IN (${_holes(some.length)})',
+          whereArgs: some,
+        );
+        for (final Map<String, Object?> row in rows) {
+          found[row['uid']! as String] = row;
+        }
+      }
+      bodies[wanted.key] = found;
+    }
+
+    final List<SyncChange> changes = <SyncChange>[];
+    for (final _Queued q in travelling) {
+      if (q.isDelete) {
         changes.add(
           SyncChange(
-            changeId: '$device:${entry['id']}',
+            changeId: '$device:${q.id}',
             deviceId: device,
-            table: table,
-            rowUid: uid,
+            table: q.table,
+            rowUid: q.uid,
             op: SyncOp.delete,
-            at: entry['at']! as String,
+            at: q.at,
           ),
         );
         continue;
       }
 
-      final List<Map<String, Object?>> rows = await _db.db.query(
-        table,
-        where: 'uid = ?',
-        whereArgs: <Object?>[uid],
-        limit: 1,
-      );
-      if (rows.isEmpty) continue;
+      final Map<String, Object?>? row = bodies[q.table]?[q.uid];
+      if (row == null) continue;
 
       changes.add(
         SyncChange(
-          changeId: '$device:${entry['id']}',
+          changeId: '$device:${q.id}',
           deviceId: device,
-          table: table,
-          rowUid: uid,
+          table: q.table,
+          rowUid: q.uid,
           op: SyncOp.upsert,
-          at: entry['at']! as String,
-          data: await _codec.encode(table, rows.first),
+          at: q.at,
+          data: await _codec.encode(q.table, row),
         ),
       );
     }
     return changes.reversed.toList();
   }
+
+  /// Splits a list into lengths SQLite will take as query arguments.
+  static Iterable<List<T>> _inHandfuls<T>(List<T> all, {int of = 200}) =>
+      <List<T>>[
+        for (int i = 0; i < all.length; i += of)
+          all.sublist(i, i + of > all.length ? all.length : i + of),
+      ];
+
+  static String _holes(int count) => List<String>.filled(count, '?').join(',');
 
   /// Marks everything up to and including [throughId] as told.
   Future<void> markSent(List<SyncChange> sent) async {
@@ -207,14 +277,23 @@ class SyncEngine {
     int known = 0;
     int older = 0;
 
+    // Which of these we have taken in before, asked once for the whole
+    // batch. Asking per change — and again on every pass over what is
+    // waiting for its parent — was the single biggest part of taking a
+    // round in, and on a phone's browser each ask is a message to the
+    // database and back.
+    _taken = await _alreadyTakenAmong(<String>[
+      for (final SyncChange change in incoming) change.changeId,
+    ]);
+
     // Nothing that arrives from elsewhere is told back to the others: they
     // each hear it from the till it happened on.
     final int echoFrom = await _highestOutboxId();
 
-    List<SyncChange> pending = <SyncChange>[
+    List<SyncChange> pending = _parentsFirst(<SyncChange>[
       for (final SyncChange change in incoming)
         if (change.deviceId != me) change,
-    ];
+    ], await _applicationOrder());
 
     while (pending.isNotEmpty) {
       final List<SyncChange> deferred = <SyncChange>[];
@@ -244,6 +323,7 @@ class SyncEngine {
       pending = deferred;
     }
 
+    _taken = null;
     await _suppressEcho(echoFrom);
     if (applied > 0) await rebuildStock();
 
@@ -253,6 +333,82 @@ class SyncEngine {
       waitingForParent: pending.length,
       ignoredAsOlder: older,
     );
+  }
+
+  /// The same changes, in an order that does not make them wait on each
+  /// other.
+  ///
+  /// An order's own row travels *after* its lines, because finishing a sale
+  /// writes the order, then its lines and its stock movements, and then goes
+  /// back and writes the order's cost of goods — and it is that last word
+  /// that travels. Applied in the order they were written, every line and
+  /// every movement arrives before the order it belongs to, is held back as
+  /// an orphan, and has to be tried again on a second pass: twice the work,
+  /// every round, and on a phone's browser that is felt.
+  ///
+  /// So they are applied in an order that respects what points at what,
+  /// while leaving two changes to the same row in the order they arrived —
+  /// there the later one really is the last word.
+  static List<SyncChange> _parentsFirst(
+    List<SyncChange> changes,
+    Map<String, int> ranks,
+  ) {
+    final List<int> order = <int>[for (int i = 0; i < changes.length; i++) i];
+    final int last = ranks.length;
+    order.sort((int a, int b) {
+      final int byTable =
+          (ranks[changes[a].table] ?? last) - (ranks[changes[b].table] ?? last);
+      return byTable != 0 ? byTable : a - b;
+    });
+    return <SyncChange>[for (final int i in order) changes[i]];
+  }
+
+  static Map<String, int>? _ranks;
+
+  /// How deep each table sits in the web of pointers: nothing is applied
+  /// before the rows it points at.
+  ///
+  /// Read from the database's own foreign keys rather than written down
+  /// here, for the same reason the codec reads them — a table that gains a
+  /// reference later cannot be forgotten about. Worked out once and kept,
+  /// because the schema does not change while the app is running.
+  Future<Map<String, int>> _applicationOrder() async {
+    final Map<String, int>? known = _ranks;
+    if (known != null) return known;
+
+    final Map<String, Set<String>> pointsAt = <String, Set<String>>{};
+    for (final SyncedTable table in syncedTables) {
+      final Map<String, String> references = await _codec.referencesOf(
+        table.name,
+      );
+      pointsAt[table.name] = <String>{
+        for (final String target in references.values)
+          if (target != table.name && _byName.containsKey(target)) target,
+      };
+    }
+
+    final Map<String, int> depth = <String, int>{};
+    final Set<String> working = <String>{};
+
+    int depthOf(String table) {
+      final int? settled = depth[table];
+      if (settled != null) return settled;
+      // A cycle cannot be ordered, so it is left where it is rather than
+      // sending this looking for itself for ever.
+      if (!working.add(table)) return 0;
+      int deepest = 0;
+      for (final String target in pointsAt[table] ?? const <String>{}) {
+        final int below = depthOf(target) + 1;
+        if (below > deepest) deepest = below;
+      }
+      working.remove(table);
+      return depth[table] = deepest;
+    }
+
+    for (final SyncedTable table in syncedTables) {
+      depthOf(table.name);
+    }
+    return _ranks = depth;
   }
 
   Future<_Outcome> _applyOne(SyncChange change) async {
@@ -295,10 +451,16 @@ class SyncEngine {
       return _Outcome.applied;
     }
 
+    final bool correcting =
+        existing.isNotEmpty && _isACorrection(change, existing.first);
+
     if (existing.isNotEmpty) {
       switch (table.kind) {
-        // It happened once. The first telling stands.
+        // It happened once. The first telling stands — unless the owner has
+        // since put the order right, which is the one correction a sale
+        // accepts. Then the later correction stands, on both phones.
         case SyncKind.event:
+          if (correcting) break;
           await _remember(change);
           return _Outcome.alreadyKnown;
         // Rebuilt from the events, never taken from the wire.
@@ -349,7 +511,12 @@ class SyncEngine {
       try {
         await _db.db.update(
           change.table,
-          row,
+          // A corrected order keeps the number this till gave it. Two
+          // tills that had to tell two orders apart by their numbers must
+          // not have one of them handed back. Everything else about the
+          // order — including which day it belongs to, which the owner can
+          // also put right — is the correction's business.
+          correcting ? _withoutIdentity(row) : row,
           where: 'uid = ?',
           whereArgs: <Object?>[change.rowUid],
         );
@@ -368,6 +535,26 @@ class SyncEngine {
   ///
   /// It depends entirely on what kind of row it is, and getting that wrong
   /// is how two separate sales were merged into one.
+  /// An order's row, without the number that says which order it is.
+  static Map<String, Object?> _withoutIdentity(Map<String, Object?> row) =>
+      <String, Object?>{
+        for (final MapEntry<String, Object?> cell in row.entries)
+          if (!_identity.contains(cell.key)) cell.key: cell.value,
+      };
+
+  static const Set<String> _identity = <String>{'order_no', 'sequence_no'};
+
+  /// Whether an order we already have has been corrected since.
+  ///
+  /// Only orders, and only forwards: an order with no correction on it, or
+  /// with an older one than ours, is left exactly as it is.
+  static bool _isACorrection(SyncChange change, Map<String, Object?> mine) {
+    if (change.table != 'orders') return false;
+    final String theirs = change.data['edited_at'] as String? ?? '';
+    if (theirs.isEmpty) return false;
+    return theirs.compareTo(mine['edited_at'] as String? ?? '') > 0;
+  }
+
   Future<_Outcome> _settleClash(
     SyncChange change,
     Map<String, Object?> row,
@@ -521,6 +708,9 @@ class SyncEngine {
         'UPDATE $table SET uid = ? WHERE rowid = ?',
         <Object?>[uid, found.first['rid']],
       );
+      // This row answers to a different name now, so anything already
+      // worked out about which uid points where is no longer safe to reuse.
+      _codec.forgetPointers();
       return true;
     }
     return false;
@@ -594,16 +784,14 @@ class SyncEngine {
     await const MovingAverageCost().rebuildAll(_db.db);
   }
 
-  Future<String?> _uidOfRow(String table, int? rowId) async {
-    if (rowId == null) return null;
-    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
-      'SELECT uid FROM $table WHERE rowid = ?',
-      <Object?>[rowId],
-    );
-    return rows.isEmpty ? null : rows.first['uid'] as String?;
-  }
+  /// What this batch of changes has already been through, if a round is
+  /// under way. Null when one change is being applied on its own.
+  Set<String>? _taken;
 
   Future<bool> _alreadyTaken(String changeId) async {
+    final Set<String>? batch = _taken;
+    if (batch != null) return batch.contains(changeId);
+
     final List<Map<String, Object?>> rows = await _db.db.query(
       'sync_inbox',
       columns: <String>['id'],
@@ -614,7 +802,25 @@ class SyncEngine {
     return rows.isNotEmpty;
   }
 
+  /// Which of [ids] are in the inbox already, in as few questions as
+  /// SQLite will take arguments for.
+  Future<Set<String>> _alreadyTakenAmong(List<String> ids) async {
+    final Set<String> found = <String>{};
+    for (final List<String> some in _inHandfuls(ids)) {
+      final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+        'SELECT change_id FROM sync_inbox '
+        'WHERE change_id IN (${_holes(some.length)})',
+        some,
+      );
+      for (final Map<String, Object?> row in rows) {
+        found.add(row['change_id']! as String);
+      }
+    }
+    return found;
+  }
+
   Future<void> _remember(SyncChange change) async {
+    _taken?.add(change.changeId);
     await _db.db.insert('sync_inbox', <String, Object?>{
       'change_id': change.changeId,
       'device_id': change.deviceId,
@@ -644,3 +850,20 @@ class SyncEngine {
 }
 
 enum _Outcome { applied, alreadyKnown, older, waiting }
+
+/// One queued change, once it is known what it is about.
+class _Queued {
+  const _Queued({
+    required this.id,
+    required this.table,
+    required this.uid,
+    required this.at,
+    required this.isDelete,
+  });
+
+  final int id;
+  final String table;
+  final String uid;
+  final String at;
+  final bool isDelete;
+}

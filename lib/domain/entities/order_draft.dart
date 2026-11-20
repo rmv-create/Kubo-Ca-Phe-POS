@@ -245,6 +245,8 @@ class OrderDraft {
     this.deliveryFee = Money.zero,
     this.unpaid = false,
     this.note,
+    this.revisingOrderId,
+    this.revisingOrderNo,
   });
 
   /// Null means a guest. A sale is never blocked on a customer.
@@ -293,6 +295,20 @@ class OrderDraft {
   /// Whatever she wants on this one order: "leave at the gate", "for Tita's
   /// birthday", "no straw". Printed on the receipt, kept with the order.
   final String? note;
+
+  /// Set when this is a finished order being changed rather than a new one.
+  ///
+  /// The customer came back and asked for another drink, or a different
+  /// size, after the order was already marked complete. The order keeps its
+  /// number and its date — it is still the same sale — so the till needs to
+  /// know to put this back over the top of it rather than ring up a second
+  /// one.
+  final int? revisingOrderId;
+
+  /// The number of the order being changed, for the top of the screen.
+  final String? revisingOrderNo;
+
+  bool get isRevising => revisingOrderId != null;
 
   bool get isEmpty => items.isEmpty;
 
@@ -364,6 +380,8 @@ class OrderDraft {
     bool? unpaid,
     String? note,
     bool clearNote = false,
+    int? revisingOrderId,
+    String? revisingOrderNo,
   }) => OrderDraft(
     customer: clearCustomer ? null : (customer ?? this.customer),
     items: items ?? this.items,
@@ -392,6 +410,8 @@ class OrderDraft {
     deliveryFee: deliveryFee ?? this.deliveryFee,
     unpaid: unpaid ?? this.unpaid,
     note: clearNote ? null : (note ?? this.note),
+    revisingOrderId: revisingOrderId ?? this.revisingOrderId,
+    revisingOrderNo: revisingOrderNo ?? this.revisingOrderNo,
   );
 }
 

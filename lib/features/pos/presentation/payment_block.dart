@@ -171,7 +171,9 @@ class _PaymentChoicesState extends ConsumerState<PaymentChoices> {
                   )
                 : Text(
                     draft.whyNotComplete() ??
-                        (draft.unpaid
+                        (draft.isRevising
+                            ? 'SAVE ${draft.revisingOrderNo}'
+                            : draft.unpaid
                             ? 'COMPLETE · NOT PAID YET'
                             : 'COMPLETE ORDER'),
                   ),
@@ -188,15 +190,28 @@ class _PaymentChoicesState extends ConsumerState<PaymentChoices> {
     final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
     final NavigatorState navigator = Navigator.of(context);
     try {
-      final CompletedOrder order = await ref
-          .read(orderServiceProvider)
-          .complete(
-            ref.read(cartProvider),
-            settings: ref.read(settingsControllerProvider),
-            takenByUserId: ref.read(signedInUserProvider)?.id,
-          );
+      final OrderDraft draft = ref.read(cartProvider);
+      final int? revising = draft.revisingOrderId;
+      // Changing an order she has already finished writes over it: same
+      // number, same date, new contents. Anything else is a new sale.
+      final CompletedOrder order = revising == null
+          ? await ref
+                .read(orderServiceProvider)
+                .complete(
+                  draft,
+                  settings: ref.read(settingsControllerProvider),
+                  takenByUserId: ref.read(signedInUserProvider)?.id,
+                )
+          : await ref
+                .read(orderServiceProvider)
+                .revise(
+                  orderId: revising,
+                  draft: draft,
+                  settings: ref.read(settingsControllerProvider),
+                );
       ref.read(cartProvider.notifier).clear();
       ref.read(salesRevisionProvider.notifier).bump();
+      ref.read(stockRevisionProvider.notifier).bump();
       widget.onCompleted?.call();
       messenger
         ..clearSnackBars()
@@ -204,7 +219,8 @@ class _PaymentChoicesState extends ConsumerState<PaymentChoices> {
           SnackBar(
             duration: const Duration(seconds: 4),
             content: Text(
-              '${order.orderNo} · ${order.total.format()} · '
+              '${order.orderNo}${revising == null ? '' : ' changed'} · '
+              '${order.total.format()} · '
               '${order.paymentMethod?.label ?? 'awaiting payment'}',
             ),
             action: SnackBarAction(

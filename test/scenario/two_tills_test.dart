@@ -285,6 +285,72 @@ void main() {
       expect(await herSync.pendingCount(), 0);
     });
   });
+
+  group('an order put right afterwards', () {
+    test('the correction reaches the other till', () async {
+      final CompletedOrder sold = await sell(her, 'Spanish Latte');
+      await push(herSync, baristaSync);
+
+      // The customer asks for a second one, after it was marked complete.
+      await her.orders.revise(
+        orderId: sold.id,
+        draft: OrderDraft(
+          items: <DraftItem>[
+            await her.item('Spanish Latte', 'Large', quantity: 2),
+          ],
+          paymentMethod: PaymentMethod.cash,
+        ),
+        settings: her.settings,
+      );
+      await push(herSync, baristaSync);
+
+      final OrderRecord theirs = (await barista.sales.orders()).single;
+      final OrderRecord mine = (await her.sales.orders()).single;
+      expect(theirs.orderNo, sold.orderNo, reason: 'still the same order');
+      expect(theirs.itemCount, 2);
+      expect(theirs.total, mine.total);
+      expect(theirs.lines.single.quantity, 2);
+    });
+
+    test('a corrected order is still one sale on both phones', () async {
+      final CompletedOrder sold = await sell(her, 'Spanish Latte');
+      await her.orders.revise(
+        orderId: sold.id,
+        draft: OrderDraft(
+          items: <DraftItem>[await her.item('Iced Black', 'Large')],
+          paymentMethod: PaymentMethod.cash,
+        ),
+        settings: her.settings,
+      );
+      await push(herSync, baristaSync);
+
+      expect((await barista.sales.orders()).length, 1);
+      expect(await barista.countOf('order_voids'), 0);
+      expect(
+        (await barista.sales.orders()).single.lines.single.productName,
+        'Iced Black',
+      );
+    });
+
+    test('an uncorrected order is still written once', () async {
+      final CompletedOrder sold = await sell(her, 'Spanish Latte');
+      await push(herSync, baristaSync);
+
+      // The barista's phone is told the same order again — a batch replayed,
+      // or a cursor that went back. Nothing about it has changed, so
+      // nothing about it should move.
+      await her.db.db.update(
+        'orders',
+        <String, Object?>{'total_centavos': 1},
+        where: 'id = ?',
+        whereArgs: <Object?>[sold.id],
+      );
+      await herSync.enqueueEverything();
+      await push(herSync, baristaSync);
+
+      expect((await barista.sales.orders()).single.total.centavos, isNot(1));
+    });
+  });
 }
 
 /// Sets the second till up from the first one's export.

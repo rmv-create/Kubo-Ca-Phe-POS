@@ -14,10 +14,10 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 /// The whole data and business layer is testable without a simulator or a
 /// device, which is what makes it practical to keep the suite green on every
 /// commit.
-Future<AppDatabase> openTestDatabase() async {
+Future<AppDatabase> openTestDatabase({DatabaseFactory? factory}) async {
   sqfliteFfiInit();
   return AppDatabase.open(
-    factory: databaseFactoryFfi,
+    factory: factory ?? databaseFactoryFfi,
     path: inMemoryDatabasePath,
   );
 }
@@ -27,12 +27,12 @@ Future<AppDatabase> openTestDatabase() async {
 /// The ffi factory hands back the *same* connection for every in-memory
 /// open, so two shops that both asked for `:memory:` would be one shop —
 /// which is no way to test two tills.
-Future<AppDatabase> openSeparateTestDatabase() async {
+Future<AppDatabase> openSeparateTestDatabase({DatabaseFactory? factory}) async {
   sqfliteFfiInit();
   final Directory dir = await Directory.systemTemp.createTemp('kubo_till');
   addTearDown(() => dir.delete(recursive: true));
   return AppDatabase.open(
-    factory: databaseFactoryFfi,
+    factory: factory ?? databaseFactoryFfi,
     path: p.join(dir.path, 'kubo.db'),
   );
 }
@@ -117,10 +117,11 @@ const Set<String> expectedTables = <String>{
 Future<AppDatabase> openSeededDatabase({
   FixedClock? clock,
   bool separate = false,
+  DatabaseFactory? factory,
 }) async {
   final AppDatabase db = separate
-      ? await openSeparateTestDatabase()
-      : await openTestDatabase();
+      ? await openSeparateTestDatabase(factory: factory)
+      : await openTestDatabase(factory: factory);
   await MenuSeeder(db, clock ?? testClock()).seedIfEmpty();
   return db;
 }

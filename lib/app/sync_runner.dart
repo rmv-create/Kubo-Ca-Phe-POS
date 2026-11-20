@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/db/sync/cloud_sync_service.dart';
+import '../domain/entities/order_draft.dart';
+import '../features/pos/state/cart_controller.dart';
 import 'providers.dart';
 
 /// Keeps the tills level with each other, without anybody pressing
@@ -18,6 +20,13 @@ import 'providers.dart';
 ///    of it.
 ///  * **Every few minutes while it sits there**, for the till that is open
 ///    on the counter all afternoon taking nothing.
+///
+/// And one moment it deliberately stays out of: while there is an order on
+/// the screen. A round is a lot of reading and writing, and the database is
+/// one thing shared with the order she is taking — so if there are drinks
+/// in the order, the round waits for the sale to finish rather than making
+/// her wait for it. Nothing is lost by waiting: it goes a few seconds
+/// later, which is what a debounce is for.
 ///
 /// None of it blocks anything. A round that fails is written down and
 /// tried again; a till with no signal sells coffee all day and catches up
@@ -57,6 +66,14 @@ class SyncRunner {
     // One at a time. Two rounds at once would publish the same outbox rows
     // twice and race each other to move the cursor.
     if (_running) return;
+
+    // Never in front of a customer. An order on the screen means she is at
+    // the till, so the round is put off until she is between customers.
+    if (_sheIsServing) {
+      _afterOrder?.cancel();
+      _afterOrder = Timer(_settle, runNow);
+      return;
+    }
     _running = true;
     try {
       final CloudSyncService sync = await _ref.read(cloudSyncProvider.future);
@@ -68,6 +85,17 @@ class SyncRunner {
       // build, which is not a reason to interrupt anybody.
     } finally {
       _running = false;
+    }
+  }
+
+  /// Whether there is an order being taken right now.
+  bool get _sheIsServing {
+    try {
+      final OrderDraft draft = _ref.read(cartProvider);
+      return !draft.isEmpty;
+    } on Object {
+      // No till on screen at all — a background round is welcome.
+      return false;
     }
   }
 

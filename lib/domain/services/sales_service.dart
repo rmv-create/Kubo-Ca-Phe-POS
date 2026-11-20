@@ -786,8 +786,12 @@ class SalesService {
         'i.base_unit AS unit '
         'FROM inventory_movements m '
         'JOIN ingredients i ON i.id = m.ingredient_id '
-        "WHERE m.order_id = ? AND m.movement_type = 'sale' "
-        'GROUP BY m.ingredient_id',
+        // Every movement this order has caused, not only the sale: an
+        // order that was changed before being voided has already had part
+        // of it put back, and only what is still out comes back now.
+        'WHERE m.order_id = ? '
+        'GROUP BY m.ingredient_id '
+        'HAVING SUM(m.qty_milli_delta) <> 0',
         <Object?>[orderId],
       );
       final List<PendingMovement> movements = <PendingMovement>[];
@@ -837,6 +841,112 @@ class SalesService {
         'summary':
             '${order.orderNo} · ${order.total.format()} voided · '
             '${reason.trim()}',
+      });
+    });
+  }
+
+  /// Moves a finished order to another day.
+  ///
+  /// For the order rung up at six in the morning that was really last
+  /// night's, or the one entered the day after it was taken. The order keeps
+  /// its number, its drinks and its money; only the day it belongs to
+  /// changes, and with it which day's takings and which day's cost of goods
+  /// it lands in.
+  ///
+  /// The time of day is kept as it was, because that is what the order says
+  /// about when it was served, and the shop's own cutoff hour decides which
+  /// trading day the new date and that time fall in.
+  ///
+  /// Everything written with the order moves with it — the payment, the
+  /// stock that came off the shelf for it, the void or refund if it has one
+  /// — so no report is left with half a sale in it.
+  Future<void> changeOrderDate({
+    required int orderId,
+    required DateTime day,
+  }) async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'orders',
+      columns: <String>['order_no', 'created_at', 'business_date'],
+      where: 'id = ?',
+      whereArgs: <Object?>[orderId],
+      limit: 1,
+    );
+    if (rows.isEmpty) throw const NotFoundException('That order is gone.');
+
+    final String orderNo = rows.first['order_no']! as String;
+    final String wasDate = rows.first['business_date']! as String;
+    final DateTime wasAt = DateTime.parse(
+      rows.first['created_at']! as String,
+    ).toLocal();
+
+    // The same time of day, on the day she chose.
+    final DateTime moved = DateTime(
+      day.year,
+      day.month,
+      day.day,
+      wasAt.hour,
+      wasAt.minute,
+      wasAt.second,
+      wasAt.millisecond,
+    );
+    if (moved.isAfter(_clock.now())) {
+      throw const BusinessRuleException(
+        'That is in the future. An order can only be moved to a day the '
+        'shop has already traded.',
+      );
+    }
+
+    final String movedAt = moved.toUtc().toIso8601String();
+    final String movedDate = _businessDateOf(moved);
+    if (movedDate == wasDate) return;
+
+    final String now = _clock.now().toUtc().toIso8601String();
+
+    await _db.transaction((Transaction txn) async {
+      await txn.update(
+        'orders',
+        <String, Object?>{
+          'created_at': movedAt,
+          'business_date': movedDate,
+          // So the other till moves it too: an order is written once
+          // unless the owner has corrected it.
+          'edited_at': now,
+        },
+        where: 'id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+
+      // What came off the shelf for it belongs to the same day, or the
+      // day's cost of goods would answer for drinks counted elsewhere.
+      await txn.update(
+        'inventory_movements',
+        <String, Object?>{'business_date': movedDate},
+        where: 'order_id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+      await txn.update(
+        'payments',
+        <String, Object?>{'created_at': movedAt},
+        where: 'order_id = ?',
+        whereArgs: <Object?>[orderId],
+      );
+      for (final String table in <String>['refunds', 'order_voids']) {
+        await txn.update(
+          table,
+          <String, Object?>{'business_date': movedDate},
+          where: 'order_id = ?',
+          whereArgs: <Object?>[orderId],
+        );
+      }
+
+      await txn.insert('audit_log', <String, Object?>{
+        'actor': _who(),
+        'at': now,
+        'business_date': movedDate,
+        'action': 'order_date_changed',
+        'entity_type': 'order',
+        'entity_id': orderId,
+        'summary': '$orderNo moved from $wasDate to $movedDate',
       });
     });
   }

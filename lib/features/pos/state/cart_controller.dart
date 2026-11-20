@@ -226,6 +226,37 @@ class CartController extends Notifier<OrderDraft> {
   void clear() {
     state = const OrderDraft();
   }
+
+  /// Puts a finished order back on the screen to be changed.
+  ///
+  /// The order keeps its number and its date; pressing COMPLETE writes the
+  /// change over the top of it rather than ringing up a second sale.
+  void reviseOrder({
+    required int orderId,
+    required String orderNo,
+    required List<DraftItem> items,
+    Customer? customer,
+    PaymentMethod? paymentMethod,
+    Money deliveryFee = Money.zero,
+    bool unpaid = false,
+    String? note,
+  }) {
+    state = OrderDraft(
+      revisingOrderId: orderId,
+      revisingOrderNo: orderNo,
+      items: <DraftItem>[
+        for (final DraftItem item in items) item.duplicatedAs(_newLineId()),
+      ],
+      customer: customer,
+      paymentMethod: paymentMethod,
+      // Money that has already changed hands does not need confirming
+      // again; she is changing the drinks, not the payment.
+      paymentConfirmed: paymentMethod != null,
+      deliveryFee: deliveryFee,
+      unpaid: unpaid,
+      note: note,
+    );
+  }
 }
 
 final NotifierProvider<CartController, OrderDraft> cartProvider =

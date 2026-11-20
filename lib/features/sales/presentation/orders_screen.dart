@@ -6,6 +6,7 @@ import '../../../app/providers.dart';
 import '../../../app/router.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../core/time/clock.dart';
 import '../../../domain/entities/menu.dart';
 import '../../../domain/entities/order_draft.dart';
 import '../../../domain/entities/reporting.dart';
@@ -374,10 +375,23 @@ class OrderDetailScreen extends ConsumerWidget {
                   title: const Text('Change this order'),
                   subtitle: const Text(
                     'They changed their mind. The drinks come back onto the '
-                    'order screen to be put right, and this one is voided — '
-                    'so the ingredients go back and it stops counting.',
+                    'order screen, and it keeps its number and its day — '
+                    'nothing is voided.',
                   ),
                   onTap: () => _changeOrder(context, ref, order),
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.event_outlined,
+                    color: theme.colorScheme.secondary,
+                  ),
+                  title: const Text('Change the date'),
+                  subtitle: Text(
+                    'It is on ${order.businessDate} now. Move it to the day '
+                    'it was really taken, and it moves on the reports with '
+                    'it.',
+                  ),
+                  onTap: () => _changeDate(context, ref, order),
                 ),
               ],
               if (!order.isRefunded) ...<Widget>[
@@ -561,19 +575,22 @@ class OrderDetailScreen extends ConsumerWidget {
     }
   }
 
-  /// Puts a finished order back on the order screen to be put right.
+  /// Puts a finished order back on the order screen to be changed.
   ///
-  /// A sale is a record of something that happened, and the two phones
-  /// agree with each other precisely because those records are written once
-  /// and never altered. Editing one in place would have no answer to the
-  /// obvious question — what if both phones edit the same order — and would
-  /// quietly rewrite a day she has already closed.
+  /// It keeps its number and its date: order 1111 taken at half past ten is
+  /// still order 1111 taken at half past ten, whatever the customer decides
+  /// afterwards. Nothing is voided and nothing appears twice on the day's
+  /// list — there was one sale, and this is what it came to.
   ///
-  /// So the order is not edited. It is voided, which puts the ingredients
-  /// back and stops it counting, and its drinks are handed to the till for
-  /// her to change and ring up again. That is what a counter does when
-  /// somebody changes their mind after paying, and it leaves both the old
-  /// order and the new one on the record saying what really happened.
+  /// What the old drinks took off the shelf goes back as a correction and
+  /// the new drinks take theirs, so the stock still adds up and still says
+  /// why it moved. The recipes and ingredient costs are read as of the day
+  /// the order was taken, so correcting an order from last week cannot
+  /// restate last week's costs at this week's prices.
+  ///
+  /// Only the owner may do it, and only to an order that has not been
+  /// refunded — money already given back would end up pointing at drinks
+  /// that are no longer on the order.
   Future<void> _changeOrder(
     BuildContext context,
     WidgetRef ref,
@@ -588,9 +605,8 @@ class OrderDetailScreen extends ConsumerWidget {
               'Its ${order.itemCount} '
               'drink${order.itemCount == 1 ? '' : 's'} go back onto the '
               'order screen for you to change.\n\n'
-              '${order.orderNo} is voided: the ingredients return to the '
-              'shelf and it stops counting. What you ring up next takes '
-              'its place, with its own number.'
+              'It stays ${order.orderNo}, taken on the same day. Nothing is '
+              'voided \u2014 pressing COMPLETE writes your changes over it.'
               '${order.isUnpaid ? '' : '\n\nThis one was paid. Settle any '
                         'difference with the customer yourself.'}',
             ),
@@ -629,12 +645,12 @@ class OrderDetailScreen extends ConsumerWidget {
     }
     if (!context.mounted) return;
 
-    // Everything is put in the cart before anything is voided: if a drink
-    // has gone from the menu since, she is left with the order she had
-    // rather than with neither.
+    // Built up as an ordinary order first, then marked as the correction
+    // of this one: if a drink has gone from the menu since, she is left
+    // looking at what she can still ring up rather than at nothing.
     final CartController cart = ref.read(cartProvider.notifier);
     cart.clear();
-    int carried = 0;
+    final List<DraftItem> carried = <DraftItem>[];
     for (final RepeatableLine line in lines) {
       final Product? product = await ref
           .read(menuRepositoryProvider)
@@ -644,22 +660,23 @@ class OrderDetailScreen extends ConsumerWidget {
           .firstOrNull;
       if (product == null || size == null) continue;
 
-      cart.addItem(
-        product: product,
-        size: size,
-        quantity: line.quantity,
-        options: await resolveOptions(
-          ref,
-          productId: product.id,
-          sizeId: size.size.id,
-          optionIds: line.optionIds,
+      carried.add(
+        DraftItem(
+          lineId: 'carried-${carried.length}',
+          product: product,
+          size: size,
+          quantity: line.quantity,
+          options: await resolveOptions(
+            ref,
+            productId: product.id,
+            sizeId: size.size.id,
+            optionIds: line.optionIds,
+          ),
         ),
       );
-      carried++;
     }
 
-    if (carried == 0) {
-      cart.clear();
+    if (carried.isEmpty) {
       messenger
         ..clearSnackBars()
         ..showSnackBar(
@@ -670,25 +687,18 @@ class OrderDetailScreen extends ConsumerWidget {
       return;
     }
 
-    if (order.customerId != null) {
-      cart.setCustomer(
-        await ref.read(customerRepositoryProvider).byId(order.customerId!),
-      );
-    }
-
-    try {
-      await ref
-          .read(salesServiceProvider)
-          .voidOrder(orderId: order.id, reason: 'Changed by the owner');
-      ref.read(salesRevisionProvider.notifier).bump();
-      ref.read(stockRevisionProvider.notifier).bump();
-    } on AppException catch (error) {
-      cart.clear();
-      messenger
-        ..clearSnackBars()
-        ..showSnackBar(SnackBar(content: Text(error.message)));
-      return;
-    }
+    cart.reviseOrder(
+      orderId: order.id,
+      orderNo: order.orderNo,
+      items: carried,
+      customer: order.customerId == null
+          ? null
+          : await ref.read(customerRepositoryProvider).byId(order.customerId!),
+      paymentMethod: order.paymentMethod,
+      deliveryFee: order.deliveryFee,
+      unpaid: order.isUnpaid,
+      note: order.note,
+    );
 
     if (!context.mounted) return;
     messenger
@@ -696,11 +706,65 @@ class OrderDetailScreen extends ConsumerWidget {
       ..showSnackBar(
         SnackBar(
           content: Text(
-            '${order.orderNo} voided \u2014 change the order and complete it',
+            'Changing ${order.orderNo} \u2014 press COMPLETE when it is '
+            'right',
           ),
         ),
       );
     context.go(Routes.pos);
+  }
+
+  /// Moves an order to the day it was really taken.
+  ///
+  /// Not on the order screen on purpose: a sale is dated when it is rung
+  /// up, and being asked for a date at the till would be one more thing to
+  /// get through in front of a customer. It belongs here, on the list,
+  /// where she is looking back over the day and can see what is wrong.
+  ///
+  /// The time of day is kept, because that is what the order says about
+  /// when it was served. What moves is which day's takings it is in.
+  Future<void> _changeDate(
+    BuildContext context,
+    WidgetRef ref,
+    OrderRecord order,
+  ) async {
+    final DateTime now = DateTime.now();
+    final DateTime? chosen = await showDatePicker(
+      context: context,
+      initialDate: BusinessDay.parseDate(order.businessDate),
+      // Far enough back for anything she might be catching up on, and never
+      // forward: a sale cannot have happened tomorrow.
+      firstDate: DateTime(now.year - 3),
+      lastDate: DateTime(now.year, now.month, now.day),
+      helpText: 'Which day was ${order.orderNo} taken?',
+      confirmText: 'MOVE IT',
+    );
+    if (chosen == null || !context.mounted) return;
+
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    final NavigatorState navigator = Navigator.of(context);
+    try {
+      await ref
+          .read(salesServiceProvider)
+          .changeOrderDate(orderId: order.id, day: chosen);
+      ref.read(salesRevisionProvider.notifier).bump();
+      ref.read(stockRevisionProvider.notifier).bump();
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(
+          SnackBar(
+            content: Text(
+              '${order.orderNo} is now on '
+              '${BusinessDay.formatDate(chosen)}',
+            ),
+          ),
+        );
+      navigator.pop();
+    } on AppException catch (error) {
+      messenger
+        ..clearSnackBars()
+        ..showSnackBar(SnackBar(content: Text(error.message)));
+    }
   }
 
   /// Removes an order that should never have been on the books.

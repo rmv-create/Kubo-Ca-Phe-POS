@@ -19,6 +19,28 @@ class SyncCodec {
   final Map<String, Map<String, String>> _references =
       <String, Map<String, String>>{};
 
+  /// Pointers already resolved, both ways round.
+  ///
+  /// Ten orders' worth of stock movements all point at the same dozen
+  /// ingredients, and asking the database which uid each one has — ten times
+  /// over, once per movement — was most of the work of telling the other till
+  /// anything. A row's id and its uid are fixed for the life of the row, so
+  /// the answer is worth keeping.
+  ///
+  /// Only answers are kept, never the absence of one: a pointer to something
+  /// that has not arrived yet must be asked about again on the next pass, or
+  /// an order line would wait for its order for ever. [forgetPointers] drops
+  /// the lot, for the one case where a row's uid really does change — when
+  /// two tills turn out to have made the same row and one adopts the other's.
+  final Map<String, String> _uids = <String, String>{};
+  final Map<String, int> _ids = <String, int>{};
+
+  /// Forgets resolved pointers, after something has changed a row's uid.
+  void forgetPointers() {
+    _uids.clear();
+    _ids.clear();
+  }
+
   /// Column → the table it points at, for one table.
   Future<Map<String, String>> referencesOf(String table) async {
     final Map<String, String>? known = _references[table];
@@ -93,6 +115,9 @@ class SyncCodec {
   }
 
   Future<String?> _uidOf(String table, int id) async {
+    final String key = '$table/$id';
+    final String? known = _uids[key];
+    if (known != null) return known;
     final List<Map<String, Object?>> rows = await _db.query(
       table,
       columns: <String>['uid'],
@@ -100,10 +125,16 @@ class SyncCodec {
       whereArgs: <Object?>[id],
       limit: 1,
     );
-    return rows.isEmpty ? null : rows.first['uid'] as String?;
+    if (rows.isEmpty) return null;
+    final String? uid = rows.first['uid'] as String?;
+    if (uid != null) _uids[key] = uid;
+    return uid;
   }
 
   Future<int?> _idOf(String table, String uid) async {
+    final String key = '$table/$uid';
+    final int? known = _ids[key];
+    if (known != null) return known;
     final List<Map<String, Object?>> rows = await _db.query(
       table,
       columns: <String>['id'],
@@ -111,6 +142,9 @@ class SyncCodec {
       whereArgs: <Object?>[uid],
       limit: 1,
     );
-    return rows.isEmpty ? null : rows.first['id'] as int?;
+    if (rows.isEmpty) return null;
+    final int? id = rows.first['id'] as int?;
+    if (id != null) _ids[key] = id;
+    return id;
   }
 }

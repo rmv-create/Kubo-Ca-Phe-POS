@@ -8,6 +8,7 @@ import '../../../app/router.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../domain/entities/customer.dart';
 import '../../../domain/entities/menu.dart';
+import '../../../domain/entities/order_draft.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/kubo_mark.dart';
 import '../../../shared/widgets/section_header.dart';
@@ -185,6 +186,11 @@ class _PosHeader extends ConsumerWidget {
     // old wording while the number is being read, rather than flashing an
     // empty line where a number is about to be.
     final String? nextNumber = ref.watch(nextOrderNumberProvider).valueOrNull;
+    // Changing an order she has already finished: it keeps its own number,
+    // and the header says so rather than showing the number of the sale
+    // that is not being rung up.
+    final OrderDraft draft = ref.watch(cartProvider);
+    final String? changing = draft.revisingOrderNo;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -198,11 +204,27 @@ class _PosHeader extends ConsumerWidget {
           Expanded(
             child: KuboWordmark(
               businessName: businessName,
-              subtitle: nextNumber == null
+              subtitle: changing != null
+                  ? 'Changing $changing'
+                  : nextNumber == null
                   ? 'New order'
                   : 'New order · $nextNumber',
             ),
           ),
+          // A way out that does not need her to empty the order by hand.
+          if (changing != null)
+            IconButton(
+              icon: const Icon(Icons.close),
+              tooltip: 'Leave $changing as it was',
+              onPressed: () {
+                ref.read(cartProvider.notifier).clear();
+                ScaffoldMessenger.of(context)
+                  ..clearSnackBars()
+                  ..showSnackBar(
+                    SnackBar(content: Text('$changing left as it was')),
+                  );
+              },
+            ),
           // Handing the phone to somebody, or putting it down: one tap
           // rather than waiting out the five-minute auto-lock.
           IconButton(

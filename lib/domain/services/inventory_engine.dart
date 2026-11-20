@@ -57,42 +57,71 @@ class InventoryEngine {
     required String at,
     required String businessDate,
   }) async {
-    for (final PendingMovement movement in movements) {
-      if (movement.delta.isZero) continue;
+    final List<PendingMovement> real = <PendingMovement>[
+      for (final PendingMovement m in movements)
+        if (!m.delta.isZero) m,
+    ];
+    if (real.isEmpty) return;
 
-      final List<Map<String, Object?>> ingredientRow = await txn.query(
-        'ingredients',
-        columns: <String>['is_inventory_tracked', 'base_unit'],
-        where: 'id = ?',
-        whereArgs: <Object?>[movement.ingredientId],
-        limit: 1,
-      );
-      if (ingredientRow.isEmpty) continue;
-      if (ingredientRow.first['is_inventory_tracked'] != 1) continue;
+    // Two questions and one answer, rather than four errands per ingredient.
+    // A drink touches a dozen ingredients and an order touches several
+    // drinks; on a phone's browser each errand is a message to the database
+    // and back, and those messages are what she feels as the till thinking.
+    final Set<int> ids = <int>{
+      for (final PendingMovement m in real) m.ingredientId,
+    };
+    final String holes = List<String>.filled(ids.length, '?').join(',');
+
+    final List<Map<String, Object?>> ingredientRows = await txn.rawQuery(
+      'SELECT id, is_inventory_tracked, base_unit '
+      'FROM ingredients WHERE id IN ($holes)',
+      ids.toList(),
+    );
+    final Map<int, Map<String, Object?>> known = <int, Map<String, Object?>>{
+      for (final Map<String, Object?> row in ingredientRows)
+        row['id']! as int: row,
+    };
+
+    final List<Map<String, Object?>> balanceRows = await txn.rawQuery(
+      'SELECT ingredient_id, qty_milli '
+      'FROM inventory WHERE ingredient_id IN ($holes)',
+      ids.toList(),
+    );
+    final Map<int, int> onHand = <int, int>{
+      for (final Map<String, Object?> row in balanceRows)
+        row['ingredient_id']! as int: row['qty_milli']! as int,
+    };
+
+    final Batch batch = txn.batch();
+    bool anything = false;
+
+    for (final PendingMovement movement in real) {
+      final Map<String, Object?>? ingredient = known[movement.ingredientId];
+      if (ingredient == null) continue;
+      // Ingredients the owner has marked as not tracked — ice made fresh each
+      // day — are skipped here. They are still costed; simply not counted.
+      if (ingredient['is_inventory_tracked'] != 1) continue;
 
       final BaseUnit unit = BaseUnit.fromCode(
-        ingredientRow.first['base_unit']! as String,
+        ingredient['base_unit']! as String,
       );
 
-      final List<Map<String, Object?>> balanceRow = await txn.query(
-        'inventory',
-        columns: <String>['qty_milli'],
-        where: 'ingredient_id = ?',
-        whereArgs: <Object?>[movement.ingredientId],
-        limit: 1,
-      );
+      // Several movements can touch the same shelf in one order, so the
+      // balance is carried forward in step, exactly as it would be if each
+      // one were read back from the database in turn.
       final Quantity before = Quantity(
-        (balanceRow.isEmpty ? 0 : balanceRow.first['qty_milli']! as int),
+        onHand[movement.ingredientId] ?? 0,
         unit,
       );
       final Quantity after = before + movement.delta;
+      onHand[movement.ingredientId] = after.milli;
 
       final UnitCost? cost = movement.unitCost;
       final Money value = cost == null
           ? Money.zero
           : moneyFromMicroCentavos(cost.costMicroCentavos(movement.delta.abs));
 
-      await txn.insert('inventory_movements', <String, Object?>{
+      batch.insert('inventory_movements', <String, Object?>{
         'at': at,
         'business_date': businessDate,
         'ingredient_id': movement.ingredientId,
@@ -111,12 +140,17 @@ class InventoryEngine {
         'note': movement.note,
       });
 
-      await txn.insert('inventory', <String, Object?>{
+      batch.insert('inventory', <String, Object?>{
         'ingredient_id': movement.ingredientId,
         'qty_milli': after.milli,
         'updated_at': at,
       }, conflictAlgorithm: ConflictAlgorithm.replace);
+
+      anything = true;
     }
+
+    // One errand for the whole order's worth of writing.
+    if (anything) await batch.commit(noResult: true);
   }
 
   /// Recomputes every balance from the ledger.

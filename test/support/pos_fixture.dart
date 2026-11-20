@@ -16,6 +16,7 @@ import 'package:kubo_pos/domain/entities/order_draft.dart';
 import 'package:kubo_pos/domain/services/order_service.dart';
 import 'package:kubo_pos/domain/services/reporting_service.dart';
 import 'package:kubo_pos/domain/services/sales_service.dart';
+import 'package:sqflite_common/sqlite_api.dart';
 
 import 'test_database.dart';
 
@@ -136,11 +137,13 @@ class PosFixture {
   static Future<PosFixture> open({
     FixedClock? clock,
     bool separate = false,
+    DatabaseFactory? factory,
   }) async {
     final FixedClock c = clock ?? testClock();
     final AppDatabase db = await openSeededDatabase(
       clock: c,
       separate: separate,
+      factory: factory,
     );
     return PosFixture._(db, c);
   }

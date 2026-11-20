@@ -34,14 +34,79 @@ class MovingAverageCost {
   const MovingAverageCost();
 
   /// Recomputes the average for every ingredient.
+  ///
+  /// Three questions and one answer for the whole pantry, however many
+  /// ingredients it holds. It used to be four questions per ingredient — a
+  /// hundred errands to the database, every time anything arrived from the
+  /// other till, which on a phone's browser is felt as the till freezing
+  /// mid-order. The arithmetic below is the same arithmetic; only the number
+  /// of errands has changed.
   Future<void> rebuildAll(DatabaseExecutor db) async {
-    final List<Map<String, Object?>> rows = await db.query(
-      'ingredients',
-      columns: <String>['id'],
-    );
-    for (final Map<String, Object?> row in rows) {
-      await rebuild(db, ingredientId: row['id']! as int);
+    final String now = DateTime.now().toUtc().toIso8601String();
+
+    final Map<int, List<_Event>> eventsPerIngredient = await _allEvents(db);
+    if (eventsPerIngredient.isEmpty) {
+      await db.delete('ingredient_avg_cost');
+      return;
     }
+    final Map<int, Map<int, int>> stockPerIngredient = await _allStockBefore(
+      db,
+    );
+
+    final Batch batch = db.batch();
+    batch.delete('ingredient_avg_cost');
+    for (final MapEntry<int, List<_Event>> entry
+        in eventsPerIngredient.entries) {
+      for (final _Line line in _replay(
+        entry.value,
+        stockPerIngredient[entry.key] ?? const <int, int>{},
+      )) {
+        batch.insert(
+          'ingredient_avg_cost',
+          line.asRow(ingredientId: entry.key, now: now),
+        );
+      }
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Every moment the average could have moved, for every ingredient.
+  Future<Map<int, List<_Event>>> _allEvents(DatabaseExecutor db) async {
+    final List<Map<String, Object?>> rows = await db.rawQuery(_eventsSql());
+    final Map<int, List<_Event>> out = <int, List<_Event>>{};
+    for (final Map<String, Object?> row in rows) {
+      (out[row['ingredient_id']! as int] ??= <_Event>[]).add(_Event.from(row));
+    }
+    return out;
+  }
+
+  /// How much was on the shelf before each delivery, for every ingredient.
+  Future<Map<int, Map<int, int>>> _allStockBefore(DatabaseExecutor db) async {
+    final List<Map<String, Object?>> movements = await db.query(
+      'inventory_movements',
+      columns: <String>[
+        'id',
+        'ingredient_id',
+        'at',
+        'qty_milli_delta',
+        'purchase_item_id',
+      ],
+      orderBy: 'ingredient_id ASC, at ASC, id ASC',
+    );
+
+    final Map<int, Map<int, int>> out = <int, Map<int, int>>{};
+    final Map<int, int> running = <int, int>{};
+    for (final Map<String, Object?> m in movements) {
+      final int ingredientId = m['ingredient_id']! as int;
+      final int? purchaseItemId = m['purchase_item_id'] as int?;
+      if (purchaseItemId != null) {
+        (out[ingredientId] ??= <int, int>{})[purchaseItemId] =
+            running[ingredientId] ?? 0;
+      }
+      running[ingredientId] =
+          (running[ingredientId] ?? 0) + (m['qty_milli_delta']! as int);
+    }
+    return out;
   }
 
   /// Recomputes the average for one ingredient, from the beginning.
@@ -66,7 +131,24 @@ class MovingAverageCost {
     final List<_Event> events = await _events(db, ingredientId);
     if (events.isEmpty) return;
 
+    final Batch batch = db.batch();
+    for (final _Line line in _replay(events, qtyBefore)) {
+      batch.insert(
+        'ingredient_avg_cost',
+        line.asRow(ingredientId: ingredientId, now: now),
+      );
+    }
+    await batch.commit(noResult: true);
+  }
+
+  /// Replays one ingredient's history and says what each step leaves behind.
+  ///
+  /// Pure arithmetic, no database: the same sequence the doc comment above
+  /// works through on paper.
+  List<_Line> _replay(List<_Event> events, Map<int, int> qtyBefore) {
+    final List<_Line> lines = <_Line>[];
     int? average;
+
     for (final _Event event in events) {
       final int before = average ?? event.unitCost;
 
@@ -74,15 +156,14 @@ class MovingAverageCost {
         // A price typed in by hand, or the one the pantry was set up with.
         // It is a statement about what the stock is worth, so it replaces
         // the average rather than averaging into it.
-        await _write(
-          db,
-          ingredientId: ingredientId,
-          event: event,
-          qtyBefore: 0,
-          qtyAdded: 0,
-          avgBefore: before,
-          avgAfter: event.unitCost,
-          now: now,
+        lines.add(
+          _Line(
+            event: event,
+            qtyBefore: 0,
+            qtyAdded: 0,
+            avgBefore: before,
+            avgAfter: event.unitCost,
+          ),
         );
         average = event.unitCost;
         continue;
@@ -106,18 +187,18 @@ class MovingAverageCost {
           ? event.unitCost
           : (valueBefore + valueAdded) ~/ total;
 
-      await _write(
-        db,
-        ingredientId: ingredientId,
-        event: event,
-        qtyBefore: onHand,
-        qtyAdded: added,
-        avgBefore: before,
-        avgAfter: after,
-        now: now,
+      lines.add(
+        _Line(
+          event: event,
+          qtyBefore: onHand,
+          qtyAdded: added,
+          avgBefore: before,
+          avgAfter: after,
+        ),
       );
       average = after;
     }
+    return lines;
   }
 
   /// How much was on the shelf immediately before each delivery landed.
@@ -149,8 +230,21 @@ class MovingAverageCost {
   /// Every moment the average could have moved, oldest first.
   Future<List<_Event>> _events(DatabaseExecutor db, int ingredientId) async {
     final List<Map<String, Object?>> rows = await db.rawQuery(
+      _eventsSql(forOne: true),
+      <Object?>[ingredientId, ingredientId],
+    );
+    return rows.map(_Event.from).toList();
+  }
+
+  /// The same history either way: deliveries, and prices typed in by hand.
+  ///
+  /// Same instant, which happens on a fresh install: the price the pantry
+  /// was set up with comes first, then deliveries, then anything typed in by
+  /// hand, because a correction is the last word on what it cost.
+  static String _eventsSql({bool forOne = false}) =>
       '''
-      SELECT p.purchased_at                        AS at,
+      SELECT pi.ingredient_id                      AS ingredient_id,
+             p.purchased_at                        AS at,
              'purchase'                            AS source,
              1                                     AS rank,
              pi.id                                 AS purchase_item_id,
@@ -160,11 +254,12 @@ class MovingAverageCost {
              pi.id                                 AS tiebreak
       FROM purchase_items pi
       JOIN purchases p ON p.id = pi.purchase_id
-      WHERE pi.ingredient_id = ?
+      ${forOne ? 'WHERE pi.ingredient_id = ?' : ''}
 
       UNION ALL
 
-      SELECT ch.effective_from                     AS at,
+      SELECT ch.ingredient_id                      AS ingredient_id,
+             ch.effective_from                     AS at,
              ch.source                             AS source,
              CASE ch.source WHEN 'seed' THEN 0 ELSE 2 END AS rank,
              NULL                                  AS purchase_item_id,
@@ -173,55 +268,23 @@ class MovingAverageCost {
              ch.unit_cost_centavos_per_1000_base   AS unit_cost,
              ch.id                                 AS tiebreak
       FROM ingredient_cost_history ch
-      WHERE ch.ingredient_id = ? AND ch.source IN ('manual', 'seed')
+      WHERE ${forOne ? 'ch.ingredient_id = ? AND ' : ''}
+            ch.source IN ('manual', 'seed')
 
-      -- Same instant, which happens on a fresh install: the price the pantry
-      -- was set up with comes first, then deliveries, then anything typed in
-      -- by hand, because a correction is the last word on what it cost.
       ORDER BY at ASC, rank ASC, tiebreak ASC
-      ''',
-      <Object?>[ingredientId, ingredientId],
-    );
-
-    return rows
-        .map(
-          (Map<String, Object?> r) => _Event(
-            at: r['at']! as String,
-            source: r['source']! as String,
-            purchaseItemId: r['purchase_item_id'] as int?,
-            qtyMilli: (r['qty_milli'] as int?) ?? 0,
-            totalCostCentavos: (r['total_cost'] as int?) ?? 0,
-            unitCost: (r['unit_cost'] as int?) ?? 0,
-          ),
-        )
-        .toList();
-  }
-
-  Future<void> _write(
-    DatabaseExecutor db, {
-    required int ingredientId,
-    required _Event event,
-    required int qtyBefore,
-    required int qtyAdded,
-    required int avgBefore,
-    required int avgAfter,
-    required String now,
-  }) async {
-    await db.insert('ingredient_avg_cost', <String, Object?>{
-      'ingredient_id': ingredientId,
-      'effective_from': event.at,
-      'source': event.source,
-      'qty_before_milli': qtyBefore,
-      'qty_added_milli': qtyAdded,
-      'avg_before_centavos_per_1000_base': avgBefore,
-      'avg_after_centavos_per_1000_base': avgAfter < 0 ? 0 : avgAfter,
-      'purchase_item_id': event.purchaseItemId,
-      'created_at': now,
-    });
-  }
+      ''';
 }
 
 class _Event {
+  factory _Event.from(Map<String, Object?> r) => _Event(
+    at: r['at']! as String,
+    source: r['source']! as String,
+    purchaseItemId: r['purchase_item_id'] as int?,
+    qtyMilli: (r['qty_milli'] as int?) ?? 0,
+    totalCostCentavos: (r['total_cost'] as int?) ?? 0,
+    unitCost: (r['unit_cost'] as int?) ?? 0,
+  );
+
   const _Event({
     required this.at,
     required this.source,
@@ -237,4 +300,36 @@ class _Event {
   final int qtyMilli;
   final int totalCostCentavos;
   final int unitCost;
+}
+
+/// One line of the replay: what the average was, and what it became.
+class _Line {
+  const _Line({
+    required this.event,
+    required this.qtyBefore,
+    required this.qtyAdded,
+    required this.avgBefore,
+    required this.avgAfter,
+  });
+
+  final _Event event;
+  final int qtyBefore;
+  final int qtyAdded;
+  final int avgBefore;
+  final int avgAfter;
+
+  Map<String, Object?> asRow({
+    required int ingredientId,
+    required String now,
+  }) => <String, Object?>{
+    'ingredient_id': ingredientId,
+    'effective_from': event.at,
+    'source': event.source,
+    'qty_before_milli': qtyBefore,
+    'qty_added_milli': qtyAdded,
+    'avg_before_centavos_per_1000_base': avgBefore,
+    'avg_after_centavos_per_1000_base': avgAfter < 0 ? 0 : avgAfter,
+    'purchase_item_id': event.purchaseItemId,
+    'created_at': now,
+  };
 }
