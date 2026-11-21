@@ -9,6 +9,7 @@ import 'package:printing/printing.dart';
 import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
+import '../../../data/receipt/drawing_the_receipt.dart';
 import '../../../data/receipt/receipt_document.dart';
 import '../../../data/receipt/receipt_sharing.dart';
 import '../../../domain/entities/business_settings.dart';
@@ -52,19 +53,7 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
           return Column(
             children: <Widget>[
               Expanded(
-                child: PdfPreview(
-                  build: (_) => _pdf(record),
-                  canChangePageFormat: false,
-                  canChangeOrientation: false,
-                  canDebug: false,
-                  // The package's own toolbar is switched off, not emptied.
-                  // Its print and share buttons hand back a `blob:` URL that
-                  // works nowhere but this tab, which is exactly the trap this
-                  // screen exists to avoid. The app's own buttons sit below,
-                  // where a thumb reaches.
-                  useActions: false,
-                  pdfFileName: 'Receipt ${record.orderNo}.pdf',
-                ),
+                child: _Picture(record: record, pdf: () => _pdf(record)),
               ),
               if (kIsWeb) const _WebSendingNote(),
               SafeArea(
@@ -123,6 +112,15 @@ class _ReceiptScreenState extends ConsumerState<ReceiptScreen> {
   /// The same receipt as a picture, for sending over Messenger or Viber where
   /// a PDF is awkward to open.
   Future<void> _shareJpeg(OrderRecord record, {bool share = true}) async {
+    // A picture of the receipt is drawn by the same machinery as the preview,
+    // so if that is not here the honest answer names the one that is.
+    if (!await readyToDrawReceipts()) {
+      throw const BusinessRuleException(
+        'This phone cannot turn the receipt into a picture at the moment. '
+        'Send it as a PDF instead, or try again once the connection is '
+        'better.',
+      );
+    }
     final Uint8List pdf = await _pdf(record);
     final PdfRaster page = await Printing.raster(
       pdf,
@@ -377,6 +375,129 @@ class _WebSendingNote extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The picture of the receipt — when the phone can draw one.
+///
+/// In a browser the drawing is done by pdf.js, which arrives separately and
+/// can be slow on a phone connection or fail outright. This waits for it,
+/// says what it is doing while it waits, and if it never comes says so in a
+/// sentence with a way to try again.
+///
+/// It is deliberately only the *picture* that depends on any of this. The
+/// buttons underneath — print, PDF, JPEG, save — are the receipt's actual
+/// job, and the PDF is built by the app itself, so they keep working on a
+/// phone that cannot draw a preview.
+class _Picture extends StatefulWidget {
+  const _Picture({required this.record, required this.pdf});
+
+  final OrderRecord record;
+  final Future<Uint8List> Function() pdf;
+
+  @override
+  State<_Picture> createState() => _PictureState();
+}
+
+class _PictureState extends State<_Picture> {
+  late Future<bool> _canDraw = readyToDrawReceipts();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<bool>(
+    future: _canDraw,
+    builder: (BuildContext context, AsyncSnapshot<bool> snapshot) {
+      if (snapshot.connectionState != ConnectionState.done) {
+        return const _Waiting();
+      }
+      if (snapshot.data != true) {
+        return _CannotDraw(
+          onRetry: () => setState(() => _canDraw = readyToDrawReceipts()),
+        );
+      }
+      return PdfPreview(
+        build: (_) => widget.pdf(),
+        canChangePageFormat: false,
+        canChangeOrientation: false,
+        canDebug: false,
+        // The package's own toolbar is switched off, not emptied. Its print
+        // and share buttons hand back a `blob:` URL that works nowhere but
+        // this tab, which is exactly the trap this screen exists to avoid.
+        // The app's own buttons sit below, where a thumb reaches.
+        useActions: false,
+        pdfFileName: 'Receipt ${widget.record.orderNo}.pdf',
+      );
+    },
+  );
+}
+
+class _Waiting extends StatelessWidget {
+  const _Waiting();
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        const SizedBox(
+          width: 26,
+          height: 26,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+        const SizedBox(height: KuboSpacing.md),
+        Text(
+          'Drawing the receipt\u2026',
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ],
+    ),
+  );
+}
+
+/// What the owner sees instead of a white rectangle.
+class _CannotDraw extends StatelessWidget {
+  const _CannotDraw({required this.onRetry});
+
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final ThemeData theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(KuboSpacing.xl),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.receipt_long_outlined,
+              size: 40,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(height: KuboSpacing.md),
+            Text(
+              'The receipt is ready, but this phone could not draw a '
+              'picture of it',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: KuboSpacing.sm),
+            Text(
+              'Printing and sending still work \u2014 the buttons below build '
+              'the receipt themselves. The preview needs one more piece to be '
+              'downloaded, which can take a moment on a slow connection.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: KuboSpacing.lg),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: const Text('TRY THE PICTURE AGAIN'),
+            ),
+          ],
+        ),
       ),
     );
   }
