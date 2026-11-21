@@ -73,9 +73,9 @@ void main() {
     );
     addTearDown(container.dispose);
 
-    container.read(signedInUserProvider.notifier).set(
-      AppUser(id: 1, name: 'Jaja', role: role, isActive: true),
-    );
+    container
+        .read(signedInUserProvider.notifier)
+        .set(AppUser(id: 1, name: 'Jaja', role: role, isActive: true));
 
     await tester.pumpWidget(
       UncontrolledProviderScope(
@@ -90,9 +90,7 @@ void main() {
     return container;
   }
 
-  testWidgets('the owner may do everything to it', (
-    WidgetTester tester,
-  ) async {
+  testWidgets('the owner may do everything to it', (WidgetTester tester) async {
     await open(tester, role: UserRole.owner, mayCorrect: false);
 
     expect(find.text('Change this order'), findsOne);

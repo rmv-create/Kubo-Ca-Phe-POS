@@ -15,11 +15,7 @@ void main() {
   setUp(() async {
     shop = await PosFixture.open();
     signIn = SignInService(database: shop.db, clock: shop.clock);
-    await signIn.addUser(
-      name: 'Jamie',
-      role: UserRole.owner,
-      pin: '314159',
-    );
+    await signIn.addUser(name: 'Jamie', role: UserRole.owner, pin: '314159');
     await signIn.addUser(name: 'Jaja', role: UserRole.barista, pin: '271828');
   });
   tearDown(() async => shop.close());

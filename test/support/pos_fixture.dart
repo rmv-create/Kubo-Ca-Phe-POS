@@ -46,8 +46,10 @@ class PosFixture {
     settings: () => settings,
   );
 
-  late final SettingsRepositoryImpl settingsRepository =
-      SettingsRepositoryImpl(db, clock);
+  late final SettingsRepositoryImpl settingsRepository = SettingsRepositoryImpl(
+    db,
+    clock,
+  );
 
   late final SalesService sales = SalesService(
     database: db,
