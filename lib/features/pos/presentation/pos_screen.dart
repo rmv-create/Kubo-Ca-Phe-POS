@@ -232,6 +232,15 @@ class _PosHeader extends ConsumerWidget {
             tooltip: 'Lock',
             onPressed: () => ref.read(signedInUserProvider.notifier).signOut(),
           ),
+          // His way to the orders, when she has given him leave to put one
+          // right. The owner reaches the same list through Manage.
+          if (!ref.watch(canManageProvider) &&
+              ref.watch(canCorrectOrdersProvider))
+            IconButton(
+              icon: const Icon(Icons.receipt_long_outlined),
+              tooltip: 'Orders',
+              onPressed: () => context.go(Routes.orders),
+            ),
           if (compact)
             IconButton(
               icon: const Icon(Icons.tune),

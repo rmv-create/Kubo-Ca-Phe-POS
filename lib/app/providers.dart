@@ -593,6 +593,17 @@ final Provider<bool> canManageProvider = Provider<bool>((Ref ref) {
   return !(ref.watch(hasUsersProvider).valueOrNull ?? false);
 });
 
+/// Whether the person at the till may put a finished order right.
+///
+/// The owner always may. The barista may when she has said so, and that is
+/// the only thing the setting opens: the order's drinks. Voiding, refunding,
+/// deleting and moving it to another day are hers, and he can ask for any of
+/// them on the spot with her PIN.
+final Provider<bool> canCorrectOrdersProvider = Provider<bool>((Ref ref) {
+  if (ref.watch(canManageProvider)) return true;
+  return ref.watch(settingsControllerProvider).baristaMayCorrectOrders;
+});
+
 // ─────────────────────────── sales and reports ───────────────────────────
 
 final FutureProviderFamily<List<OrderRecord>, String?> ordersProvider =

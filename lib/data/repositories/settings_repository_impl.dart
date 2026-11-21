@@ -53,6 +53,10 @@ class SettingsRepositoryImpl implements SettingsRepository {
         values[SettingKeys.orderNumberResetDaily],
         d.orderNumberResetDaily,
       ),
+      baristaMayCorrectOrders: _bool(
+        values[SettingKeys.baristaMayCorrectOrders],
+        d.baristaMayCorrectOrders,
+      ),
       showCustomerName: _bool(
         values[SettingKeys.showCustomerName],
         d.showCustomerName,
@@ -138,6 +142,11 @@ class SettingsRepositoryImpl implements SettingsRepository {
         txn,
         SettingKeys.showCustomerName,
         settings.showCustomerName ? '1' : '0',
+      );
+      await _put(
+        txn,
+        SettingKeys.baristaMayCorrectOrders,
+        settings.baristaMayCorrectOrders ? '1' : '0',
       );
       await _put(
         txn,

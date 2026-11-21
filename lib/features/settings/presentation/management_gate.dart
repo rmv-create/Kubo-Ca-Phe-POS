@@ -15,13 +15,23 @@ import 'sign_in_screen.dart';
 ///
 /// The POS is never gated. Whoever is on shift can serve all day.
 class ManagementGate extends ConsumerWidget {
-  const ManagementGate({required this.child, super.key});
+  const ManagementGate({required this.child, this.alsoAllow, super.key});
 
   final Widget child;
+
+  /// A second way in, for the one screen the owner can hand over.
+  ///
+  /// The orders list opens for the barista when she has given him leave to
+  /// correct an order, because he cannot put one right without finding it
+  /// first. Nothing else about this gate changes: what he may do once he is
+  /// in is decided screen by screen, action by action.
+  final Provider<bool>? alsoAllow;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     if (ref.watch(canManageProvider)) return child;
+    final Provider<bool>? second = alsoAllow;
+    if (second != null && ref.watch(second)) return child;
 
     final ThemeData theme = Theme.of(context);
     final AppUser? user = ref.watch(signedInUserProvider);

@@ -18,6 +18,7 @@ import '../../pos/presentation/customer_sheet.dart';
 import '../../pos/state/cart_controller.dart';
 import '../../receipts/presentation/name_this_order_sheet.dart';
 import '../../receipts/presentation/receipt_screen.dart';
+import '../../settings/presentation/ask_the_owner.dart';
 
 /// Every sale, and the two ways to undo one.
 class OrdersScreen extends ConsumerStatefulWidget {
@@ -215,6 +216,10 @@ class OrderDetailScreen extends ConsumerWidget {
         }
 
         final ThemeData theme = Theme.of(context);
+        // Whose decisions these are. The barista reaches this screen when
+        // she has given him leave to correct an order; everything else here
+        // still needs her, and he can ask for it with her PIN.
+        final bool mayManage = ref.watch(canManageProvider);
         return Scaffold(
           appBar: AppBar(title: Text(order.orderNo)),
           body: ListView(
@@ -272,14 +277,21 @@ class OrderDetailScreen extends ConsumerWidget {
                   emphasise: true,
                 ),
               _Row(label: 'Kept', value: order.netTotal.format()),
-              _Row(
-                label: 'Cost to make',
-                value: order.isCosted ? order.cogs.format() : 'partly unknown',
-              ),
-              _Row(
-                label: 'Gross profit',
-                value: order.isCosted ? order.grossProfit.format() : '—',
-              ),
+              // What a drink costs to make, and what it earns, is the one
+              // thing the barista's side of the app has never shown — and
+              // being allowed to correct an order is no reason to start.
+              if (mayManage) ...<Widget>[
+                _Row(
+                  label: 'Cost to make',
+                  value: order.isCosted
+                      ? order.cogs.format()
+                      : 'partly unknown',
+                ),
+                _Row(
+                  label: 'Gross profit',
+                  value: order.isCosted ? order.grossProfit.format() : '—',
+                ),
+              ],
               _Row(
                 label: 'Paid by',
                 value:
@@ -319,7 +331,14 @@ class OrderDetailScreen extends ConsumerWidget {
                     'When the ${order.total.format()} arrives. Counted on the '
                     'day it lands, not back-dated to the order.',
                   ),
-                  onTap: () => _recordPayment(context, ref, order),
+                  onTap: () => _withHerLeave(
+                    context,
+                    ref,
+                    order,
+                    mayManage: mayManage,
+                    what: 'record the ${order.total.format()}',
+                    run: () => _recordPayment(context, ref, order),
+                  ),
                 ),
               if (order.customerName == null && !order.isVoided)
                 ListTile(
@@ -346,7 +365,14 @@ class OrderDetailScreen extends ConsumerWidget {
                   enabled: !order.isFullyRefunded,
                   onTap: order.isFullyRefunded
                       ? null
-                      : () => _refund(context, ref, order),
+                      : () => _withHerLeave(
+                          context,
+                          ref,
+                          order,
+                          mayManage: mayManage,
+                          what: 'refund ${order.orderNo}',
+                          run: () => _refund(context, ref, order),
+                        ),
                 ),
                 ListTile(
                   leading: Icon(Icons.block, color: theme.colorScheme.error),
@@ -358,7 +384,14 @@ class OrderDetailScreen extends ConsumerWidget {
                   enabled: !order.isRefunded,
                   onTap: order.isRefunded
                       ? null
-                      : () => _voidOrder(context, ref, order),
+                      : () => _withHerLeave(
+                          context,
+                          ref,
+                          order,
+                          mayManage: mayManage,
+                          what: 'void ${order.orderNo}',
+                          run: () => _voidOrder(context, ref, order),
+                        ),
                 ),
               ],
               // Deleting is for the rows that were never a sale — an evening
@@ -367,19 +400,20 @@ class OrderDetailScreen extends ConsumerWidget {
               // time she decides they should not be there at all.
               if (!order.isVoided && !order.isRefunded) ...<Widget>[
                 const SectionHeader('Change it'),
-                ListTile(
-                  leading: Icon(
-                    Icons.edit_outlined,
-                    color: theme.colorScheme.secondary,
+                if (mayManage || ref.watch(canCorrectOrdersProvider))
+                  ListTile(
+                    leading: Icon(
+                      Icons.edit_outlined,
+                      color: theme.colorScheme.secondary,
+                    ),
+                    title: const Text('Change this order'),
+                    subtitle: const Text(
+                      'They changed their mind. The drinks come back onto the '
+                      'order screen, and it keeps its number and its day — '
+                      'nothing is voided.',
+                    ),
+                    onTap: () => _changeOrder(context, ref, order),
                   ),
-                  title: const Text('Change this order'),
-                  subtitle: const Text(
-                    'They changed their mind. The drinks come back onto the '
-                    'order screen, and it keeps its number and its day — '
-                    'nothing is voided.',
-                  ),
-                  onTap: () => _changeOrder(context, ref, order),
-                ),
                 ListTile(
                   leading: Icon(
                     Icons.event_outlined,
@@ -391,7 +425,14 @@ class OrderDetailScreen extends ConsumerWidget {
                     'it was really taken, and it moves on the reports with '
                     'it.',
                   ),
-                  onTap: () => _changeDate(context, ref, order),
+                  onTap: () => _withHerLeave(
+                    context,
+                    ref,
+                    order,
+                    mayManage: mayManage,
+                    what: 'move ${order.orderNo} to another day',
+                    run: () => _changeDate(context, ref, order),
+                  ),
                 ),
               ],
               if (!order.isRefunded) ...<Widget>[
@@ -410,7 +451,14 @@ class OrderDetailScreen extends ConsumerWidget {
                               'The ingredients go back on the shelf and it '
                               'stops counting anywhere. This cannot be undone.',
                   ),
-                  onTap: () => _deleteOrder(context, ref, order),
+                  onTap: () => _withHerLeave(
+                    context,
+                    ref,
+                    order,
+                    mayManage: mayManage,
+                    what: 'delete ${order.orderNo} for good',
+                    run: () => _deleteOrder(context, ref, order),
+                  ),
                 ),
               ],
             ],
@@ -418,6 +466,36 @@ class OrderDetailScreen extends ConsumerWidget {
         );
       },
     );
+  }
+
+  /// Runs something that is the owner's to decide.
+  ///
+  /// For her, straight through: she is already signed in, and asking her to
+  /// confirm that she is herself would be a tap for nothing.
+  ///
+  /// For the barista, her PIN first. She allows the one action, it goes
+  /// ahead, and the trail carries both halves: the action against his name,
+  /// because he is the one who did it, and a line saying she allowed it.
+  Future<void> _withHerLeave(
+    BuildContext context,
+    WidgetRef ref,
+    OrderRecord order, {
+    required bool mayManage,
+    required String what,
+    required Future<void> Function() run,
+  }) async {
+    if (mayManage) {
+      await run();
+      return;
+    }
+
+    final String? owner = await AskTheOwner.show(context, what: what);
+    if (owner == null || !context.mounted) return;
+
+    await run();
+    await ref
+        .read(salesServiceProvider)
+        .noteOwnerAllowed(orderId: order.id, what: what, owner: owner);
   }
 
   /// Takes the money for an order that was finished unpaid.

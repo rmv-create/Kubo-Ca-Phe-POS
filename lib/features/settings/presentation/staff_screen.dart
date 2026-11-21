@@ -6,6 +6,7 @@ import '../../../app/providers.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../core/errors/app_exception.dart';
 import '../../../domain/entities/app_user.dart';
+import '../../../domain/entities/business_settings.dart';
 import '../../../domain/services/sign_in_service.dart';
 import '../../../shared/widgets/async_view.dart';
 
@@ -53,11 +54,17 @@ class StaffScreen extends ConsumerWidget {
                 subtitle: Text(
                   user.role == UserRole.owner
                       ? 'Owner · everything'
+                      : ref
+                            .watch(settingsControllerProvider)
+                            .baristaMayCorrectOrders
+                      ? 'Barista · the POS, and may correct an order'
                       : 'Barista · the POS only',
                 ),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => _edit(context, ref, user),
               ),
+            if (users.any((AppUser u) => u.role == UserRole.barista))
+              const _MayCorrectOrders(),
             const Divider(height: KuboSpacing.xxl),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
@@ -240,5 +247,59 @@ class _UserSheetState extends ConsumerState<_UserSheet> {
     } on AppException catch (error) {
       messenger.showSnackBar(SnackBar(content: Text(error.message)));
     }
+  }
+}
+
+/// The one right the owner can hand to the barista.
+///
+/// Her reason for wanting it: she will not always be there, the person at
+/// the till is the one standing in front of the customer who has changed
+/// their mind, and "wait until she is back" is not an answer in a coffee
+/// shop. Her reason for hesitating is just as good, so this gives away as
+/// little as will do the job.
+///
+/// What it opens: he can find a finished order and change the drinks on it.
+/// The order keeps its number and its date, the stock and the money still
+/// add up, and the trail says it was him.
+///
+/// What it does not: voiding, refunding, deleting, and moving an order to
+/// another day stay hers. He can ask for any of them while she is standing
+/// there, with her PIN, and the trail records that she allowed it.
+class _MayCorrectOrders extends ConsumerWidget {
+  const _MayCorrectOrders();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final BusinessSettings settings = ref.watch(settingsControllerProvider);
+    final ThemeData theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        const Divider(height: KuboSpacing.xxl),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: KuboSpacing.lg),
+          child: Text(
+            'What the barista may do with a finished order',
+            style: theme.textTheme.titleSmall,
+          ),
+        ),
+        SwitchListTile(
+          value: settings.baristaMayCorrectOrders,
+          title: const Text('Correct an order'),
+          subtitle: const Text(
+            'For the customer who changes their mind after it is rung up. '
+            'The order keeps its number and its day, and the trail says who '
+            'changed it.\n\n'
+            'Voiding, refunding, deleting and changing the date stay yours. '
+            'He can ask for those with your PIN while you are there.',
+          ),
+          isThreeLine: true,
+          onChanged: (bool value) => ref
+              .read(settingsControllerProvider.notifier)
+              .update(settings.copyWith(baristaMayCorrectOrders: value)),
+        ),
+      ],
+    );
   }
 }

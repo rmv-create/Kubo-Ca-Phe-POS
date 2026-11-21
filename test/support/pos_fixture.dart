@@ -9,6 +9,7 @@ import 'package:kubo_pos/data/repositories/inventory_repository_impl.dart';
 import 'package:kubo_pos/data/repositories/menu_repository_impl.dart';
 import 'package:kubo_pos/data/repositories/purchasing_repository_impl.dart';
 import 'package:kubo_pos/data/repositories/recipe_repository_impl.dart';
+import 'package:kubo_pos/data/repositories/settings_repository_impl.dart';
 import 'package:kubo_pos/domain/entities/business_settings.dart';
 import 'package:kubo_pos/domain/entities/ingredient.dart';
 import 'package:kubo_pos/domain/entities/menu.dart';
@@ -44,6 +45,9 @@ class PosFixture {
     clock,
     settings: () => settings,
   );
+
+  late final SettingsRepositoryImpl settingsRepository =
+      SettingsRepositoryImpl(db, clock);
 
   late final SalesService sales = SalesService(
     database: db,

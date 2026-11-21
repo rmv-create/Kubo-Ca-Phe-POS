@@ -845,6 +845,28 @@ class SalesService {
     });
   }
 
+  /// Writes down that the owner stood over the till and allowed something.
+  ///
+  /// Her PIN allows one action once, and the trail should say so: the
+  /// action itself is recorded against whoever is signed in — the barista —
+  /// and this says who let him. Two lines, because that is two facts.
+  Future<void> noteOwnerAllowed({
+    required int orderId,
+    required String what,
+    required String owner,
+  }) async {
+    final DateTime now = _clock.now();
+    await _db.db.insert('audit_log', <String, Object?>{
+      'actor': _who(),
+      'at': now.toUtc().toIso8601String(),
+      'business_date': _businessDateOf(now),
+      'action': 'owner_allowed',
+      'entity_type': 'order',
+      'entity_id': orderId,
+      'summary': '$owner allowed it: $what',
+    });
+  }
+
   /// Moves a finished order to another day.
   ///
   /// For the order rung up at six in the morning that was really last

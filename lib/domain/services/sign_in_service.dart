@@ -151,6 +151,31 @@ class SignInService {
     return _fromRow(<String, Object?>{...row, 'last_signed_in_at': now});
   }
 
+  /// Checks a PIN against the owners, without signing anybody in.
+  ///
+  /// For the one thing on the orders list the barista may not do by himself.
+  /// She stands at his shoulder, types her six digits, and the action goes
+  /// ahead once — the till is still his, she has not taken it over, and
+  /// nothing about who is signed in has changed. The trail records both: the
+  /// person at the till, and that she allowed it.
+  ///
+  /// Returns her name when the PIN is an owner's, and null otherwise.
+  Future<String?> ownerSaysYes(String pin) async {
+    if (pin.length != pinLength) return null;
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'app_users',
+      where: "role = 'owner' AND is_active = 1",
+    );
+    for (final Map<String, Object?> row in rows) {
+      final bool matches = _matches(
+        _hash(pin, row['pin_salt']! as String),
+        row['pin_hash']! as String,
+      );
+      if (matches) return row['name']! as String;
+    }
+    return null;
+  }
+
   Future<bool> _isLastOwner(int userId) async {
     final List<Map<String, Object?>> rows = await _db.db.rawQuery(
       'SELECT COUNT(*) AS n FROM app_users '

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../features/access/presentation/tills_screen.dart';
@@ -27,6 +28,7 @@ import '../features/stock/presentation/ingredients_screen.dart';
 import '../features/stock/presentation/inventory_screen.dart';
 import '../features/stock/presentation/purchasing_screens.dart';
 import '../features/stock/presentation/recipes_screen.dart';
+import 'providers.dart';
 import 'shell/app_shell.dart';
 
 abstract final class Routes {
@@ -93,7 +95,13 @@ GoRouter createRouter() => GoRouter(
               builder: (BuildContext context, GoRouterState state) =>
                   const ManagementGate(child: ManagementHomeScreen()),
               routes: <RouteBase>[
-                _section('orders', const OrdersScreen()),
+                // The one screen she can hand over: he cannot put an order
+                // right without finding it first.
+                _section(
+                  'orders',
+                  const OrdersScreen(),
+                  alsoAllow: canCorrectOrdersProvider,
+                ),
                 _section('customers', const CustomersScreen()),
                 GoRoute(
                   path: 'menu',
@@ -182,8 +190,9 @@ GoRouter createRouter() => GoRouter(
 /// The gate is applied per route rather than once around the branch, because
 /// a deep link — a receipt sent to someone, a bookmarked report — must land on
 /// the same check as tapping through would.
-GoRoute _section(String path, Widget child) => GoRoute(
-  path: path,
-  builder: (BuildContext context, GoRouterState state) =>
-      ManagementGate(child: child),
-);
+GoRoute _section(String path, Widget child, {Provider<bool>? alsoAllow}) =>
+    GoRoute(
+      path: path,
+      builder: (BuildContext context, GoRouterState state) =>
+          ManagementGate(alsoAllow: alsoAllow, child: child),
+    );

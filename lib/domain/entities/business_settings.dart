@@ -41,6 +41,7 @@ class BusinessSettings {
     required this.lowStockAlertsEnabled,
     required this.orderNumberResetDaily,
     required this.showCustomerName,
+    required this.baristaMayCorrectOrders,
     required this.pricesProvisional,
     required this.vatRegistered,
     required this.vatRateBp,
@@ -76,6 +77,9 @@ class BusinessSettings {
     // The owner numbers orders K-0001 onwards, continuously.
     orderNumberResetDaily: false,
     showCustomerName: true,
+    // Off until she says otherwise. A right over the books is given, never
+    // assumed.
+    baristaMayCorrectOrders: false,
     pricesProvisional: false,
     // Off until the owner says otherwise. A shop below the ₱3M threshold is
     // not VAT-registered, and claiming VAT it never charged would misstate
@@ -136,6 +140,21 @@ class BusinessSettings {
   /// Whether the customer's name is shown on the order screen.
   final bool showCustomerName;
 
+  /// Whether the barista may put a finished order right.
+  ///
+  /// The case for it is the one that keeps happening: the customer changes
+  /// their mind after the order is marked complete, and the person at the
+  /// till is the one standing in front of them. The case against giving him
+  /// the run of the books is obvious, so this opens exactly one door — he
+  /// may change what is on an order. Voiding it, refunding it, deleting it
+  /// and moving it to another day stay the owner's, and he can ask her for
+  /// any of them on the spot with her PIN.
+  ///
+  /// Off unless she turns it on, and she can turn it off again from her own
+  /// phone while she is out, because this travels between the tills like
+  /// every other setting.
+  final bool baristaMayCorrectOrders;
+
   /// Set while the seeded menu still carries the owner's tentative prices.
   /// The app says so on screen rather than presenting guesses as final.
   final bool pricesProvisional;
@@ -195,6 +214,7 @@ class BusinessSettings {
     bool? lowStockAlertsEnabled,
     bool? orderNumberResetDaily,
     bool? showCustomerName,
+    bool? baristaMayCorrectOrders,
     bool? pricesProvisional,
     bool? vatRegistered,
     int? vatRateBp,
@@ -222,6 +242,8 @@ class BusinessSettings {
     lowStockAlertsEnabled: lowStockAlertsEnabled ?? this.lowStockAlertsEnabled,
     orderNumberResetDaily: orderNumberResetDaily ?? this.orderNumberResetDaily,
     showCustomerName: showCustomerName ?? this.showCustomerName,
+    baristaMayCorrectOrders:
+        baristaMayCorrectOrders ?? this.baristaMayCorrectOrders,
     pricesProvisional: pricesProvisional ?? this.pricesProvisional,
     vatRegistered: vatRegistered ?? this.vatRegistered,
     vatRateBp: vatRateBp ?? this.vatRateBp,
@@ -253,6 +275,11 @@ abstract final class SettingKeys {
   static const String lowStockAlertsEnabled = 'features.low_stock_alerts';
   static const String orderNumberResetDaily = 'orders.number_reset_daily';
   static const String showCustomerName = 'pos.show_customer_name';
+
+  /// Whether the barista may correct a finished order. The shop's decision,
+  /// not the phone's, so it travels: she can withdraw it from her own phone
+  /// while she is away.
+  static const String baristaMayCorrectOrders = 'staff.barista_may_correct';
   static const String pricesProvisional = 'menu.prices_provisional';
   static const String menuSeeded = 'data.menu_seeded';
 
