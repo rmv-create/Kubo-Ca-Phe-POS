@@ -78,14 +78,40 @@ class SyncRunner {
     try {
       final CloudSyncService sync = await _ref.read(cloudSyncProvider.future);
       final String label = await _label();
-      await sync.syncNow(label: label);
+      final SyncReport report = await sync.syncNow(label: label);
       _ref.read(syncTickProvider.notifier).bump();
+      if ((report.applied?.applied ?? 0) > 0) _tellTheScreens();
     } on Object {
       // syncNow does not throw; this is for the provider itself failing to
       // build, which is not a reason to interrupt anybody.
     } finally {
       _running = false;
     }
+  }
+
+  /// Lets the screens know that the world changed underneath them.
+  ///
+  /// A round writes the other till's orders, customers and settings straight
+  /// into the database, and nothing on screen was watching the database —
+  /// every list in the app refreshes when *this* phone does something, and a
+  /// round is the one case where something happens that this phone did not
+  /// do. So the owner's phone could hold order 1217 and still show 1216 as
+  /// the next one, and a barista given leave to correct an order would not
+  /// be given it until he restarted the app.
+  ///
+  /// Cheap: each of these is a counter, and the lists hanging off them are
+  /// only rebuilt if a screen is actually watching.
+  void _tellTheScreens() {
+    _ref.read(salesRevisionProvider.notifier).heard();
+    _ref.read(customerRevisionProvider.notifier).bump();
+    _ref.read(menuRevisionProvider.notifier).bump();
+    _ref.read(stockRevisionProvider.notifier).bump();
+    _ref.read(userRevisionProvider.notifier).bump();
+    _ref.read(paymentMethodRevisionProvider.notifier).bump();
+    // The shop's own settings travel too — what the receipt says, and who
+    // may put an order right — and they are held in memory, so they are the
+    // one thing a counter cannot refresh.
+    unawaited(_ref.read(settingsControllerProvider.notifier).reload());
   }
 
   /// Whether there is an order being taken right now.

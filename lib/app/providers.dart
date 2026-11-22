@@ -350,6 +350,12 @@ class SalesRevision extends Notifier<int> {
     state = state + 1;
     ref.read(syncRunnerProvider).somethingHappened();
   }
+
+  /// The same refresh, without the nudge to tell anyone.
+  ///
+  /// For what arrived *from* the other till: it already knows, and telling
+  /// it back would have the two of them taking turns to say nothing.
+  void heard() => state = state + 1;
 }
 
 /// Bumped after a customer is created or edited.

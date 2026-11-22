@@ -4,6 +4,7 @@ import 'package:kubo_pos/data/db/seed/pantry_seeder.dart';
 import 'package:kubo_pos/data/db/sync/sync_change.dart';
 import 'package:kubo_pos/data/db/sync/sync_engine.dart';
 import 'package:kubo_pos/domain/entities/order_draft.dart';
+import 'package:kubo_pos/domain/entities/reporting.dart';
 import 'package:kubo_pos/domain/services/moving_average_cost.dart';
 import 'package:sqflite_common/sqflite_logger.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -113,6 +114,38 @@ void main() {
       errands,
       lessThan(20),
       reason: 'the whole pantry at once, not ingredient by ingredient',
+    );
+  });
+
+  test('the list she records payments on', () async {
+    final PosFixture shop = await PosFixture.open(factory: counting);
+    addTearDown(shop.close);
+    await PantrySeeder(shop.db, shop.clock).seedIfEmpty();
+
+    // A morning of online orders, rung up and waiting to be paid.
+    for (int i = 0; i < 60; i++) {
+      await shop.sell(
+        OrderDraft(
+          items: <DraftItem>[
+            await shop.item('Spanish Latte', 'Large', lineId: 'u$i'),
+          ],
+          unpaid: true,
+        ),
+      );
+    }
+
+    errands = 0;
+    final List<OrderRecord> waiting = await shop.sales.unpaidOrders();
+    expect(waiting.length, 60);
+
+    // Measured at 4, whatever the length of the list. It was three questions
+    // per order — the drinks, the choices on each drink, the discount — so
+    // a hundred orders meant three hundred errands, and she called the page
+    // very slow.
+    expect(
+      errands,
+      lessThan(12),
+      reason: 'a list is a handful of questions, not three per order',
     );
   });
 

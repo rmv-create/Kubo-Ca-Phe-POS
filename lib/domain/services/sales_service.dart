@@ -93,11 +93,7 @@ class SalesService {
       <Object?>[...args, limit],
     );
 
-    final List<OrderRecord> records = <OrderRecord>[];
-    for (final Map<String, Object?> row in rows) {
-      records.add(await _record(row));
-    }
-    return records;
+    return _records(rows);
   }
 
   Future<OrderRecord?> orderById(int id) async {
@@ -126,30 +122,101 @@ class SalesService {
     return rows.isEmpty ? null : _record(rows.first);
   }
 
-  Future<OrderRecord> _record(Map<String, Object?> row) async {
-    final int id = row['id']! as int;
-    final List<Map<String, Object?>> lineRows = await _db.db.query(
-      'order_items',
-      where: 'order_id = ?',
-      whereArgs: <Object?>[id],
-      orderBy: 'line_no',
-    );
+  Future<OrderRecord> _record(Map<String, Object?> row) async =>
+      (await _records(<Map<String, Object?>>[row])).first;
 
-    final List<OrderLineRecord> lines = <OrderLineRecord>[];
-    for (final Map<String, Object?> line in lineRows) {
-      final List<Map<String, Object?>> optionRows = await _db.db.query(
-        'order_item_customizations',
-        columns: <String>[
-          'option_name_snapshot',
-          'group_name_snapshot',
-          'price_delta_centavos',
-          'was_default_snapshot',
-        ],
-        where: 'order_item_id = ?',
-        whereArgs: <Object?>[line['id']],
-        orderBy: 'display_order',
+  /// Builds every order on a list, in a fixed number of questions.
+  ///
+  /// It used to be three per order — the drinks, then the choices on each
+  /// drink, then any discount — so a hundred orders meant three hundred
+  /// separate errands to the database. On a phone, where the database is
+  /// behind a worker and every statement is a message sent and waited for,
+  /// that is what made the unpaid list sit there thinking. It is four
+  /// questions now, however long the list.
+  Future<List<OrderRecord>> _records(List<Map<String, Object?>> rows) async {
+    if (rows.isEmpty) return const <OrderRecord>[];
+
+    final List<int> ids = <int>[
+      for (final Map<String, Object?> row in rows) row['id']! as int,
+    ];
+
+    // The drinks, for every order at once.
+    final Map<int, List<Map<String, Object?>>> linesByOrder =
+        <int, List<Map<String, Object?>>>{};
+    for (final List<int> some in _inHandfuls(ids)) {
+      final List<Map<String, Object?>> lineRows = await _db.db.rawQuery(
+        'SELECT * FROM order_items WHERE order_id IN (${_holes(some.length)}) '
+        'ORDER BY order_id, line_no',
+        some,
       );
-      lines.add(
+      for (final Map<String, Object?> line in lineRows) {
+        (linesByOrder[line['order_id']! as int] ??= <Map<String, Object?>>[])
+            .add(line);
+      }
+    }
+
+    // What was chosen on each of them, again all at once.
+    final List<int> lineIds = <int>[
+      for (final List<Map<String, Object?>> lines in linesByOrder.values)
+        for (final Map<String, Object?> line in lines) line['id']! as int,
+    ];
+    final Map<int, List<Map<String, Object?>>> optionsByLine =
+        <int, List<Map<String, Object?>>>{};
+    for (final List<int> some in _inHandfuls(lineIds)) {
+      final List<Map<String, Object?>> optionRows = await _db.db.rawQuery(
+        'SELECT order_item_id, option_name_snapshot, group_name_snapshot, '
+        'price_delta_centavos, was_default_snapshot '
+        'FROM order_item_customizations '
+        'WHERE order_item_id IN (${_holes(some.length)}) '
+        'ORDER BY order_item_id, display_order',
+        some,
+      );
+      for (final Map<String, Object?> option in optionRows) {
+        (optionsByLine[option['order_item_id']! as int] ??=
+                <Map<String, Object?>>[])
+            .add(option);
+      }
+    }
+
+    // The statutory discount, where one was applied. Read from its own table
+    // rather than recomputed: the rate or the shop's VAT position may have
+    // changed since, and the receipt has to say what was actually charged.
+    final Map<int, Map<String, Object?>> discountByOrder =
+        <int, Map<String, Object?>>{};
+    for (final List<int> some in _inHandfuls(ids)) {
+      final List<Map<String, Object?>> discountRows = await _db.db.rawQuery(
+        'SELECT * FROM order_discounts '
+        'WHERE order_id IN (${_holes(some.length)})',
+        some,
+      );
+      for (final Map<String, Object?> discount in discountRows) {
+        discountByOrder.putIfAbsent(
+          discount['order_id']! as int,
+          () => discount,
+        );
+      }
+    }
+
+    return <OrderRecord>[
+      for (final Map<String, Object?> row in rows)
+        _assemble(
+          row,
+          lines:
+              linesByOrder[row['id']! as int] ?? const <Map<String, Object?>>[],
+          optionsByLine: optionsByLine,
+          discount: discountByOrder[row['id']! as int],
+        ),
+    ];
+  }
+
+  OrderRecord _assemble(
+    Map<String, Object?> row, {
+    required List<Map<String, Object?>> lines,
+    required Map<int, List<Map<String, Object?>>> optionsByLine,
+    required Map<String, Object?>? discount,
+  }) {
+    final List<OrderLineRecord> drinks = <OrderLineRecord>[
+      for (final Map<String, Object?> line in lines)
         OrderLineRecord(
           id: line['id']! as int,
           productName: line['product_name_snapshot']! as String,
@@ -161,38 +228,25 @@ class SalesService {
           lineTotal: Money(line['line_total_centavos']! as int),
           lineCogs: Money(line['line_cogs_centavos']! as int),
           isCosted: line['recipe_version_id'] != null,
-          options: optionRows
-              .map(
-                (Map<String, Object?> o) => OrderLineOption(
-                  name: o['option_name_snapshot']! as String,
-                  groupName: (o['group_name_snapshot'] as String?) ?? '',
-                  // Null on an order sold before this was recorded: those
-                  // receipts keep printing every choice, as they did when
-                  // they were issued.
-                  wasDefault: o['was_default_snapshot'] == 1,
-                  priceDelta: Money(o['price_delta_centavos']! as int),
-                ),
-              )
-              .toList(),
+          options: <OrderLineOption>[
+            for (final Map<String, Object?> o
+                in optionsByLine[line['id']! as int] ??
+                    const <Map<String, Object?>>[])
+              OrderLineOption(
+                name: o['option_name_snapshot']! as String,
+                groupName: (o['group_name_snapshot'] as String?) ?? '',
+                // Null on an order sold before this was recorded: those
+                // receipts keep printing every choice, as they did when
+                // they were issued.
+                wasDefault: o['was_default_snapshot'] == 1,
+                priceDelta: Money(o['price_delta_centavos']! as int),
+              ),
+          ],
         ),
-      );
-    }
-
-    // The statutory discount, if one was applied. Read from its own table
-    // rather than recomputed: the rate or the shop's VAT position may have
-    // changed since, and the receipt has to say what was actually charged.
-    final List<Map<String, Object?>> discountRows = await _db.db.query(
-      'order_discounts',
-      where: 'order_id = ?',
-      whereArgs: <Object?>[id],
-      limit: 1,
-    );
-    final Map<String, Object?>? discountRow = discountRows.isEmpty
-        ? null
-        : discountRows.first;
+    ];
 
     return OrderRecord(
-      id: id,
+      id: row['id']! as int,
       orderNo: row['order_no']! as String,
       createdAt: DateTime.parse(row['created_at']! as String),
       businessDate: row['business_date']! as String,
@@ -221,13 +275,11 @@ class SalesService {
       deliveryFee: Money((row['delivery_fee_centavos'] as int?) ?? 0),
       vat: Money((row['vat_centavos'] as int?) ?? 0),
       vatRateBp: (row['vat_rate_bp'] as int?) ?? 0,
-      discountLabel: discountRow?['name'] as String?,
-      discountRateBp: (discountRow?['rate_bp'] as int?) ?? 0,
-      discountVatExempt: Money(
-        (discountRow?['vat_exempt_centavos'] as int?) ?? 0,
-      ),
-      discountBeneficiaryName: discountRow?['beneficiary_name'] as String?,
-      discountBeneficiaryIdNo: discountRow?['beneficiary_id_no'] as String?,
+      discountLabel: discount?['name'] as String?,
+      discountRateBp: (discount?['rate_bp'] as int?) ?? 0,
+      discountVatExempt: Money((discount?['vat_exempt_centavos'] as int?) ?? 0),
+      discountBeneficiaryName: discount?['beneficiary_name'] as String?,
+      discountBeneficiaryIdNo: discount?['beneficiary_id_no'] as String?,
       paymentReference: row['payment_reference'] as String?,
       tendered: row['tendered_centavos'] == null
           ? null
@@ -235,9 +287,18 @@ class SalesService {
       change: row['change_centavos'] == null
           ? null
           : Money(row['change_centavos']! as int),
-      lines: lines,
+      lines: drinks,
     );
   }
+
+  /// Splits a list into lengths SQLite will take as query arguments.
+  static Iterable<List<T>> _inHandfuls<T>(List<T> all, {int of = 200}) =>
+      <List<T>>[
+        for (int i = 0; i < all.length; i += of)
+          all.sublist(i, i + of > all.length ? all.length : i + of),
+      ];
+
+  static String _holes(int count) => List<String>.filled(count, '?').join(',');
 
   // ───────────────────────── paying afterwards ─────────────────────────
 
@@ -263,11 +324,7 @@ class SalesService {
       ''',
       <Object?>[limit],
     );
-    final List<OrderRecord> records = <OrderRecord>[];
-    for (final Map<String, Object?> row in rows) {
-      records.add(await _record(row));
-    }
-    return records;
+    return _records(rows);
   }
 
   /// Records the money arriving for an order that was completed unpaid.
