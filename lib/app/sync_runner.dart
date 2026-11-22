@@ -69,7 +69,11 @@ class SyncRunner {
     _afterOrder = Timer(_settle, runNow);
   }
 
-  Future<void> runNow() async {
+  /// Tells and is told, unless this is a bad moment.
+  ///
+  /// [asked] is for a round somebody pressed a button for: she has asked
+  /// for it in so many words, so it does not stand aside for anything.
+  Future<void> runNow({bool asked = false}) async {
     // One at a time. Two rounds at once would publish the same outbox rows
     // twice and race each other to move the cursor.
     if (_running) return;
@@ -83,11 +87,12 @@ class SyncRunner {
     // never arriving, the number on screen falling further behind, all day.
     // So after [longestStandDown] the round goes anyway: a moment's wait
     // for her is better than a till that quietly stops listening.
-    if (waitForTheTill(
-      serving: _sheIsServing,
-      putOffSince: _putOff,
-      now: DateTime.now(),
-    )) {
+    if (!asked &&
+        waitForTheTill(
+          serving: _sheIsServing,
+          putOffSince: _putOff,
+          now: DateTime.now(),
+        )) {
       _putOff ??= DateTime.now();
       _afterOrder?.cancel();
       _afterOrder = Timer(_settle, runNow);

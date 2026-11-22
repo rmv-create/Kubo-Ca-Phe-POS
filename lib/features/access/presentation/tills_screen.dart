@@ -429,7 +429,9 @@ class _SyncLine extends ConsumerWidget {
           ),
           TextButton(
             onPressed: () async {
-              await ref.read(syncRunnerProvider).runNow();
+              // She pressed it, so it goes now — even with an order still
+              // on the screen behind her.
+              await ref.read(syncRunnerProvider).runNow(asked: true);
               ref.invalidate(syncStandingProvider);
             },
             child: const Text('NOW'),
