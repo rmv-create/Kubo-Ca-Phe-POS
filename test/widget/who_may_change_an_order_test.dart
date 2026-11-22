@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kubo_pos/app/providers.dart';
+import 'package:kubo_pos/app/responsive/form_factor.dart';
 import 'package:kubo_pos/app/theme/app_theme.dart';
 import 'package:kubo_pos/data/db/seed/pantry_seeder.dart';
 import 'package:kubo_pos/domain/entities/app_user.dart';
 import 'package:kubo_pos/domain/entities/business_settings.dart';
 import 'package:kubo_pos/domain/entities/order_draft.dart';
+import 'package:kubo_pos/features/pos/presentation/pos_screen.dart';
 import 'package:kubo_pos/features/sales/presentation/orders_screen.dart';
 
 import '../support/pos_fixture.dart';
@@ -135,6 +137,58 @@ void main() {
     await open(tester, role: UserRole.barista, mayCorrect: true);
     expect(find.text('Cost to make'), findsNothing);
     expect(find.text('Gross profit'), findsNothing);
+  });
+
+  testWidgets('and he is given a way to the orders at the till', (
+    WidgetTester tester,
+  ) async {
+    // What he reported: no order list. The orders live behind Management,
+    // which is hers, so being allowed to correct an order is no use without
+    // a door to walk through — this is that door, on the POS header.
+    tester.view.physicalSize =
+        const Size(430, 932) * tester.view.devicePixelRatio;
+    addTearDown(tester.view.reset);
+
+    Future<void> pumpTill({required bool mayCorrect}) async {
+      final ProviderContainer container = ProviderContainer(
+        overrides: <Override>[
+          databaseProvider.overrideWithValue(shop.db),
+          clockProvider.overrideWithValue(shop.clock),
+          initialSettingsProvider.overrideWithValue(
+            BusinessSettings.defaults.copyWith(
+              baristaMayCorrectOrders: mayCorrect,
+            ),
+          ),
+        ],
+      );
+      addTearDown(container.dispose);
+      container
+          .read(signedInUserProvider.notifier)
+          .set(
+            const AppUser(
+              id: 1,
+              name: 'Jaja',
+              role: UserRole.barista,
+              isActive: true,
+            ),
+          );
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light,
+            home: const AppLayout(child: Scaffold(body: PosScreen())),
+          ),
+        ),
+      );
+      await settle(tester);
+    }
+
+    await pumpTill(mayCorrect: false);
+    expect(find.byTooltip('Orders'), findsNothing);
+
+    await pumpTill(mayCorrect: true);
+    expect(find.byTooltip('Orders'), findsOne);
   });
 
   // Whether her PIN is the right PIN is tested without a screen, in
