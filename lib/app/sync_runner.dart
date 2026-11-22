@@ -40,10 +40,17 @@ class SyncRunner {
   Timer? _idle;
   bool _running = false;
 
+  /// When this round first stood aside for an order on the screen.
+  DateTime? _putOff;
+
   /// Long enough that a queue of customers is one round, short enough that
   /// the other till is never far behind.
   static const Duration _settle = Duration(seconds: 20);
   static const Duration _everySoOften = Duration(minutes: 5);
+
+  /// Longer than any real order takes to ring up, short enough that a
+  /// forgotten one cannot hold the two tills apart.
+  static const Duration longestStandDown = Duration(minutes: 2);
 
   void start() {
     _idle ??= Timer.periodic(_everySoOften, (_) => runNow());
@@ -67,13 +74,26 @@ class SyncRunner {
     // twice and race each other to move the cursor.
     if (_running) return;
 
-    // Never in front of a customer. An order on the screen means she is at
-    // the till, so the round is put off until she is between customers.
-    if (_sheIsServing) {
+    // Not in front of a customer, if that can be helped. An order on the
+    // screen means she is at the till, so the round waits for her to finish.
+    //
+    // But only for so long. A till with a drink left in the order and the
+    // phone put down is not serving anybody, and the first version of this
+    // would have waited for that order for ever — the other phone's sales
+    // never arriving, the number on screen falling further behind, all day.
+    // So after [longestStandDown] the round goes anyway: a moment's wait
+    // for her is better than a till that quietly stops listening.
+    if (waitForTheTill(
+      serving: _sheIsServing,
+      putOffSince: _putOff,
+      now: DateTime.now(),
+    )) {
+      _putOff ??= DateTime.now();
       _afterOrder?.cancel();
       _afterOrder = Timer(_settle, runNow);
       return;
     }
+    _putOff = null;
     _running = true;
     try {
       final CloudSyncService sync = await _ref.read(cloudSyncProvider.future);
@@ -133,3 +153,22 @@ final Provider<SyncRunner> syncRunnerProvider = Provider<SyncRunner>((Ref ref) {
   ref.onDispose(runner.stop);
   return runner;
 });
+
+/// Whether a round should stand aside for the person at the till.
+///
+/// Yes while she is ringing something up — a round is a lot of reading and
+/// writing, and the database is the one thing it shares with the order in
+/// front of her.
+///
+/// No once it has waited [SyncRunner.longestStandDown], however. A till with
+/// a drink left in the order and the phone put down is not serving anybody,
+/// and waiting for that order for ever is how one phone ends up a number
+/// behind the other all day.
+bool waitForTheTill({
+  required bool serving,
+  required DateTime? putOffSince,
+  required DateTime now,
+}) =>
+    serving &&
+    (putOffSince == null ||
+        now.difference(putOffSince) < SyncRunner.longestStandDown);
