@@ -279,9 +279,17 @@ class _NotReachingTheOtherPhone extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final SyncStanding? standing = ref.watch(syncStandingProvider).valueOrNull;
     if (standing == null || !standing.paired) return const SizedBox.shrink();
-    if (standing.problem == null || standing.waiting == 0) {
-      return const SizedBox.shrink();
-    }
+    if (standing.problem == null) return const SizedBox.shrink();
+
+    // Something waiting is the plainest sign of trouble, but not the only
+    // one: a phone shut out before it has sold anything has nothing queued
+    // and is just as cut off. So a round that has been failing for a while,
+    // or has never once succeeded, says so too.
+    final DateTime? lastAt = standing.lastAt;
+    final bool stale =
+        lastAt == null ||
+        DateTime.now().difference(lastAt) > const Duration(minutes: 15);
+    if (standing.waiting == 0 && !stale) return const SizedBox.shrink();
 
     final ThemeData theme = Theme.of(context);
     return Padding(
@@ -311,16 +319,20 @@ class _NotReachingTheOtherPhone extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        'The other phone is not getting these orders',
+                        standing.waiting == 0
+                            ? 'This phone is not reaching the other one'
+                            : 'The other phone is not getting these orders',
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: theme.colorScheme.onErrorContainer,
                         ),
                       ),
                       Text(
-                        '${standing.waiting} '
-                        '${standing.waiting == 1 ? 'thing is' : 'things are'} '
-                        'waiting to go. Nothing is lost \u2014 tap to put it '
-                        'right.',
+                        standing.waiting == 0
+                            ? 'Nothing has gone across. Tap to put it right.'
+                            : '${standing.waiting} '
+                                  '${standing.waiting == 1 ? 'thing is' : 'things are'} '
+                                  'waiting to go. Nothing is lost \u2014 tap '
+                                  'to put it right.',
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onErrorContainer,
                         ),
