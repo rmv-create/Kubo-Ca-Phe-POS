@@ -9,6 +9,7 @@ import '../../../app/sync_runner.dart';
 import '../../../app/theme/kubo_tokens.dart';
 import '../../../data/cloud/shop_directory.dart';
 import '../../../domain/services/shop_access_service.dart';
+import 'rejoin_sheet.dart';
 
 /// Which phones are in the shop, and how another one gets in.
 ///
@@ -89,6 +90,34 @@ class _TillsScreenState extends ConsumerState<TillsScreen> {
                   _invite == null ? 'INVITE A PHONE' : 'A DIFFERENT INVITE',
                 ),
               ),
+            ),
+          ),
+
+          // The way back in, for a phone the shop has stopped recognising.
+          //
+          // A till is admitted by its own sign-in id, which lives in the
+          // browser's storage; clear the site data or reinstall from the
+          // home screen and the phone goes on taking orders as a stranger.
+          // Typing an invite is what admits it again — and until now there
+          // was nowhere to type one, because the screen that asks for a
+          // code is only shown to a phone that belongs to no shop at all.
+          // This phone belongs to a shop. It is simply not welcome in it.
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              KuboSpacing.lg,
+              KuboSpacing.sm,
+              KuboSpacing.lg,
+              0,
+            ),
+            child: TextButton.icon(
+              onPressed: _working
+                  ? null
+                  : () async {
+                      await RejoinSheet.show(context);
+                      await _refresh();
+                    },
+              icon: const Icon(Icons.login),
+              label: const Text('ENTER AN INVITE ON THIS PHONE'),
             ),
           ),
 
