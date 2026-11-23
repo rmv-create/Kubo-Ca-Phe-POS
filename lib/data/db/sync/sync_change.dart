@@ -69,6 +69,7 @@ class SyncApplied {
     required this.alreadyKnown,
     required this.waitingForParent,
     required this.ignoredAsOlder,
+    this.stillWaiting = const <SyncChange>[],
   });
 
   final int applied;
@@ -80,6 +81,11 @@ class SyncApplied {
   /// Changes whose row points at something that has not arrived yet — an
   /// order line ahead of its order. Held, not dropped, and tried again.
   final int waitingForParent;
+
+  /// Which ones those were, so the caller can write them down and try them
+  /// on the next round. Without this they were held for the length of one
+  /// round and then forgotten, while the cursor moved past them for ever.
+  final List<SyncChange> stillWaiting;
 
   /// Edits to the menu or a recipe that were older than what is here.
   final int ignoredAsOlder;

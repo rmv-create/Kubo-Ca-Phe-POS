@@ -935,6 +935,7 @@ final FutureProvider<SyncStanding> syncStandingProvider =
         paired: await sync.isPaired(),
         lastAt: await sync.lastSyncAt(),
         waiting: await sync.waitingToGoUp(),
+        held: await sync.waitingToComeIn(),
         problem: await sync.lastError(),
       );
     });
@@ -953,6 +954,7 @@ class SyncStanding {
   const SyncStanding({
     required this.paired,
     required this.waiting,
+    this.held = 0,
     this.lastAt,
     this.problem,
   });
@@ -962,5 +964,11 @@ class SyncStanding {
 
   /// Changes this till has made that the others have not heard yet.
   final int waiting;
+
+  /// Changes it has heard and cannot apply yet, because the row they point
+  /// at has not arrived. Normally nought, and briefly one or two around a
+  /// page boundary. A number that stays up means something is genuinely
+  /// missing, which is worth being able to see rather than guess at.
+  final int held;
   final String? problem;
 }

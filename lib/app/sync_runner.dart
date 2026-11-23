@@ -43,10 +43,16 @@ class SyncRunner {
   /// When this round first stood aside for an order on the screen.
   DateTime? _putOff;
 
-  /// Long enough that a queue of customers is one round, short enough that
-  /// the other till is never far behind.
-  static const Duration _settle = Duration(seconds: 20);
-  static const Duration _everySoOften = Duration(minutes: 5);
+  /// Long enough that a queue of three customers is one round, short enough
+  /// that the other till is never far behind. It was twenty seconds, which
+  /// is a long time to stand looking at a number you know is wrong.
+  static const Duration _settle = Duration(seconds: 6);
+
+  /// For the till sitting on the counter taking nothing while the other one
+  /// is busy. A minute, rather than five: a round costs a few dozen
+  /// questions now, where it used to cost hundreds, so it can be asked far
+  /// more often.
+  static const Duration _everySoOften = Duration(minutes: 1);
 
   /// Longer than any real order takes to ring up, short enough that a
   /// forgotten one cannot hold the two tills apart.

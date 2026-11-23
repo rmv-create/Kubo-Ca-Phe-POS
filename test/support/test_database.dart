@@ -110,6 +110,9 @@ const Set<String> expectedTables = <String>{
   'sync_outbox',
   'sync_inbox',
   'sync_devices',
+  // Changes that arrived before the rows they point at, kept until the
+  // rows turn up. This device's own notebook; never sent anywhere.
+  'sync_waiting',
 };
 
 /// Opens a test database and writes the owner's menu into it, exactly as the

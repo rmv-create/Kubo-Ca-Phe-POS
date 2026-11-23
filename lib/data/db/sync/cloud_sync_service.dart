@@ -43,6 +43,10 @@ class CloudSyncService {
 
   Future<int> waitingToGoUp() => _engine.pendingCount();
 
+  /// How much this till has heard and cannot use yet, for want of the row it
+  /// points at.
+  Future<int> waitingToComeIn() => _engine.waitingCount();
+
   /// Remembers which shop this till belongs to, once it has been let in.
   Future<void> rememberShop(String id) async =>
       _settings.writeRaw(SettingKeys.syncShopId, id);
@@ -74,10 +78,22 @@ class CloudSyncService {
         await _settings.readRaw(SettingKeys.syncCursor),
       );
       final SyncFetch incoming = await transport.fetch(afterCursor: cursor);
-      final SyncApplied applied = await _engine.apply(incoming.changes);
 
-      // Only after they are safely applied: a cursor moved too early is a
-      // change nobody ever hears about again.
+      // What this till is still holding goes in with the new page, so a
+      // change that arrived before the row it belongs to gets another
+      // chance every round. Held first: the page may well be carrying the
+      // parent it has been waiting for.
+      final List<SyncChange> held = await _engine.waitingRoom();
+      final SyncApplied applied = await _engine.apply(<SyncChange>[
+        ...held,
+        ...incoming.changes,
+      ]);
+      await _engine.keepWaiting(applied.stillWaiting);
+
+      // The cursor may now move. It could before, too — past changes that
+      // had not been applied and were about to be forgotten, which is how
+      // an order on one phone never reached the other with nothing in the
+      // log to show for it.
       final String? next = incoming.cursor;
       if (next != null && next != cursor) {
         await _settings.writeRaw(SettingKeys.syncCursor, next);

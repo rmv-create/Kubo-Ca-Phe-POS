@@ -415,7 +415,11 @@ class _SyncLine extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  standing.waiting == 0
+                  standing.held > 0
+                      ? '${standing.held} '
+                            '${standing.held == 1 ? 'thing' : 'things'} '
+                            'waiting for something else to arrive'
+                      : standing.waiting == 0
                       ? 'Everything here has been passed on'
                       : '${standing.waiting} '
                             '${standing.waiting == 1 ? 'thing' : 'things'} '

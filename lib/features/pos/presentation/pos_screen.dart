@@ -12,6 +12,7 @@ import '../../../domain/entities/order_draft.dart';
 import '../../../shared/widgets/async_view.dart';
 import '../../../shared/widgets/kubo_mark.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../../access/presentation/rejoin_sheet.dart';
 import '../state/cart_controller.dart';
 import 'customer_sheet.dart';
 import 'order_pane.dart';
@@ -55,6 +56,7 @@ class _CompactPos extends StatelessWidget {
     child: Column(
       children: <Widget>[
         _PosHeader(),
+        _NotReachingTheOtherPhone(),
         _CustomerStrip(),
         Expanded(child: _MenuPane()),
         _BottomBar(),
@@ -79,6 +81,7 @@ class _WidePos extends ConsumerWidget {
       child: Column(
         children: <Widget>[
           const _PosHeader(),
+          const _NotReachingTheOtherPhone(),
           const Divider(height: 1),
           Expanded(
             child: Row(
@@ -248,6 +251,87 @@ class _PosHeader extends ConsumerWidget {
               onPressed: () => context.go(Routes.manage),
             ),
         ],
+      ),
+    );
+  }
+}
+
+/// Says, on the till itself, when this phone's orders are going nowhere.
+///
+/// A till is let into the shop by its own sign-in id, and that id lives in
+/// the browser's storage: clear the site data or reinstall from the home
+/// screen and the phone goes on taking orders while the shop no longer
+/// recognises it. Everything queues and nothing leaves.
+///
+/// That happened, and it was invisible — the only sign was a line on a
+/// screen in the management area that nobody had reason to open, while the
+/// owner's phone quietly showed three of the day's eight orders. So it is
+/// said here, where whoever is serving will see it, and the way out is one
+/// tap away.
+///
+/// It appears only when there is both a problem and something waiting: a
+/// till that has simply not synced yet, or has nothing to say, is not a
+/// till in trouble.
+class _NotReachingTheOtherPhone extends ConsumerWidget {
+  const _NotReachingTheOtherPhone();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final SyncStanding? standing = ref.watch(syncStandingProvider).valueOrNull;
+    if (standing == null || !standing.paired) return const SizedBox.shrink();
+    if (standing.problem == null || standing.waiting == 0) {
+      return const SizedBox.shrink();
+    }
+
+    final ThemeData theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        KuboSpacing.lg,
+        0,
+        KuboSpacing.lg,
+        KuboSpacing.md,
+      ),
+      child: Material(
+        color: theme.colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(KuboRadius.lg),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(KuboRadius.lg),
+          onTap: () => RejoinSheet.show(context),
+          child: Padding(
+            padding: const EdgeInsets.all(KuboSpacing.md),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.sync_problem,
+                  color: theme.colorScheme.onErrorContainer,
+                ),
+                const SizedBox(width: KuboSpacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        'The other phone is not getting these orders',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                      ),
+                      Text(
+                        '${standing.waiting} '
+                        '${standing.waiting == 1 ? 'thing is' : 'things are'} '
+                        'waiting to go. Nothing is lost \u2014 tap to put it '
+                        'right.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../../core/time/clock.dart';
@@ -254,6 +256,61 @@ class SyncEngine {
     );
   }
 
+  // ────────────────────── what is still waiting ──────────────────────
+
+  /// The changes this till is holding until the rows they point at arrive.
+  Future<List<SyncChange>> waitingRoom({int limit = 2000}) async {
+    final List<Map<String, Object?>> rows = await _db.db.query(
+      'sync_waiting',
+      columns: <String>['payload'],
+      orderBy: 'first_seen, change_id',
+      limit: limit,
+    );
+    return <SyncChange>[
+      for (final Map<String, Object?> row in rows)
+        SyncChange.fromJson(
+          jsonDecode(row['payload']! as String) as Map<String, Object?>,
+        ),
+    ];
+  }
+
+  /// Writes down what is still waiting, and forgets what no longer is.
+  ///
+  /// The round has just tried everything it was holding along with the new
+  /// page, so whatever is not in [stillWaiting] has been dealt with — it
+  /// went in, or it was already known, or it was older than what is here.
+  Future<void> keepWaiting(List<SyncChange> stillWaiting) async {
+    final String now = _clock.now().toUtc().toIso8601String();
+    await _db.db.transaction((Transaction txn) async {
+      final Map<String, int> triedBefore = <String, int>{
+        for (final Map<String, Object?> row in await txn.query(
+          'sync_waiting',
+          columns: <String>['change_id', 'tries'],
+        ))
+          row['change_id']! as String: row['tries']! as int,
+      };
+      await txn.delete('sync_waiting');
+      final Batch batch = txn.batch();
+      for (final SyncChange change in stillWaiting) {
+        batch.insert('sync_waiting', <String, Object?>{
+          'change_id': change.changeId,
+          'payload': jsonEncode(change.toJson()),
+          'first_seen': now,
+          'tries': (triedBefore[change.changeId] ?? 0) + 1,
+        }, conflictAlgorithm: ConflictAlgorithm.replace);
+      }
+      if (stillWaiting.isNotEmpty) await batch.commit(noResult: true);
+    });
+  }
+
+  /// How many changes are being held. For the sync screen.
+  Future<int> waitingCount() async {
+    final List<Map<String, Object?>> rows = await _db.db.rawQuery(
+      'SELECT COUNT(*) AS n FROM sync_waiting',
+    );
+    return (rows.first['n'] as int?) ?? 0;
+  }
+
   // ─────────────────────────── coming in ───────────────────────────
 
   /// Takes in what the other tills have done.
@@ -332,6 +389,7 @@ class SyncEngine {
       alreadyKnown: known,
       waitingForParent: pending.length,
       ignoredAsOlder: older,
+      stillWaiting: pending,
     );
   }
 
