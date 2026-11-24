@@ -8,6 +8,7 @@ import 'package:kubo_pos/data/db/app_database.dart';
 import 'package:kubo_pos/domain/entities/app_user.dart';
 import 'package:kubo_pos/domain/entities/business_settings.dart';
 import 'package:kubo_pos/features/pos/presentation/pos_screen.dart';
+import 'package:sqflite_common/sqlite_api.dart';
 
 import '../support/test_database.dart';
 
@@ -40,7 +41,23 @@ void main() {
     WidgetTester tester, {
     required SyncStanding standing,
     UserRole role = UserRole.barista,
+    String till = 'barista',
   }) async {
+    // What this phone was set up as, which decides which way back in it is
+    // offered. It is not the same thing as who is signed in at the till:
+    // the barista's phone was set up with the owner's own account, so it
+    // calls itself her phone and he has to say otherwise.
+    // Through runAsync: a widget test runs in a zone where real work —
+    // the database lives in another isolate — never finishes unless it is
+    // let out. Awaited plainly, this line waits for ever.
+    await tester.runAsync(
+      () => database.db.insert('app_settings', <String, Object?>{
+        'key': SettingKeys.syncRole,
+        'value': till,
+        'updated_at': '2026-11-24T00:00:00.000Z',
+      }, conflictAlgorithm: ConflictAlgorithm.replace),
+    );
+
     tester.view.physicalSize =
         const Size(430, 1400) * tester.view.devicePixelRatio;
     addTearDown(tester.view.reset);
@@ -91,6 +108,30 @@ void main() {
     await tester.tap(find.textContaining('357'));
     await settle(tester);
     expect(find.text('Let this phone back in'), findsOne);
+  });
+
+  testWidgets('a phone set up with her account is offered her way back in', (
+    WidgetTester tester,
+  ) async {
+    // Which is the barista's phone, as it happens: it was set up by signing
+    // in with her account, so it calls itself the owner's. The sheet offers
+    // what the phone says it is, and a line to say otherwise.
+    await pumpTill(
+      tester,
+      till: 'owner',
+      standing: SyncStanding(
+        paired: true,
+        waiting: 357,
+        problem: 'This till has not been let into the shop yet.',
+        lastAt: DateTime(2026, 11, 20),
+      ),
+    );
+
+    await tester.tap(find.textContaining('357'));
+    await settle(tester);
+
+    expect(find.text('Sign this phone back in'), findsOne);
+    expect(find.textContaining('barista'), findsOne);
   });
 
   testWidgets('a phone shut out before it sold anything is told too', (
