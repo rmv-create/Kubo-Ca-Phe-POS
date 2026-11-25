@@ -309,14 +309,22 @@ class ShopAccessService {
     required String code,
     required String deviceLabel,
   }) async {
-    if (!await _account.signInAsDevice()) {
+    if (!await _account.signInAsDevice(asItself: true)) {
       return const AccessOutcome.failed(
         'No connection. Joining a shop needs signal, just this once.',
       );
     }
 
-    final String? shopId = await _directory.shopForInvite(code);
+    final ({String? shopId, String? trouble}) found = await _directory
+        .shopForInvite(code);
+    final String? shopId = found.shopId;
     if (shopId == null) {
+      if (found.trouble != null) {
+        return AccessOutcome.failed(
+          'The shop would not answer about that code (${found.trouble}). '
+          'A new code will not help with this one.',
+        );
+      }
       return const AccessOutcome.failed(
         'That code is wrong or has run out. Ask for a new one — they '
         'last ten minutes.',
@@ -328,16 +336,17 @@ class ShopAccessService {
       return const AccessOutcome.failed('This phone could not sign in.');
     }
 
-    final bool welcomed = await _directory.join(
+    final String? refused = await _directory.join(
       shopId: shopId,
       code: code,
       uid: uid,
       deviceId: await _engine.deviceId(),
       label: deviceLabel.trim().isEmpty ? 'Barista' : deviceLabel.trim(),
     );
-    if (!welcomed) {
-      return const AccessOutcome.failed(
-        'That code was refused. Ask for a new one.',
+    if (refused != null) {
+      return AccessOutcome.failed(
+        'The shop turned this phone away ($refused). The code was read, so '
+        'a new one will not help \u2014 show this to whoever set the phone up.',
       );
     }
 

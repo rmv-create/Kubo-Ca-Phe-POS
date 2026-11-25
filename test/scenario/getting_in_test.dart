@@ -304,6 +304,46 @@ void main() {
     });
   });
 
+  group('the barista joins on a phone set up with her account', () {
+    // Two days of this. She made a code, he typed it, the shop said no,
+    // she made another. The code was never the fault: the phone was
+    // carrying her sign-in, so to the shop it was not a new phone asking
+    // to come in — it was the owner's till asking to be demoted, and that
+    // is the one thing the rules will not have.
+    test('puts her account down first, and is let in as itself', () async {
+      await account.createAccount(email: 'her@example.com', password: 'coffee');
+      directory.tillRoles['uid-of-her@example.com'] = 'owner';
+      directory.liveInvite = 'K7PQM39X';
+      directory.shopOfInvite = 'her-shop';
+
+      final AccessOutcome joined = await access.joinWithInvite(
+        code: 'K7PQ-M39X',
+        deviceLabel: 'Jaja',
+      );
+
+      expect(account.askedAsItself, isTrue, reason: 'asked as its own phone');
+      expect(joined.succeeded, isTrue);
+      expect(await access.role(), 'barista');
+    });
+
+    test('is told what the shop said, not that the code was bad', () async {
+      directory.liveInvite = 'K7PQM39X';
+      directory.shopOfInvite = 'her-shop';
+      directory.refuseToJoin = true;
+
+      final AccessOutcome turned = await access.joinWithInvite(
+        code: 'K7PQ-M39X',
+        deviceLabel: 'Jaja',
+      );
+
+      expect(turned.succeeded, isFalse);
+      // The old wording sent her off to write out another code, over and
+      // over, against a refusal no new code could ever answer.
+      expect(turned.problem, contains('permission-denied'));
+      expect(turned.problem, contains('a new one will not help'));
+    });
+  });
+
   group('the barista joins', () {
     test('is let in by a live invite, as a barista', () async {
       directory.liveInvite = 'K7PQM39X';
@@ -525,6 +565,10 @@ class _Account extends AccountService {
   @override
   String? get deviceUid => _user?.uid ?? 'anonymous-device';
 
+  /// Whether the phone put down the account it was holding before asking
+  /// to be let in as a barista's.
+  bool askedAsItself = false;
+
   @override
   Future<AccountOutcome> createAccount({
     required String email,
@@ -559,7 +603,13 @@ class _Account extends AccountService {
   }
 
   @override
-  Future<bool> signInAsDevice() async => true;
+  Future<bool> signInAsDevice({bool asItself = false}) async {
+    if (asItself && _user != null) {
+      askedAsItself = true;
+      _user = null;
+    }
+    return true;
+  }
 
   bool discarded = false;
 
@@ -620,19 +670,30 @@ class _Directory extends ShopDirectory {
   }
 
   @override
-  Future<String?> shopForInvite(String code) async =>
-      ShopDirectory.tidy(code) == liveInvite ? shopOfInvite : null;
+  Future<({String? shopId, String? trouble})> shopForInvite(
+    String code,
+  ) async => ShopDirectory.tidy(code) == liveInvite
+      ? (shopId: shopOfInvite, trouble: null)
+      : (shopId: null, trouble: null);
+
+  /// The tills the shop already holds, by sign-in id, and what each is.
+  /// The rules will not let a till change what it is, so a uid already in
+  /// here as the owner cannot be written in again as a barista.
+  final Map<String, String> tillRoles = <String, String>{};
 
   @override
-  Future<bool> join({
+  Future<String?> join({
     required String shopId,
     required String code,
     required String uid,
     required String deviceId,
     required String label,
   }) async {
-    if (refuseToJoin) return false;
+    if (refuseToJoin) return 'permission-denied';
+    final String? already = tillRoles[uid];
+    if (already != null && already != 'barista') return 'permission-denied';
+    tillRoles[uid] = 'barista';
     joinedAs = label;
-    return true;
+    return null;
   }
 }

@@ -148,32 +148,43 @@ class ShopDirectory {
     });
   }
 
-  /// Which shop an invite opens, or null if it is wrong or has run out.
-  Future<String?> shopForInvite(String code) async {
+  /// Which shop an invite opens, and if none, what actually went wrong.
+  ///
+  /// The two are kept apart because they send her to different places. A
+  /// code that has run out is answered by making another; a refusal or a
+  /// lost connection is not, and telling her the code was wrong when it was
+  /// not had her writing out fresh codes for two days against a fault that
+  /// was never in them.
+  Future<({String? shopId, String? trouble})> shopForInvite(String code) async {
     await CloudStart.ready();
     final FirebaseFirestore? db = _db;
-    if (db == null) return null;
+    if (db == null) {
+      return (shopId: null, trouble: 'this phone cannot reach the shop');
+    }
     final String key = tidy(code);
-    if (key.isEmpty) return null;
+    if (key.isEmpty) return (shopId: null, trouble: null);
     try {
       final DocumentSnapshot<Map<String, Object?>> doc = await db
           .collection('invites')
           .doc(key)
           .get();
       final Map<String, Object?>? data = doc.data();
-      if (data == null) return null;
+      if (data == null) return (shopId: null, trouble: null);
       final Timestamp? expires = data['expires_at'] as Timestamp?;
       if (expires == null || expires.toDate().isBefore(DateTime.now())) {
-        return null;
+        return (shopId: null, trouble: null);
       }
-      return data['shop_id'] as String?;
-    } on FirebaseException {
-      return null;
+      return (shopId: data['shop_id'] as String?, trouble: null);
+    } on FirebaseException catch (error) {
+      return (shopId: null, trouble: error.code);
     }
   }
 
   /// Takes the invite and becomes a till of that shop.
-  Future<bool> join({
+  ///
+  /// Returns null when the phone is in, and otherwise the shop's own word
+  /// for why it is not.
+  Future<String?> join({
     required String shopId,
     required String code,
     required String uid,
@@ -190,10 +201,9 @@ class ShopDirectory {
         'code': tidy(code),
         'joined_at': FieldValue.serverTimestamp(),
       });
-      return true;
+      return null;
     } on FirebaseException catch (error) {
-      if (error.code == 'permission-denied') return false;
-      rethrow;
+      return error.code;
     }
   }
 

@@ -75,11 +75,24 @@ class AccountService {
 
   /// Signs the device in without an account, which is how a barista's phone
   /// identifies itself while she types an invite.
-  Future<bool> signInAsDevice() async {
+  ///
+  /// [asItself] puts down whatever account is already signed in here first.
+  /// A phone set up by signing in with the owner's email is, to the shop,
+  /// the owner's phone: it carries her sign-in id, not one of its own. An
+  /// invite cannot admit it, because there is nothing to admit — that id is
+  /// already a till, and the one thing the rules will not allow is a till
+  /// changing what it is. Every invite made for such a phone is refused,
+  /// and making another makes no difference. So a phone asking to be let in
+  /// as the barista's stops being hers first, and asks as itself.
+  Future<bool> signInAsDevice({bool asItself = false}) async {
     await CloudStart.ready();
     final FirebaseAuth? auth = _firebase;
     if (auth == null) return false;
     try {
+      final User? standing = auth.currentUser;
+      if (asItself && standing != null && !standing.isAnonymous) {
+        await auth.signOut();
+      }
       if (auth.currentUser == null) await auth.signInAnonymously();
       return auth.currentUser != null;
     } on Object {
