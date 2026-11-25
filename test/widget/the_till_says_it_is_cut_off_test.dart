@@ -107,15 +107,40 @@ void main() {
     // app, because he cannot reach that.
     await tester.tap(find.textContaining('357'));
     await settle(tester);
+    // The sheet does not guess. It asks, and his way in is one of two
+    // buttons rather than a line of small print under a form he cannot use.
+    expect(find.text('This phone is cut off from the shop'), findsOne);
+    await tester.tap(find.text('THIS IS THE BARISTA\u2019S PHONE'));
+    await settle(tester);
     expect(find.text('Let this phone back in'), findsOne);
   });
 
-  testWidgets('a phone set up with her account is offered her way back in', (
+  testWidgets('the till repeats what the shop actually said', (
     WidgetTester tester,
   ) async {
-    // Which is the barista's phone, as it happens: it was set up by signing
-    // in with her account, so it calls itself the owner's. The sheet offers
-    // what the phone says it is, and a line to say otherwise.
+    // Three people and a photograph were guessing at this for two days.
+    await pumpTill(
+      tester,
+      standing: SyncStanding(
+        paired: true,
+        waiting: 357,
+        problem: 'This till has not been let into the shop yet.',
+        lastAt: DateTime(2026, 11, 20),
+      ),
+    );
+
+    expect(
+      find.text('This till has not been let into the shop yet.'),
+      findsOne,
+    );
+  });
+
+  testWidgets('a phone set up with her account still asks whose it is', (
+    WidgetTester tester,
+  ) async {
+    // This phone was set up by signing in with her account, so it calls
+    // itself the owner's — and it is the barista who serves on it. Taking
+    // the phone's word for that is what kept him locked out.
     await pumpTill(
       tester,
       till: 'owner',
@@ -130,8 +155,11 @@ void main() {
     await tester.tap(find.textContaining('357'));
     await settle(tester);
 
+    expect(find.text('I AM THE OWNER'), findsOne);
+    expect(find.text('THIS IS THE BARISTA\u2019S PHONE'), findsOne);
+    await tester.tap(find.text('I AM THE OWNER'));
+    await settle(tester);
     expect(find.text('Sign this phone back in'), findsOne);
-    expect(find.textContaining('barista'), findsOne);
   });
 
   testWidgets('a phone shut out before it sold anything is told too', (

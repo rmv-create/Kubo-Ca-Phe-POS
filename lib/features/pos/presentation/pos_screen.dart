@@ -337,6 +337,16 @@ class _NotReachingTheOtherPhone extends ConsumerWidget {
                           color: theme.colorScheme.onErrorContainer,
                         ),
                       ),
+                      // What the shop actually said, in its own words.
+                      // Without it, every report of this is a guessing game
+                      // played by three people and a photograph.
+                      Text(
+                        standing.problem!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
                     ],
                   ),
                 ),

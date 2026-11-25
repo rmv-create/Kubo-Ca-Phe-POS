@@ -53,8 +53,14 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
   bool _busy = false;
   bool _done = false;
 
-  /// Whether this phone is the owner's. Null until the app has been asked.
+  /// Whose phone this is. Null until somebody says, which is the point:
+  /// the app's own guess was wrong for the one phone that needed this most
+  /// — the barista's, set up with the owner's account, which calls itself
+  /// hers. So it asks, and the answer it suggests is only a suggestion.
   bool? _hers;
+
+  /// What the phone says it is, used to put a word beside each choice.
+  bool? _suggested;
 
   @override
   void initState() {
@@ -75,7 +81,7 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
     // A phone that has never been told is treated as hers: she is offered a
     // sign-in, which is hers to use and which a barista cannot complete,
     // rather than an invite she has no way to make.
-    if (mounted) setState(() => _hers ??= role != 'barista');
+    if (mounted) setState(() => _suggested = role != 'barista');
   }
 
   @override
@@ -116,6 +122,8 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
             Text(
               _done
                   ? 'This phone is back in the shop'
+                  : _hers == null
+                  ? 'This phone is cut off from the shop'
                   : _hers == true
                   ? 'Sign this phone back in'
                   : 'Let this phone back in',
@@ -127,14 +135,50 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
               _done
                   ? 'Everything it was holding is on its way to the other '
                         'phone now.'
-                  : '${_hers == true ? 'This phone has been signed out of the shop, so nothing it rings up is reaching the other one. Sign in with the email and password you opened the shop with.' : 'The shop no longer recognises this phone, so nothing it rings up is reaching the other one. Ask the owner for an invite \u2014 her phone makes one under Phones in this shop \u2014 and type it here.'}'
+                  : '${_hers == null
+                            ? 'Nothing it rings up is reaching the other phone. Who is this phone? The way back in is different for each, and only one of them works.'
+                            : _hers == true
+                            ? 'Sign in with the email and password you opened the shop with. An invite cannot let the owner in — her account is the shop.'
+                            : 'Ask the owner for an invite. Her phone makes one under Phones in this shop, and it lasts ten minutes.'}'
                         '${waiting == 0 ? '' : ' $waiting '
                                   '${waiting == 1 ? 'thing is' : 'things are'} '
                                   'waiting to go, and nothing has been lost.'}',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
-            if (!_done) ...<Widget>[
+            if (!_done && _hers == null) ...<Widget>[
+              const SizedBox(height: KuboSpacing.lg),
+              // Two plain choices, both in front of her. The first version
+              // of this guessed, put the other behind a line of small text
+              // at the bottom, and guessed wrong on the phone that mattered.
+              SizedBox(
+                height: KuboTouch.primaryAction,
+                child: FilledButton(
+                  onPressed: () => setState(() => _hers = true),
+                  child: const Text('I AM THE OWNER'),
+                ),
+              ),
+              const SizedBox(height: KuboSpacing.sm),
+              SizedBox(
+                height: KuboTouch.primaryAction,
+                child: OutlinedButton(
+                  onPressed: () => setState(() => _hers = false),
+                  child: const Text('THIS IS THE BARISTA\u2019S PHONE'),
+                ),
+              ),
+              if (_suggested != null) ...<Widget>[
+                const SizedBox(height: KuboSpacing.sm),
+                Text(
+                  _suggested!
+                      ? 'This phone was set up with the owner\u2019s account. '
+                            'If the barista uses it, choose the second one.'
+                      : 'This phone was let in with an invite.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ],
+            if (!_done && _hers != null) ...<Widget>[
               const SizedBox(height: KuboSpacing.lg),
               if (_hers == true) ...<Widget>[
                 TextField(
@@ -199,21 +243,14 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
                       : Text(_hers == true ? 'SIGN BACK IN' : 'LET IT BACK IN'),
                 ),
               ),
-              // Whoever is holding the phone decides. The app only knows what
-              // this till was set up as, and a phone changes hands in a small
-              // shop.
               TextButton(
                 onPressed: _busy
                     ? null
                     : () => setState(() {
-                        _hers = !(_hers ?? false);
+                        _hers = null;
                         _problem = null;
                       }),
-                child: Text(
-                  _hers == true
-                      ? 'This is the barista\u2019s phone \u2014 use an invite'
-                      : 'I am the owner \u2014 sign in instead',
-                ),
+                child: const Text('This is the other phone'),
               ),
             ],
             TextButton(
