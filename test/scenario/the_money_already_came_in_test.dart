@@ -1,0 +1,127 @@
+import 'package:flutter_test/flutter_test.dart';
+import 'package:kubo_pos/data/db/seed/pantry_seeder.dart';
+import 'package:kubo_pos/data/db/sync/sync_change.dart';
+import 'package:kubo_pos/data/db/sync/sync_engine.dart';
+import 'package:kubo_pos/domain/entities/order_draft.dart';
+
+import '../support/pos_fixture.dart';
+
+/// What happens to a sale *after* it is rung up.
+///
+/// A sale is written once, so the engine treated every later telling of an
+/// order as a repeat and dropped it. Most of the time that is exactly
+/// right. But some things about a sale genuinely happen afterwards — the
+/// money arrives on an order that went out on credit, the order is voided
+/// — and those were going over the side with the repeats.
+///
+/// Her words, the morning it landed: "112 orders still owed, the ones I
+/// already received payment for are owed again."
+void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  late PosFixture her;
+  late PosFixture barista;
+  late SyncEngine herSync;
+  late SyncEngine baristaSync;
+
+  setUp(() async {
+    her = await PosFixture.open(separate: true);
+    barista = await PosFixture.open(separate: true);
+    await PantrySeeder(her.db, her.clock).seedIfEmpty();
+    await PantrySeeder(barista.db, barista.clock).seedIfEmpty();
+    herSync = SyncEngine(database: her.db, clock: her.clock);
+    baristaSync = SyncEngine(database: barista.db, clock: barista.clock);
+  });
+  tearDown(() async {
+    await her.close();
+    await barista.close();
+  });
+
+  Future<SyncApplied> push(SyncEngine from, SyncEngine to) async {
+    final List<SyncChange> changes = await from.collect();
+    final SyncApplied result = await to.apply(changes);
+    await from.markSent(changes);
+    return result;
+  }
+
+  Future<CompletedOrder> sellOnCredit(PosFixture shop) async => shop.sell(
+    OrderDraft(
+      items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
+      unpaid: true,
+    ),
+  );
+
+  Future<String?> stateOn(PosFixture shop, String orderNo) async {
+    final List<Map<String, Object?>> rows = await shop.db.db.query(
+      'orders',
+      columns: <String>['payment_state', 'status'],
+      where: 'order_no = ?',
+      whereArgs: <Object?>[orderNo],
+      limit: 1,
+    );
+    return rows.isEmpty
+        ? null
+        : '${rows.first['payment_state']}/${rows.first['status']}';
+  }
+
+  test('an order paid for after it was rung up is not still owed', () async {
+    final CompletedOrder sale = await sellOnCredit(barista);
+    await push(baristaSync, herSync);
+    expect(await stateOn(her, sale.orderNo), 'unpaid/completed');
+
+    // The customer comes back and settles up at his till.
+    await barista.sales.recordPayment(
+      orderId: sale.id,
+      method: PaymentMethod.cash,
+    );
+    await push(baristaSync, herSync);
+
+    expect(
+      await stateOn(her, sale.orderNo),
+      'paid/completed',
+      reason: 'she had been paid, and her phone still asked for the money',
+    );
+  });
+
+  test('and it is not talked back into being owed afterwards', () async {
+    final CompletedOrder sale = await sellOnCredit(barista);
+    await push(baristaSync, herSync);
+    await barista.sales.recordPayment(
+      orderId: sale.id,
+      method: PaymentMethod.cash,
+    );
+    await push(baristaSync, herSync);
+
+    // The same order arrives again from a phone that has not heard yet —
+    // an older copy, out of a queue that had been standing for two days.
+    final List<SyncChange> stale = await baristaSync.collect(limit: 500);
+    await herSync.apply(stale);
+    await herSync.apply(stale);
+
+    expect(await stateOn(her, sale.orderNo), 'paid/completed');
+  });
+
+  test('a void crosses as well, and is not undone', () async {
+    final CompletedOrder sale = await sellOnCredit(barista);
+    await push(baristaSync, herSync);
+
+    await barista.sales.voidOrder(orderId: sale.id, reason: 'Wrong drink');
+    await push(baristaSync, herSync);
+
+    expect(await stateOn(her, sale.orderNo), 'unpaid/voided');
+  });
+
+  test('neither phone talks the other backwards', () async {
+    final CompletedOrder sale = await sellOnCredit(her);
+    await push(herSync, baristaSync);
+
+    // She takes the money on her phone. He has not heard yet, and his copy
+    // still says owed — but his copy must not undo hers.
+    await her.sales.recordPayment(orderId: sale.id, method: PaymentMethod.cash);
+    await push(baristaSync, herSync);
+    await push(herSync, baristaSync);
+
+    expect(await stateOn(her, sale.orderNo), 'paid/completed');
+    expect(await stateOn(barista, sale.orderNo), 'paid/completed');
+  });
+}

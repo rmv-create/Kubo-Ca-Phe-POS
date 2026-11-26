@@ -23,6 +23,7 @@ import 'm020_regular_is_the_default.dart';
 import 'm021_ice_can_be_asked_for.dart';
 import 'm022_an_order_can_be_corrected.dart';
 import 'm023_nothing_is_lost_waiting.dart';
+import 'm024_money_that_already_arrived.dart';
 import 'migration.dart';
 
 /// Every migration this app has ever shipped, in order.
@@ -53,6 +54,7 @@ const List<Migration> appMigrations = <Migration>[
   M021IceCanBeAskedFor(),
   M022AnOrderCanBeCorrected(),
   M023NothingIsLostWaiting(),
+  M024MoneyThatAlreadyArrived(),
 ];
 
 /// The schema version a freshly built app expects.

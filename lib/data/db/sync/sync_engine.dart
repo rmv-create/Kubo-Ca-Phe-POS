@@ -519,6 +519,27 @@ class SyncEngine {
         // accepts. Then the later correction stands, on both phones.
         case SyncKind.event:
           if (correcting) break;
+          // A sale is written once, but a few things about it genuinely
+          // happen afterwards: the money arrives on an order that went out
+          // on credit, the order is voided, it is put under a customer's
+          // name. Those are later facts about the same sale, not a second
+          // telling of it, and dropping them was costing her real money —
+          // a hundred and twelve orders she had been paid for still stood
+          // as owed on the other phone, because 'paid' never crossed.
+          final Map<String, Object?>? since = await _afterwards(
+            change,
+            existing.first,
+          );
+          if (since != null) {
+            await _db.db.update(
+              change.table,
+              since,
+              where: 'uid = ?',
+              whereArgs: <Object?>[change.rowUid],
+            );
+            await _remember(change);
+            return _Outcome.applied;
+          }
           await _remember(change);
           return _Outcome.alreadyKnown;
         // Rebuilt from the events, never taken from the wire.
@@ -593,6 +614,55 @@ class SyncEngine {
   ///
   /// It depends entirely on what kind of row it is, and getting that wrong
   /// is how two separate sales were merged into one.
+  /// What has happened to a sale since it was rung up, and nothing else.
+  ///
+  /// Every rule here only ever moves one way — owed becomes paid, a sale
+  /// becomes voided, a nameless order gains a customer, a refund only
+  /// grows. That is what makes it safe without a clock to referee: two
+  /// phones applying each other's news in whatever order they receive it
+  /// come to the same answer, and neither can talk the other backwards.
+  /// Nothing about what was sold, at what price, on which day, is touched.
+  Future<Map<String, Object?>?> _afterwards(
+    SyncChange change,
+    Map<String, Object?> mine,
+  ) async {
+    if (change.table != 'orders') return null;
+
+    final Map<String, Object?>? theirs = await _codec.decode(
+      change.table,
+      change.data,
+    );
+    if (theirs == null) return null;
+
+    final Map<String, Object?> since = <String, Object?>{};
+
+    // The money came in. It can never go back to being owed.
+    if (mine['payment_state'] == 'unpaid' &&
+        theirs['payment_state'] == 'paid') {
+      since['payment_state'] = 'paid';
+    }
+
+    // The sale was taken back. A void is never undone; an order that is
+    // put right is corrected instead, and that goes the other way above.
+    if (mine['status'] == 'completed' && theirs['status'] == 'voided') {
+      since['status'] = 'voided';
+    }
+
+    // Put under somebody's name afterwards — on the orders list, or when
+    // the drink is handed over and she asks who it is for.
+    if (mine['customer_id'] == null && theirs['customer_id'] != null) {
+      since['customer_id'] = theirs['customer_id'];
+      since['customer_name_snapshot'] = theirs['customer_name_snapshot'];
+    }
+
+    // Refunds accumulate, so the larger figure is the later one.
+    final int refunded = (mine['refunded_centavos'] as int?) ?? 0;
+    final int alsoRefunded = (theirs['refunded_centavos'] as int?) ?? 0;
+    if (alsoRefunded > refunded) since['refunded_centavos'] = alsoRefunded;
+
+    return since.isEmpty ? null : since;
+  }
+
   /// An order's row, without the number that says which order it is.
   static Map<String, Object?> _withoutIdentity(Map<String, Object?> row) =>
       <String, Object?>{
