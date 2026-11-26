@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:kubo_pos/data/db/migrations/m024_money_that_already_arrived.dart';
 import 'package:kubo_pos/data/db/seed/pantry_seeder.dart';
 import 'package:kubo_pos/data/db/sync/sync_change.dart';
 import 'package:kubo_pos/data/db/sync/sync_engine.dart';
@@ -123,5 +124,35 @@ void main() {
 
     expect(await stateOn(her, sale.orderNo), 'paid/completed');
     expect(await stateOn(barista, sale.orderNo), 'paid/completed');
+  });
+
+  test('the same money is not counted twice in the takings', () async {
+    // What she did while her phone kept asking for money she already had:
+    // received it again. The order is paid either way; the takings she
+    // reconciles against the tin were counting it twice.
+    final CompletedOrder sale = await sellOnCredit(her);
+    await her.sales.recordPayment(orderId: sale.id, method: PaymentMethod.cash);
+    // A second recording of the same money, as the broken state allowed.
+    await her.db.db.insert('payments', <String, Object?>{
+      'order_id': sale.id,
+      'method': 'cash',
+      'method_name_snapshot': 'Cash',
+      'amount_centavos': 13900,
+      'status': 'confirmed',
+      'created_at': her.clock.now().toUtc().toIso8601String(),
+      'confirmed_at': her.clock.now().toUtc().toIso8601String(),
+    });
+
+    await const M024MoneyThatAlreadyArrived().up(her.db.db);
+
+    final List<Map<String, Object?>> standing = await her.db.db.rawQuery(
+      'SELECT status, COUNT(*) AS n FROM payments WHERE order_id = ? '
+      'GROUP BY status ORDER BY status',
+      <Object?>[sale.id],
+    );
+    expect(standing, <Map<String, Object?>>[
+      <String, Object?>{'status': 'confirmed', 'n': 1},
+      <String, Object?>{'status': 'pending', 'n': 1},
+    ], reason: 'one counted, the other kept but stood down — never deleted');
   });
 }

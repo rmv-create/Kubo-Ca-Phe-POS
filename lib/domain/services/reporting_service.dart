@@ -72,6 +72,7 @@ class ReportingService {
       FROM payments p
       JOIN orders o ON o.id = p.order_id
       WHERE o.status = 'completed' AND ${where('o.')}
+        AND p.status = 'confirmed'
       GROUP BY p.method
       ''', args);
     // One line per way of paying. Cash and GCash keep their own fields

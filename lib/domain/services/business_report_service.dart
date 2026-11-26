@@ -48,6 +48,7 @@ class BusinessReportService {
       FROM payments p
       JOIN orders o ON o.id = p.order_id
       WHERE o.status = 'completed' AND o.business_date LIKE ?
+        AND p.status = 'confirmed'
       GROUP BY p.method
       ''',
       <Object?>[like],

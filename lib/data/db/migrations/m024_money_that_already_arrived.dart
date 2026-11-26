@@ -51,5 +51,30 @@ class M024MoneyThatAlreadyArrived extends Migration {
           SELECT 1 FROM order_voids v WHERE v.order_id = orders.id
         )
     ''');
+
+    // The same money, written down twice.
+    //
+    // While her phone was showing a paid order as still owed, the way to
+    // make it stop asking was to receive the payment again — so she did,
+    // on orders the barista had already been paid for. An order is only
+    // ever paid in full and in one go, so a second confirmed payment on
+    // one order is the same money counted twice, and it was being added
+    // to the cash and GCash totals she reconciles against the tin.
+    //
+    // The duplicate is not deleted. Her books should not lose a line
+    // because of a fault in mine, and the record of what she did that day
+    // is worth keeping. It is stood down to 'pending' instead, which the
+    // takings no longer count, and which can be read back if she ever
+    // wants to know what happened here. The first recording of the money
+    // — the one the customer actually handed over against — stands.
+    await db.execute('''
+      UPDATE payments SET status = 'pending'
+      WHERE status = 'confirmed'
+        AND id NOT IN (
+          SELECT MIN(id) FROM payments
+          WHERE status = 'confirmed'
+          GROUP BY order_id
+        )
+    ''');
   }
 }
