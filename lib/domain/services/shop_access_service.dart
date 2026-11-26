@@ -1,3 +1,5 @@
+import 'package:firebase_core/firebase_core.dart';
+
 import '../../core/time/clock.dart';
 import '../../data/cloud/account_service.dart';
 import '../../data/cloud/shop_directory.dart';
@@ -355,10 +357,31 @@ class ShopAccessService {
   }
 
   /// An invite for somebody else's phone, good for ten minutes.
-  Future<String?> newInvite() async {
+  ///
+  /// Says why, when there is no code. Three different things stop one being
+  /// made and they are not the same problem: this phone holds no shop, this
+  /// phone is not signed in as the owner, or the shop would not answer. The
+  /// middle one is the one that matters, and it was being reported with the
+  /// other two as a single shrug — so a phone that had quietly signed
+  /// itself out looked exactly like no signal, and the barista went on
+  /// waiting for a code that was never going to be made.
+  Future<InviteOffer> newInvite() async {
     final String? shop = await shopId();
+    if (shop == null) {
+      return const InviteOffer.none(
+        'This phone is not holding a shop, so there is nothing to invite '
+        'anybody into.',
+        signedOut: false,
+      );
+    }
     final AccountUser? owner = _account.current;
-    if (shop == null || owner == null) return null;
+    if (owner == null) {
+      return const InviteOffer.none(
+        'This phone is signed out of the shop account, so it cannot make '
+        'an invite. Sign in and it can.',
+        signedOut: true,
+      );
+    }
     final String code = ShopDirectory.newInvite();
     try {
       await _directory.offerInvite(
@@ -367,9 +390,17 @@ class ShopAccessService {
         until: _clock.now().toUtc().add(const Duration(minutes: 10)),
         byUid: owner.uid,
       );
-      return code;
-    } on Object {
-      return null;
+      return InviteOffer.code(code);
+    } on FirebaseException catch (error) {
+      return InviteOffer.none(
+        'The shop would not take the invite (${error.code}).',
+        signedOut: false,
+      );
+    } on Object catch (error) {
+      return InviteOffer.none(
+        'The invite could not be made ($error).',
+        signedOut: false,
+      );
     }
   }
 
@@ -425,4 +456,17 @@ class AccessOutcome {
   final String? problem;
 
   bool get succeeded => standing != null;
+}
+
+/// A code, or the reason there is none.
+class InviteOffer {
+  const InviteOffer.code(String this.code) : problem = null, signedOut = false;
+  const InviteOffer.none(this.problem, {required this.signedOut}) : code = null;
+
+  final String? code;
+  final String? problem;
+
+  /// Whether the way out of this is to sign back in, which is a button
+  /// rather than a paragraph.
+  final bool signedOut;
 }

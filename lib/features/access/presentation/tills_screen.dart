@@ -166,22 +166,29 @@ class _TillsScreenState extends ConsumerState<TillsScreen> {
 
   Future<void> _makeInvite() async {
     setState(() => _working = true);
-    final String? code = await ref.read(shopAccessServiceProvider).newInvite();
+    final InviteOffer offer = await ref
+        .read(shopAccessServiceProvider)
+        .newInvite();
     if (!mounted) return;
     setState(() {
       _working = false;
-      _invite = code;
+      _invite = offer.code;
     });
-    if (code == null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Could not make an invite. This needs signal, and you have to '
-            'be signed in as the owner.',
-          ),
-        ),
-      );
-    }
+    if (offer.code != null || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 8),
+        content: Text(offer.problem!),
+        // Being signed out is the one of these she can put right from
+        // here, in the moment, with the barista waiting on the phone.
+        action: offer.signedOut
+            ? SnackBarAction(
+                label: 'SIGN IN',
+                onPressed: () => RejoinSheet.show(context),
+              )
+            : null,
+      ),
+    );
   }
 
   Future<void> _remove(AdmittedTill till) async {

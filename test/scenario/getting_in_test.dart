@@ -1,3 +1,4 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:kubo_pos/core/time/clock.dart';
 import 'package:kubo_pos/data/cloud/account_service.dart';
@@ -524,14 +525,14 @@ void main() {
 
   group('the owner hands out an invite', () {
     test('only once she has a shop and is signed in', () async {
-      expect(await access.newInvite(), isNull);
+      expect((await access.newInvite()).code, isNull);
 
       await access.openShop(
         email: 'her@example.com',
         password: 'a-good-password',
       );
 
-      final String? invite = await access.newInvite();
+      final String? invite = (await access.newInvite()).code;
       expect(invite, isNotNull);
       expect(invite, matches(RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}$')));
       expect(directory.offeredUntil, isNotNull);
@@ -541,6 +542,44 @@ void main() {
         reason: 'a code that never expires is a password that was shouted',
       );
     });
+
+    // She tapped the button and got one flat sentence about signal and
+    // being signed in, which covered three different faults. The barista
+    // sat waiting for a code that was never going to be made.
+    test('says it is the signing out, and offers the way back', () async {
+      await access.openShop(
+        email: 'her@example.com',
+        password: 'a-good-password',
+      );
+      await account.signOut();
+
+      final InviteOffer offer = await access.newInvite();
+
+      expect(offer.code, isNull);
+      expect(offer.signedOut, isTrue);
+      expect(offer.problem, contains('signed out'));
+    });
+
+    test(
+      'says what the shop said, when the shop is the one refusing',
+      () async {
+        await access.openShop(
+          email: 'her@example.com',
+          password: 'a-good-password',
+        );
+        directory.refuseToOffer = true;
+
+        final InviteOffer offer = await access.newInvite();
+
+        expect(offer.code, isNull);
+        expect(
+          offer.signedOut,
+          isFalse,
+          reason: 'signing in again fixes nothing',
+        );
+        expect(offer.problem, contains('would not take'));
+      },
+    );
   });
 }
 
@@ -611,6 +650,9 @@ class _Account extends AccountService {
     return true;
   }
 
+  @override
+  Future<void> signOut() async => _user = null;
+
   bool discarded = false;
 
   @override
@@ -628,6 +670,7 @@ class _Directory extends ShopDirectory {
   String? liveInvite;
   String? shopOfInvite;
   bool refuseToCreate = false;
+  bool refuseToOffer = false;
   bool refuseToJoin = false;
 
   bool refuseAsUnapproved = false;
@@ -664,6 +707,12 @@ class _Directory extends ShopDirectory {
     required DateTime until,
     required String byUid,
   }) async {
+    if (refuseToOffer) {
+      throw FirebaseException(
+        plugin: 'cloud_firestore',
+        code: 'permission-denied',
+      );
+    }
     liveInvite = ShopDirectory.tidy(code);
     shopOfInvite = shopId;
     offeredUntil = until;
