@@ -182,6 +182,14 @@ class _Postbox implements SyncTransport {
   final _Log _log;
   bool letIn = true;
 
+  /// The sign-in id this phone is holding. A phone whose browser loses the
+  /// anonymous session comes back holding a different one, and the shop
+  /// admitted the old one.
+  String? uid = 'till-uid';
+
+  @override
+  String? get identity => uid;
+
   List<SyncChange> get posted => _log.posted;
 
   @override

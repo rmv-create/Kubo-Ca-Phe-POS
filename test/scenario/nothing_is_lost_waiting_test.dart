@@ -148,6 +148,9 @@ void main() {
 
 /// A postbox that hands out one page per round, as Firestore does.
 class _PagedPostbox implements SyncTransport {
+  @override
+  String? get identity => 'till-uid';
+
   List<List<SyncChange>> pages = <List<SyncChange>>[];
   int _round = 0;
 

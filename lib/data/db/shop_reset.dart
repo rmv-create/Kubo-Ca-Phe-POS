@@ -52,6 +52,7 @@ class ShopReset {
     SettingKeys.syncRole,
     SettingKeys.syncDeviceLabel,
     SettingKeys.syncAdmittedAt,
+    SettingKeys.syncTillUid,
   ];
 
   Future<void> run() async {

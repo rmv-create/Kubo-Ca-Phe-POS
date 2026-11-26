@@ -116,20 +116,28 @@ void main() {
       expect(await sync.lastError(), isNull, reason: 'the trouble has passed');
     });
 
-    test('a till that has not been let in is told so, not shown a stack '
-        'trace', () async {
-      postbox.failWith = Exception(
-        '[cloud_firestore/permission-denied] Missing or insufficient '
-        'permissions.',
-      );
+    test(
+      'a refusal mid-round says it is a refusal, not a stack trace',
+      () async {
+        postbox.failWith = Exception(
+          '[cloud_firestore/permission-denied] Missing or insufficient '
+          'permissions.',
+        );
 
-      final SyncReport report = await sync.syncNow();
+        final SyncReport report = await sync.syncNow();
 
-      expect(
-        report.describe(),
-        'This till has not been let into the shop yet.',
-      );
-    });
+        // It no longer says "not been let into the shop yet". This till got
+        // as far as posting, so it had been let in; saying otherwise sent
+        // the shop off to make another invite against a fault no invite
+        // touches. Whether a till is in is decided before the round, where
+        // the phone's own sign-in can be compared with the one admitted.
+        expect(
+          report.describe(),
+          'The shop would not take this phone\u2019s orders '
+          '(permission-denied).',
+        );
+      },
+    );
 
     test('the cursor does not move when the round failed', () async {
       await sync.syncNow();
@@ -181,6 +189,9 @@ void main() {
 
 /// A postbox on the table rather than in the cloud.
 class _Postbox implements SyncTransport {
+  @override
+  String? get identity => 'till-uid';
+
   final List<SyncChange> posted = <SyncChange>[];
   final List<SyncChange> waiting = <SyncChange>[];
   Exception? failWith;

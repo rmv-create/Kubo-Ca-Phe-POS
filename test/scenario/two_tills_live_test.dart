@@ -187,6 +187,9 @@ class _Postbox {
 }
 
 class _Till implements SyncTransport {
+  @override
+  String? get identity => 'till-uid';
+
   _Till(this._box, this._deviceId);
 
   final _Postbox _box;

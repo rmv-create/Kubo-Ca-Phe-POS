@@ -63,7 +63,7 @@ class CloudSyncService {
 
     try {
       if (!await transport.isReady()) {
-        return await _fail('This till has not been let into the shop yet.');
+        return await _fail(await _whyRefused(transport));
       }
 
       // Ours first. If the signal dies halfway, the other till has at least
@@ -159,6 +159,40 @@ class CloudSyncService {
     );
   }
 
+  /// Which of three quite different things is keeping this till out.
+  ///
+  /// They were all reported as "this till has not been let into the shop
+  /// yet", which is true of only one of them and sends everybody off to
+  /// make another invite. A phone whose sign-in has changed since it
+  /// joined will be refused for ever by codes, however many are typed,
+  /// because the shop admitted an id the phone is no longer holding.
+  Future<String> _whyRefused(SyncTransport transport) async {
+    final String? now = transport.identity;
+    final String? joined = _nonEmpty(
+      await _settings.readRaw(SettingKeys.syncTillUid),
+    );
+
+    if (now == null) {
+      return 'This phone is not signed in to anything, so the shop cannot '
+          'know it. Close the app and open it again.';
+    }
+    if (joined == null) {
+      return 'This till has not been let into the shop yet.';
+    }
+    if (joined != now) {
+      return 'This phone was let in as ${_short(joined)} and is now '
+          '${_short(now)}. Its sign-in has changed, so the shop no longer '
+          'knows it — it needs a fresh invite, and this will keep '
+          'happening until that stops.';
+    }
+    return 'The shop is refusing this phone (${_short(now)}) even though it '
+        'was let in. This is not the code — a new one will not help.';
+  }
+
+  /// Enough of an id to compare two by eye, in a photograph.
+  static String _short(String uid) =>
+      uid.length <= 8 ? uid : '${uid.substring(0, 8)}…';
+
   Future<SyncReport> _fail(String message) async {
     await _settings.writeRaw(SettingKeys.syncLastError, message);
     return SyncReport.failed(message);
@@ -168,7 +202,8 @@ class CloudSyncService {
   static String _readable(Object error) {
     final String raw = error.toString();
     if (raw.contains('permission-denied')) {
-      return 'This till has not been let into the shop yet.';
+      return 'The shop would not take this phone\u2019s orders '
+          '(permission-denied).';
     }
     if (raw.contains('unavailable') || raw.contains('network')) {
       return 'No connection. Nothing is lost — it will go up next time.';

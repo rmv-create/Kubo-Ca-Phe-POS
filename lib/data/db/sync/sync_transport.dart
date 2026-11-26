@@ -23,6 +23,10 @@ abstract interface class SyncTransport {
 
   /// Says hello, so the other till can show when this one was last seen.
   Future<void> heartbeat({required String label});
+
+  /// The sign-in id this phone is holding right now, if any. The shop knows
+  /// a till by this and by nothing else.
+  String? get identity;
 }
 
 /// What came back, and where to carry on from.

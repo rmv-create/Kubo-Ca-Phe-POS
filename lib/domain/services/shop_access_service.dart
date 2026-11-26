@@ -439,6 +439,12 @@ class ShopAccessService {
       SettingKeys.syncAdmittedAt,
       _clock.now().toUtc().toIso8601String(),
     );
+    // The id the shop actually admitted. A till is known by this and by
+    // nothing else, so a phone holding a different one later is a stranger
+    // again — and that is worth being able to say out loud, because no
+    // number of fresh invites will cure it.
+    final String? uid = _account.deviceUid;
+    if (uid != null) await _settings.writeRaw(SettingKeys.syncTillUid, uid);
   }
 
   Future<void> _fillWithTheMenu() async {

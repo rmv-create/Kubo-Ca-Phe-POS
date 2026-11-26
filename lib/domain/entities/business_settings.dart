@@ -316,6 +316,14 @@ abstract final class SettingKeys {
   /// This device's name in the owner's list of tills.
   static const String syncDeviceLabel = 'sync.device_label';
 
+  /// The sign-in id this phone was holding when the shop let it in.
+  ///
+  /// A till is admitted by its sign-in id and by nothing else, so if the
+  /// phone is later holding a different one it is a stranger again, however
+  /// many invites it has typed. Keeping the id it joined with is what lets
+  /// the phone tell that apart from a shop that is simply refusing it.
+  static const String syncTillUid = 'sync.till_uid';
+
   static const String syncCursor = 'sync.cursor';
   static const String syncLastAt = 'sync.last_at';
   static const String syncLastError = 'sync.last_error';

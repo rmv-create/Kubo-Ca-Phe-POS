@@ -35,6 +35,9 @@ class FirestoreSyncTransport implements SyncTransport {
       _db.collection('shops').doc(shopId).collection('changes');
 
   @override
+  String? get identity => _auth.currentUser?.uid;
+
+  @override
   Future<bool> isReady() async {
     if (shopId.isEmpty) return false;
     // Signing in is the account's business, not the postbox's. By the time
