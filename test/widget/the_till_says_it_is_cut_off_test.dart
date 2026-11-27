@@ -115,6 +115,42 @@ void main() {
     expect(find.text('Let this phone back in'), findsOne);
   });
 
+  testWidgets('the till says nobody has ever asked to be let in', (
+    WidgetTester tester,
+  ) async {
+    // A code that was never typed and a code that was refused look the
+    // same from outside, and a week went into not knowing which this was.
+    await pumpTill(
+      tester,
+      standing: SyncStanding(
+        paired: true,
+        waiting: 1708,
+        problem: 'This till has not been let into the shop yet.',
+        lastAt: DateTime(2026, 11, 20),
+      ),
+    );
+
+    expect(find.text('This phone has never asked to be let in.'), findsOne);
+  });
+
+  testWidgets('and otherwise what it was told when it did', (
+    WidgetTester tester,
+  ) async {
+    await pumpTill(
+      tester,
+      standing: SyncStanding(
+        paired: true,
+        waiting: 1708,
+        problem: 'This till has not been let into the shop yet.',
+        lastAt: DateTime(2026, 11, 20),
+        lastJoin: '2026-11-27T03:11:00Z|That code is wrong or has run out.',
+      ),
+    );
+
+    expect(find.textContaining('That code is wrong or has run out.'), findsOne);
+    expect(find.textContaining('Last asked 27/11'), findsOne);
+  });
+
   testWidgets('the till repeats what the shop actually said', (
     WidgetTester tester,
   ) async {

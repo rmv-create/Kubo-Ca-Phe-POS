@@ -258,6 +258,27 @@ class _PosHeader extends ConsumerWidget {
 
 /// Says, on the till itself, when this phone's orders are going nowhere.
 ///
+/// What this phone was told the last time it asked to be let in.
+///
+/// Written as `<when>|<what>`, or missing entirely when it has never
+/// asked — which is itself worth saying out loud, because an invite that
+/// was never typed and an invite that was refused are different problems
+/// and have looked the same from the outside all week.
+String _lastAsked(String? raw) {
+  if (raw == null || raw.isEmpty) {
+    return 'This phone has never asked to be let in.';
+  }
+  final int bar = raw.indexOf('|');
+  if (bar < 0) return raw;
+  final DateTime? when = DateTime.tryParse(raw.substring(0, bar))?.toLocal();
+  final String what = raw.substring(bar + 1);
+  if (when == null) return 'Last asked: $what';
+  final String time =
+      '${when.hour.toString().padLeft(2, '0')}:'
+      '${when.minute.toString().padLeft(2, '0')}';
+  return 'Last asked ${when.day}/${when.month} at $time: $what';
+}
+
 /// A till is let into the shop by its own sign-in id, and that id lives in
 /// the browser's storage: clear the site data or reinstall from the home
 /// screen and the phone goes on taking orders while the shop no longer
@@ -345,6 +366,17 @@ class _NotReachingTheOtherPhone extends ConsumerWidget {
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onErrorContainer,
                           fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                      // Whether anybody has actually asked this phone to be
+                      // let in, and what it was told. "Never asked" and
+                      // "asked and refused" look identical from outside,
+                      // and days went into not knowing which this was.
+                      const SizedBox(height: KuboSpacing.xs),
+                      Text(
+                        _lastAsked(standing.lastJoin),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onErrorContainer,
                         ),
                       ),
                     ],

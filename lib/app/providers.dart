@@ -937,6 +937,9 @@ final FutureProvider<SyncStanding> syncStandingProvider =
         waiting: await sync.waitingToGoUp(),
         held: await sync.waitingToComeIn(),
         problem: await sync.lastError(),
+        lastJoin: await ref
+            .watch(settingsRepositoryProvider)
+            .readRaw(SettingKeys.syncLastJoin),
       );
     });
 
@@ -957,6 +960,7 @@ class SyncStanding {
     this.held = 0,
     this.lastAt,
     this.problem,
+    this.lastJoin,
   });
 
   final bool paired;
@@ -971,4 +975,11 @@ class SyncStanding {
   /// missing, which is worth being able to see rather than guess at.
   final int held;
   final String? problem;
+
+  /// What happened the last time this phone asked to be let in, raw, as
+  /// `<when>|<what>`. Shown on the till itself and not only on the sheet,
+  /// because the till is the screen anybody photographs when they are
+  /// asked what is wrong — and "never asked" and "asked and refused" are
+  /// different problems that look identical from outside.
+  final String? lastJoin;
 }
