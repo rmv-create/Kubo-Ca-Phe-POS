@@ -162,7 +162,7 @@ class _Rounds extends CloudSyncService {
   }) async => ok
       ? const SyncReport(sent: 1540, applied: null)
       : const SyncReport.failed(
-          'This till has not been let into the shop yet. It is signed in '
-          '(a1b2c3d4…) but the shop has no record of letting it in.',
+          'This phone is signed in (a1b2c3d4…) and the shop would not take '
+          'its orders.',
         );
 }

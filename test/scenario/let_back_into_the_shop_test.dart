@@ -89,7 +89,11 @@ void main() {
       final SyncReport refused = await hisSync.syncNow();
 
       expect(refused.ok, isFalse);
-      expect(refused.error, contains('not been let into the shop'));
+      // Says what the phone knows: it is signed in and the shop would not
+      // take its orders. Whether the shop still holds a record of it is
+      // not something the phone can see, and claiming otherwise sent
+      // everybody chasing invites for a till that was admitted all along.
+      expect(refused.error, contains('would not take its orders'));
       expect(postbox.posted, isEmpty, reason: 'nothing could go out');
       expect(
         await hisSync.waitingToGoUp(),

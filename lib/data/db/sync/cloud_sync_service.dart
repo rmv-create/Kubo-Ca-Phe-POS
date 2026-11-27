@@ -185,8 +185,15 @@ class CloudSyncService {
           'know it. Close the app and open it again.';
     }
     if (joined == null) {
-      return 'This till has not been let into the shop yet. It is signed in '
-          '(${_short(now)}) but the shop has no record of letting it in.';
+      // Carefully worded, because the confident version of this cost a
+      // week. The phone knows what it has written down and nothing more:
+      // his had no note of being admitted and said the shop had no record
+      // of it, while the shop had held his till record, by name, the whole
+      // time. An app may not claim to know something it has not asked.
+      return 'This phone is signed in (${_short(now)}) and the shop would '
+          'not take its orders. This phone has no note of being let in, '
+          'though it may have been — the note is only kept since the '
+          'last few updates.';
     }
     if (joined != now) {
       return 'This phone was let in as ${_short(joined)} and is now '

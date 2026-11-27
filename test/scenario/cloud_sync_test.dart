@@ -132,8 +132,12 @@ void main() {
         // was never admitted at all, and the message says so and names the
         // id — instead of the flat sentence that sent everybody off to
         // make another invite without knowing a code was not the fault.
-        expect(report.describe(), contains('not been let into the shop yet'));
+        // Worded for what the phone actually knows. It knows it is signed
+        // in, and it knows the shop refused; it does not know whether the
+        // shop holds a record of it, and saying so cost a week.
+        expect(report.describe(), contains('would not take its orders'));
         expect(report.describe(), contains('till-uid'));
+        expect(report.describe(), contains('may have been'));
       },
     );
 

@@ -43,7 +43,7 @@ void main() {
   test('a phone that has never been let in is told so', () async {
     postbox.ready = false;
 
-    expect(await complaint(), contains('not been let into the shop yet'));
+    expect(await complaint(), contains('would not take its orders'));
   });
 
   test('a phone holding no sign-in is told to restart', () async {
@@ -88,8 +88,15 @@ void main() {
 
     test('a phone never admitted says so, and shows the id it holds', () async {
       final String? said = await complaint();
-      expect(said, contains('not been let into the shop yet'));
+      expect(said, contains('would not take its orders'));
       expect(said, contains('the-one-'), reason: 'the id it is signed in as');
+      expect(
+        said,
+        contains('may have been'),
+        reason:
+            'the phone does not know what the shop holds, and said it '
+            'did — his till record was there the whole week',
+      );
     });
 
     test('a phone whose sign-in changed says that, here too', () async {
