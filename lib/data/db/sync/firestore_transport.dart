@@ -50,21 +50,44 @@ class FirestoreSyncTransport implements SyncTransport {
   @override
   Future<void> publish(List<SyncChange> changes) async {
     if (changes.isEmpty) return;
+    // In lots, because Firestore takes 500 writes at a time and a till that
+    // has been offline all day will have more than that. The rule about
+    // what to do when the shop refuses one lives in PostingToTheLog, where
+    // it can be read and tested without a shop to be refused by.
+    await PostingToTheLog(
+      commit: (List<SyncChange> lot) async {
+        final WriteBatch batch = _db.batch();
+        for (final SyncChange change in lot) {
+          batch.set(_changes.doc(change.changeId), _posting(change));
+        }
+        await _orRefused(batch.commit());
+      },
+      postOne: (SyncChange change) =>
+          _orRefused(_changes.doc(change.changeId).set(_posting(change))),
+      alreadyThere: (String changeId) async {
+        final DocumentSnapshot<Map<String, Object?>> there = await _changes
+            .doc(changeId)
+            .get();
+        return there.exists;
+      },
+    )(changes);
+  }
 
-    // In batches, because Firestore takes 500 writes at a time and a till
-    // that has been offline all day will have more than that.
-    for (int from = 0; from < changes.length; from += 400) {
-      final WriteBatch batch = _db.batch();
-      for (final SyncChange change in changes.skip(from).take(400)) {
-        batch.set(_changes.doc(change.changeId), <String, Object?>{
-          ...change.toJson(),
-          // The server's clock, not the till's: two tills' clocks disagree,
-          // and this is only ever used to ask "what is new since I last
-          // looked", never to decide who wins.
-          'posted_at': FieldValue.serverTimestamp(),
-        });
-      }
-      await batch.commit();
+  Map<String, Object?> _posting(SyncChange change) => <String, Object?>{
+    ...change.toJson(),
+    // The server's clock, not the till's: two tills' clocks disagree, and
+    // this is only ever used to ask "what is new since I last looked",
+    // never to decide who wins.
+    'posted_at': FieldValue.serverTimestamp(),
+  };
+
+  /// Firestore's word for a refusal, in the one this code is written in.
+  Future<T> _orRefused<T>(Future<T> work) async {
+    try {
+      return await work;
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied') throw const RefusedByTheShop();
+      rethrow;
     }
   }
 
