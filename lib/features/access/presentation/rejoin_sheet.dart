@@ -329,17 +329,56 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
       return;
     }
 
-    // Back in — now send everything that has been piling up.
+    // Let in, as far as the door is concerned. Whether the shop will
+    // actually take this phone's orders is a different question, and it is
+    // the one that matters: the answer used to be thrown away.
     ref.invalidate(syncTransportProvider);
     ref.invalidate(cloudSyncProvider);
     final CloudSyncService sync = await ref.read(cloudSyncProvider.future);
-    await sync.catchUp(label: await shop.deviceLabel());
+    final SyncReport report = await sync.catchUp(
+      label: await shop.deviceLabel(),
+    );
     if (!mounted) return;
     ref.read(syncTickProvider.notifier).bump();
+
+    if (!report.ok) {
+      // This is the failure they have been living with. A round that was
+      // refused still left the sheet saying "this phone is back in the
+      // shop" and "everything it was holding is on its way" — so the code
+      // was typed, the app said it had worked, and nothing moved. Nobody
+      // could tell a join that worked from one that did not, because the
+      // app could not tell them apart either.
+      await _noteThat(
+        'let in, but the shop refused its orders: '
+        '${report.describe()}',
+      );
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _problem =
+            'This phone was let in, but the shop then would not take its '
+            'orders. ${report.describe()}';
+      });
+      return;
+    }
+
+    await _noteThat('let in, and ${report.sent} sent');
+    if (!mounted) return;
     setState(() {
       _busy = false;
       _done = true;
     });
+  }
+
+  /// Writes down how this attempt really ended, replacing the note the
+  /// service made when the door opened. The door is not the question.
+  Future<void> _noteThat(String what) async {
+    await ref
+        .read(settingsRepositoryProvider)
+        .writeRaw(
+          SettingKeys.syncLastJoin,
+          '${DateTime.now().toUtc().toIso8601String()}|$what',
+        );
   }
 }
 
