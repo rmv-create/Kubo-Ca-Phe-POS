@@ -74,6 +74,7 @@ void main() {
 
       expect(tried.succeeded, isFalse);
       expect(tried.problem, contains('wrong or has run out'));
+      expect(tried.problem, isNot(contains('ten minutes')));
       expect(await access.standing(), ShopStanding.outside);
       expect(await drinkCount(), 0);
     });
@@ -536,10 +537,13 @@ void main() {
       expect(invite, isNotNull);
       expect(invite, matches(RegExp(r'^[A-Z0-9]{4}-[A-Z0-9]{4}$')));
       expect(directory.offeredUntil, isNotNull);
+      // Short, because a code that never expires is a password that was
+      // shouted — but not so close to the shop's own eleven-minute limit
+      // that a phone whose clock runs a couple of minutes fast writes an
+      // invite the shop refuses on sight.
       expect(
         directory.offeredUntil!.difference(clock.now().toUtc()).inMinutes,
-        10,
-        reason: 'a code that never expires is a password that was shouted',
+        8,
       );
     });
 

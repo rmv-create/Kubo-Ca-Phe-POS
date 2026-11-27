@@ -151,7 +151,7 @@ class _Doors extends StatelessWidget {
         ),
         note(
           'Working here? Ask the owner for an invite \u2014 eight '
-          'characters, good for ten minutes.',
+          'characters, good for a few minutes.',
         ),
       ],
     );

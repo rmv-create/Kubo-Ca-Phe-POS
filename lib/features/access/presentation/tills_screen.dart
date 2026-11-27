@@ -248,7 +248,7 @@ class _InviteCard extends StatelessWidget {
             ),
             const SizedBox(height: KuboSpacing.sm),
             Text(
-              'Good for ten minutes. On her phone: open the link, tap '
+              'Good for a few minutes. On her phone: open the link, tap '
               '“I have an invite”, type this.',
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall,

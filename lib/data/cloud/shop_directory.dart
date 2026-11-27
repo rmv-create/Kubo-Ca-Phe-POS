@@ -170,8 +170,12 @@ class ShopDirectory {
           .get();
       final Map<String, Object?>? data = doc.data();
       if (data == null) return (shopId: null, trouble: null);
-      final Timestamp? expires = data['expires_at'] as Timestamp?;
-      if (expires == null || expires.toDate().isBefore(DateTime.now())) {
+      // Whether the invite is still alive is the shop's ruling, not this
+      // phone's. It was being judged here against this phone's own clock,
+      // so a barista's phone running a few minutes fast threw away a
+      // perfectly good code and reported it as wrong — and the owner, who
+      // had just made it, was told to make another.
+      if (data['expires_at'] is! Timestamp) {
         return (shopId: null, trouble: null);
       }
       return (shopId: data['shop_id'] as String?, trouble: null);

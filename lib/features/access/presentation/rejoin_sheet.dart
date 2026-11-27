@@ -167,7 +167,7 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
                             ? 'Nothing it rings up is reaching the other phone. Who is this phone? The way back in is different for each, and only one of them works.'
                             : _hers == true
                             ? 'Sign in with the email and password you opened the shop with. An invite cannot let the owner in — her account is the shop.'
-                            : 'Ask the owner for an invite. Her phone makes one under Phones in this shop, and it lasts ten minutes.'}'
+                            : 'Ask the owner for an invite. Her phone makes one under Phones in this shop, and it only lasts a few minutes.'}'
                         '${waiting == 0 ? '' : ' $waiting '
                                   '${waiting == 1 ? 'thing is' : 'things are'} '
                                   'waiting to go, and nothing has been lost.'}',

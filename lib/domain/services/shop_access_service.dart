@@ -345,7 +345,7 @@ class ShopAccessService {
       }
       return const AccessOutcome.failed(
         'That code is wrong or has run out. Ask for a new one — they '
-        'last ten minutes.',
+        'only last a few minutes.',
       );
     }
 
@@ -372,7 +372,17 @@ class ShopAccessService {
     return const AccessOutcome.ok(ShopStanding.inside);
   }
 
-  /// An invite for somebody else's phone, good for ten minutes.
+  /// How long an invite lives, as her phone reckons it.
+  ///
+  /// The shop will not accept one that dies more than eleven minutes from
+  /// now, and "now" there is the server's clock while this is her phone's.
+  /// At ten minutes a phone running two minutes fast writes an invite the
+  /// shop refuses outright, and nothing says why — the owner sees a button
+  /// that does not work. Eight leaves room for a clock that disagrees in
+  /// either direction, and nobody has ever needed the other two.
+  static const Duration inviteLasts = Duration(minutes: 8);
+
+  /// An invite for somebody else's phone, good for a few minutes.
   ///
   /// Says why, when there is no code. Three different things stop one being
   /// made and they are not the same problem: this phone holds no shop, this
@@ -403,7 +413,7 @@ class ShopAccessService {
       await _directory.offerInvite(
         shopId: shop,
         code: code,
-        until: _clock.now().toUtc().add(const Duration(minutes: 10)),
+        until: _clock.now().toUtc().add(inviteLasts),
         byUid: owner.uid,
       );
       return InviteOffer.code(code);
