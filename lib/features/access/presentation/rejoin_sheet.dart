@@ -62,6 +62,11 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
   /// What the phone says it is, used to put a word beside each choice.
   bool? _suggested;
 
+  /// What it was told the last time it asked to be let in. Kept because the
+  /// answer used to flash past and be gone, so five refusals and no
+  /// attempt at all looked identical to everybody trying to help.
+  String? _lastTried;
+
   @override
   void initState() {
     super.initState();
@@ -81,7 +86,30 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
     // A phone that has never been told is treated as hers: she is offered a
     // sign-in, which is hers to use and which a barista cannot complete,
     // rather than an invite she has no way to make.
-    if (mounted) setState(() => _suggested = role != 'barista');
+    final String? tried = await ref
+        .read(settingsRepositoryProvider)
+        .readRaw(SettingKeys.syncLastJoin);
+    if (mounted) {
+      setState(() {
+        _suggested = role != 'barista';
+        _lastTried = _readLastTried(tried);
+      });
+    }
+  }
+
+  /// "2026-11-27T03:11:00Z|That code is wrong" as something to read.
+  static String? _readLastTried(String? raw) {
+    if (raw == null || raw.isEmpty) return null;
+    final int bar = raw.indexOf('|');
+    if (bar < 0) return raw;
+    final DateTime? when = DateTime.tryParse(raw.substring(0, bar))?.toLocal();
+    final String what = raw.substring(bar + 1);
+    if (when == null) return what;
+    final String day = '${when.day}/${when.month}';
+    final String time =
+        '${when.hour.toString().padLeft(2, '0')}:'
+        '${when.minute.toString().padLeft(2, '0')}';
+    return 'Last tried $day at $time: $what';
   }
 
   @override
@@ -146,6 +174,21 @@ class _RejoinSheetState extends ConsumerState<RejoinSheet> {
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium,
             ),
+            if (!_done && _lastTried != null) ...<Widget>[
+              const SizedBox(height: KuboSpacing.md),
+              Container(
+                padding: const EdgeInsets.all(KuboSpacing.sm),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  _lastTried!,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodySmall,
+                ),
+              ),
+            ],
             if (!_done && _hers == null) ...<Widget>[
               const SizedBox(height: KuboSpacing.lg),
               // Two plain choices, both in front of her. The first version

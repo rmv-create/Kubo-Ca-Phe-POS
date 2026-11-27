@@ -7,6 +7,8 @@ import 'package:kubo_pos/data/db/sync/sync_transport.dart';
 import 'package:kubo_pos/data/repositories/settings_repository_impl.dart';
 import 'package:kubo_pos/domain/entities/business_settings.dart';
 
+import 'package:kubo_pos/domain/entities/order_draft.dart';
+
 import '../support/pos_fixture.dart';
 
 /// Why a till is being kept out, in its own words.
@@ -71,6 +73,43 @@ void main() {
     },
   );
 
+  group('refused at the post box, with a sign-in in hand', () {
+    // His screen, exactly: a queue waiting, signed in, and told only that
+    // the shop would not take the orders.
+    setUp(() async {
+      await shop.sell(
+        OrderDraft(
+          items: <DraftItem>[await shop.item('Spanish Latte', 'Large')],
+          paymentMethod: PaymentMethod.cash,
+        ),
+      );
+      postbox.refuseThePost = true;
+    });
+
+    test('a phone never admitted says so, and shows the id it holds', () async {
+      final String? said = await complaint();
+      expect(said, contains('not been let into the shop yet'));
+      expect(said, contains('the-one-'), reason: 'the id it is signed in as');
+    });
+
+    test('a phone whose sign-in changed says that, here too', () async {
+      await settings.writeRaw(SettingKeys.syncTillUid, 'the-one-let-in');
+      postbox.uid = 'a-different-one';
+
+      final String? said = await complaint();
+      expect(said, contains('sign-in has changed'));
+      expect(said, contains('needs a fresh invite'));
+    });
+
+    test('and the shop refusing an admitted phone is named as that', () async {
+      await settings.writeRaw(SettingKeys.syncTillUid, 'the-one-let-in');
+
+      final String? said = await complaint();
+      expect(said, contains('even though it was let in'));
+      expect(said, contains('a new one will not help'));
+    });
+  });
+
   test(
     'a phone the shop simply refuses is not sent for another code',
     () async {
@@ -90,6 +129,11 @@ class _Postbox implements SyncTransport {
   bool ready = true;
   String? uid = 'the-one-let-in';
 
+  /// A phone signed in to *something* gets past the readiness check and is
+  /// refused at the post box instead. That is what his was doing, and the
+  /// message there used to explain nothing.
+  bool refuseThePost = false;
+
   @override
   String? get identity => uid;
 
@@ -97,7 +141,14 @@ class _Postbox implements SyncTransport {
   Future<bool> isReady() async => ready;
 
   @override
-  Future<void> publish(List<SyncChange> changes) async {}
+  Future<void> publish(List<SyncChange> changes) async {
+    if (refuseThePost) {
+      throw Exception(
+        '[cloud_firestore/permission-denied] Missing or insufficient '
+        'permissions.',
+      );
+    }
+  }
 
   @override
   Future<SyncFetch> fetch({String? afterCursor, int limit = 500}) async =>

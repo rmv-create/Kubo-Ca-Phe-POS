@@ -311,6 +311,22 @@ class ShopAccessService {
     required String code,
     required String deviceLabel,
   }) async {
+    final AccessOutcome outcome = await _tryToJoin(
+      code: code,
+      deviceLabel: deviceLabel,
+    );
+    await _settings.writeRaw(
+      SettingKeys.syncLastJoin,
+      '${_clock.now().toUtc().toIso8601String()}|'
+      '${outcome.succeeded ? 'let in' : outcome.problem ?? 'refused'}',
+    );
+    return outcome;
+  }
+
+  Future<AccessOutcome> _tryToJoin({
+    required String code,
+    required String deviceLabel,
+  }) async {
     if (!await _account.signInAsDevice(asItself: true)) {
       return const AccessOutcome.failed(
         'No connection. Joining a shop needs signal, just this once.',

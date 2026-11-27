@@ -126,16 +126,14 @@ void main() {
 
         final SyncReport report = await sync.syncNow();
 
-        // It no longer says "not been let into the shop yet". This till got
-        // as far as posting, so it had been let in; saying otherwise sent
-        // the shop off to make another invite against a fault no invite
-        // touches. Whether a till is in is decided before the round, where
-        // the phone's own sign-in can be compared with the one admitted.
-        expect(
-          report.describe(),
-          'The shop would not take this phone\u2019s orders '
-          '(permission-denied).',
-        );
+        // A refusal part-way through a round is taken apart the same way
+        // as one before it starts: this till is signed in, so the question
+        // is whether the id it holds is the id the shop admitted. Here it
+        // was never admitted at all, and the message says so and names the
+        // id — instead of the flat sentence that sent everybody off to
+        // make another invite without knowing a code was not the fault.
+        expect(report.describe(), contains('not been let into the shop yet'));
+        expect(report.describe(), contains('till-uid'));
       },
     );
 

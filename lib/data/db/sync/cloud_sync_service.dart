@@ -108,6 +108,14 @@ class CloudSyncService {
 
       return SyncReport(sent: mine.length, applied: applied);
     } on Object catch (error) {
+      // A refusal is the one error worth taking apart, and it does not
+      // only arrive before the round starts. A phone signed in to
+      // *something* gets past the readiness check and is turned away at
+      // the post box instead — which is exactly where his was being
+      // turned away, and where the plain sentence told nobody anything.
+      if (error.toString().contains('permission-denied')) {
+        return _fail(await _whyRefused(transport));
+      }
       return _fail(_readable(error));
     }
   }
@@ -177,7 +185,8 @@ class CloudSyncService {
           'know it. Close the app and open it again.';
     }
     if (joined == null) {
-      return 'This till has not been let into the shop yet.';
+      return 'This till has not been let into the shop yet. It is signed in '
+          '(${_short(now)}) but the shop has no record of letting it in.';
     }
     if (joined != now) {
       return 'This phone was let in as ${_short(joined)} and is now '

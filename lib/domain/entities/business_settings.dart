@@ -316,6 +316,14 @@ abstract final class SettingKeys {
   /// This device's name in the owner's list of tills.
   static const String syncDeviceLabel = 'sync.device_label';
 
+  /// What happened the last time this phone asked to be let in, and when.
+  ///
+  /// The answer used to appear for a moment on the sheet and then be gone,
+  /// so a phone that had been refused five times looked exactly like a
+  /// phone nobody had tried. Writing it down is what lets the till say,
+  /// afterwards and to anybody, what it was actually told.
+  static const String syncLastJoin = 'sync.last_join';
+
   /// The sign-in id this phone was holding when the shop let it in.
   ///
   /// A till is admitted by its sign-in id and by nothing else, so if the
