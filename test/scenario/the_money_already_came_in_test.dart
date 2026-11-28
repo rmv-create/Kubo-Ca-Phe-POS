@@ -126,6 +126,59 @@ void main() {
     expect(await stateOn(barista, sale.orderNo), 'paid/completed');
   });
 
+  test('a payment that crosses alone still settles the order', () async {
+    // The one that cost a week: the payment record always crosses, because
+    // it is an event. The word "paid" on the order is an update, and an
+    // update can be dropped. So the order is read back off the records
+    // instead of waiting to be told.
+    final CompletedOrder sale = await sellOnCredit(barista);
+    await push(baristaSync, herSync);
+    await barista.sales.recordPayment(
+      orderId: sale.id,
+      method: PaymentMethod.cash,
+    );
+
+    // Only the payment itself goes across; the order's own change is lost
+    // on the way, as it was for a hundred and twelve of hers.
+    final List<SyncChange> all = await baristaSync.collect();
+    await herSync.apply(<SyncChange>[
+      for (final SyncChange c in all)
+        if (c.table != 'orders') c,
+    ]);
+
+    expect(
+      await stateOn(her, sale.orderNo),
+      'paid/completed',
+      reason: 'her phone was holding the payment the whole time',
+    );
+  });
+
+  test('a void that crosses alone settles the order too', () async {
+    final CompletedOrder sale = await sellOnCredit(barista);
+    await push(baristaSync, herSync);
+    await barista.sales.voidOrder(orderId: sale.id, reason: 'Wrong drink');
+
+    final List<SyncChange> all = await baristaSync.collect();
+    await herSync.apply(<SyncChange>[
+      for (final SyncChange c in all)
+        if (c.table != 'orders') c,
+    ]);
+
+    expect(await stateOn(her, sale.orderNo), 'unpaid/voided');
+  });
+
+  test('and nothing is invented for an order with no payment', () async {
+    final CompletedOrder sale = await sellOnCredit(barista);
+    await push(baristaSync, herSync);
+    await herSync.settleWhatFollows();
+
+    expect(
+      await stateOn(her, sale.orderNo),
+      'unpaid/completed',
+      reason: 'an order nobody has paid for is still owed',
+    );
+  });
+
   test('the same money is not counted twice in the takings', () async {
     // What she did while her phone kept asking for money she already had:
     // received it again. The order is paid either way; the takings she

@@ -382,7 +382,10 @@ class SyncEngine {
 
     _taken = null;
     await _suppressEcho(echoFrom);
-    if (applied > 0) await rebuildStock();
+    if (applied > 0) {
+      await rebuildStock();
+      await settleWhatFollows();
+    }
 
     return SyncApplied(
       applied: applied,
@@ -391,6 +394,42 @@ class SyncEngine {
       ignoredAsOlder: older,
       stillWaiting: pending,
     );
+  }
+
+  /// Puts an order's state back in step with the records under it.
+  ///
+  /// Whether a sale has been paid for, and whether it was taken back, are
+  /// written on the order itself, and also recorded underneath it — a
+  /// payment, a void. Those records are events: they always cross, in full,
+  /// in any order, and nothing can overwrite them. The word on the order is
+  /// an update to a row that already exists, which is a far more fragile
+  /// thing to depend on; it has already been dropped once, for a week, with
+  /// a hundred and twelve orders standing as owed on a phone that was
+  /// holding the payments for them.
+  ///
+  /// So it is not depended on. After anything is taken in, the order is
+  /// read back off the records: paid where a confirmed payment for it is
+  /// sitting right here, voided where this phone holds the void. Both only
+  /// ever move one way, both are read from this phone's own books, and
+  /// neither invents anything — so it comes out the same on every phone
+  /// however the changes happened to arrive, and running it twice changes
+  /// nothing.
+  Future<void> settleWhatFollows() async {
+    final Batch batch = _db.db.batch();
+    batch.rawUpdate('''
+      UPDATE orders SET payment_state = 'paid'
+      WHERE payment_state = 'unpaid'
+        AND EXISTS (
+          SELECT 1 FROM payments p
+          WHERE p.order_id = orders.id AND p.status = 'confirmed'
+        )
+    ''');
+    batch.rawUpdate('''
+      UPDATE orders SET status = 'voided'
+      WHERE status = 'completed'
+        AND EXISTS (SELECT 1 FROM order_voids v WHERE v.order_id = orders.id)
+    ''');
+    await batch.commit(noResult: true);
   }
 
   /// The same changes, in an order that does not make them wait on each
